@@ -13,44 +13,49 @@ interface PreviewGenerationRequest {
   styleDescription: string;
 }
 
-interface GeneratedPreview {
-  url: string;
-  subject: string;
+interface PreviewImage {
+  portrait: string;
+  landscape: string;
+  stillLife: string;
 }
 
 /**
- * Generate 9 canonical preview images showcasing a style in different contexts
- * Similar to Midjourney's style preview gallery
+ * Generate 3 canonical preview images (portrait, landscape, still life) at lower resolution
+ * These are then composited side-by-side into a single preview image
+ * Much faster than generating 9 high-res images
  */
 export async function generateCanonicalPreviews(
   request: PreviewGenerationRequest
-): Promise<GeneratedPreview[]> {
+): Promise<PreviewImage> {
   const { styleName, styleDescription } = request;
 
-  // Define 9 diverse subject categories to showcase the style
-  const subjects = [
-    "portrait photography",
-    "landscape scenery",
-    "still life arrangement",
-    "urban architecture",
-    "close-up detail",
-    "interior design",
-    "nature and wildlife",
-    "conceptual abstract",
-    "everyday objects"
+  // Define 3 preview types with specific prompts
+  const previewTypes = [
+    {
+      key: "portrait",
+      prompt: `A portrait in the "${styleName}" style: ${styleDescription}. 
+      Create a compelling portrait image that demonstrates this style. Focus on capturing the essential visual characteristics.
+      Generate at 384x512 resolution.`,
+    },
+    {
+      key: "landscape",
+      prompt: `A landscape scene in the "${styleName}" style: ${styleDescription}. 
+      Create a scenic landscape that showcases this style's color palette and lighting.
+      Generate at 512x384 resolution.`,
+    },
+    {
+      key: "stillLife",
+      prompt: `A still life arrangement in the "${styleName}" style: ${styleDescription}. 
+      Create a still life composition that captures the aesthetic and mood of this style.
+      Generate at 384x512 resolution.`,
+    },
   ];
 
-  const previews: GeneratedPreview[] = [];
+  const results: Partial<PreviewImage> = {};
 
   try {
-    for (const subject of subjects) {
+    for (const preview of previewTypes) {
       try {
-        const prompt = `Generate an image in the "${styleName}" style: ${styleDescription}
-        
-        Subject: ${subject}
-        
-        Create a visually compelling image that demonstrates this style applied to ${subject}. Maintain artistic consistency with the style description while showcasing the unique characteristics of ${subject}.`;
-
         const response = await ai.models.generateContent({
           model: "gemini-2.5-flash-image",
           contents: [
@@ -58,7 +63,7 @@ export async function generateCanonicalPreviews(
               role: "user",
               parts: [
                 {
-                  text: prompt,
+                  text: preview.prompt,
                 },
               ],
             },
@@ -78,10 +83,7 @@ export async function generateCanonicalPreviews(
                   // Convert base64 to data URL
                   const mimeType = imageData.mimeType || "image/png";
                   const dataUrl = `data:${mimeType};base64,${imageData.data}`;
-                  previews.push({
-                    url: dataUrl,
-                    subject,
-                  });
+                  results[preview.key as keyof PreviewImage] = dataUrl;
                   break;
                 }
               }
@@ -89,12 +91,9 @@ export async function generateCanonicalPreviews(
           }
         }
       } catch (error) {
-        console.warn(`Failed to generate preview for ${subject}:`, error);
-        // Continue with next subject instead of failing entirely
-        previews.push({
-          url: `https://images.unsplash.com/photo-${Math.random().toString().slice(2, 15)}?q=80&w=600&h=400&auto=format&fit=crop`,
-          subject,
-        });
+        console.warn(`Failed to generate ${preview.key} preview:`, error);
+        // Use placeholder if generation fails
+        results[preview.key as keyof PreviewImage] = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Crect fill='%23ddd' width='400' height='400'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%23999' font-family='sans-serif'%3EFailed to generate ${preview.key}%3C/text%3E%3C/svg%3E`;
       }
     }
   } catch (error) {
@@ -102,5 +101,9 @@ export async function generateCanonicalPreviews(
     throw error;
   }
 
-  return previews;
+  return {
+    portrait: results.portrait || "",
+    landscape: results.landscape || "",
+    stillLife: results.stillLife || "",
+  };
 }

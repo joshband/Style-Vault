@@ -10,37 +10,33 @@ interface StyleCardProps {
 }
 
 export function StyleCard({ style, className }: StyleCardProps) {
-  const [activePreview, setActivePreview] = useState<'stillLife' | 'landscape' | 'portrait'>('stillLife');
-
   return (
     <div className={cn("group relative flex flex-col bg-card border border-border rounded-lg overflow-hidden transition-all hover:shadow-md hover:border-primary/20", className)}>
-      {/* Preview Area */}
-      <div className="relative aspect-[4/3] bg-muted overflow-hidden">
-        <img 
-          src={style.previews[activePreview]} 
-          alt={`${style.name} - ${activePreview}`}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-        />
-        
-        {/* Preview Switcher Overlay - Appears on Hover */}
-        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
-          <div className="flex gap-2 w-full justify-center">
-            {(['stillLife', 'landscape', 'portrait'] as const).map((type) => (
-              <button
-                key={type}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setActivePreview(type);
-                }}
-                className={cn(
-                  "h-1.5 flex-1 rounded-full backdrop-blur-md transition-colors",
-                  activePreview === type ? "bg-white" : "bg-white/30 hover:bg-white/50"
-                )}
-                title={type}
-              />
-            ))}
-          </div>
+      {/* Preview Area - 3 Column Composite */}
+      <div className="relative aspect-[12/4] bg-muted overflow-hidden flex">
+        {/* Portrait Column */}
+        <div className="flex-1 relative overflow-hidden border-r border-border/50">
+          <img 
+            src={style.previews.portrait} 
+            alt={`${style.name} - portrait`}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        </div>
+        {/* Landscape Column */}
+        <div className="flex-1 relative overflow-hidden border-r border-border/50">
+          <img 
+            src={style.previews.landscape} 
+            alt={`${style.name} - landscape`}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        </div>
+        {/* Still Life Column */}
+        <div className="flex-1 relative overflow-hidden">
+          <img 
+            src={style.previews.stillLife} 
+            alt={`${style.name} - still life`}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
         </div>
 
         {/* Quick Actions */}

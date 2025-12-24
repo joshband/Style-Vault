@@ -280,27 +280,32 @@ export default function Authoring() {
              </div>
 
              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-                {/* Generated Previews - Composite Grid */}
+                {/* Generated Previews - 3 Columns Side-by-Side */}
                 <div className="space-y-3 md:space-y-4">
                   <h3 className="text-xs md:text-sm font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                     <ImageIcon size={14} /> Canonical Preview Set
                   </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-3 p-2 md:p-3 border border-border rounded-sm bg-muted/20">
-                     <div className="col-span-1 sm:col-span-2 aspect-video bg-muted rounded-sm border border-border/50 relative overflow-hidden shadow-sm">
-                        <img src={generatedPreviews.landscape} className="w-full h-full object-cover" alt="Landscape" />
-                        <span className="absolute bottom-2 left-2 text-[10px] bg-black/70 text-white px-1.5 py-0.5 rounded-sm backdrop-blur-sm">LANDSCAPE 16:9</span>
-                     </div>
-                     <div className="aspect-square bg-muted rounded-sm border border-border/50 relative overflow-hidden shadow-sm">
-                        <img src={generatedPreviews.stillLife} className="w-full h-full object-cover" alt="Still Life" />
-                        <span className="absolute bottom-2 left-2 text-[10px] bg-black/70 text-white px-1.5 py-0.5 rounded-sm backdrop-blur-sm">STILL 1:1</span>
-                     </div>
-                     <div className="aspect-[3/4] bg-muted rounded-sm border border-border/50 relative overflow-hidden shadow-sm">
+                  <div className="relative w-full border border-border rounded-sm bg-muted/20 overflow-hidden shadow-sm">
+                    <div className="flex w-full aspect-[12/4] md:aspect-[16/6]">
+                      {/* Portrait Column */}
+                      <div className="flex-1 relative overflow-hidden border-r border-border/50">
                         <img src={generatedPreviews.portrait} className="w-full h-full object-cover" alt="Portrait" />
                         <span className="absolute bottom-2 left-2 text-[10px] bg-black/70 text-white px-1.5 py-0.5 rounded-sm backdrop-blur-sm">PORTRAIT 3:4</span>
-                     </div>
+                      </div>
+                      {/* Landscape Column */}
+                      <div className="flex-1 relative overflow-hidden border-r border-border/50">
+                        <img src={generatedPreviews.landscape} className="w-full h-full object-cover" alt="Landscape" />
+                        <span className="absolute bottom-2 left-2 text-[10px] bg-black/70 text-white px-1.5 py-0.5 rounded-sm backdrop-blur-sm">LANDSCAPE 16:9</span>
+                      </div>
+                      {/* Still Life Column */}
+                      <div className="flex-1 relative overflow-hidden">
+                        <img src={generatedPreviews.stillLife} className="w-full h-full object-cover" alt="Still Life" />
+                        <span className="absolute bottom-2 left-2 text-[10px] bg-black/70 text-white px-1.5 py-0.5 rounded-sm backdrop-blur-sm">STILL 1:1</span>
+                      </div>
+                    </div>
                   </div>
                   <p className="text-[10px] md:text-xs text-muted-foreground">
-                    These 3 previews are generated from the extracted tokens and serve as the style's visual signature across different aspect ratios.
+                    Three canonical previews showcasing the style across different aspect ratios and subjects.
                   </p>
                 </div>
 
