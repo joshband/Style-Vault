@@ -359,7 +359,7 @@ export default function Authoring() {
                   <h3 className="text-xs md:text-sm font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                     <Code size={14} /> W3C DTCG Design Tokens
                   </h3>
-                  <TokenViewer tokens={SAMPLE_TOKENS} className="h-[300px] md:h-[400px]" />
+                  <TokenViewer tokens={SAMPLE_TOKENS} expandable showExport />
                   <p className="text-[10px] md:text-xs text-muted-foreground">
                     Extracted from the reference image using vision analysis and standardized in W3C Design Token Community Group format.
                   </p>

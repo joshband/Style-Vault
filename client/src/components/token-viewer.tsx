@@ -1,23 +1,70 @@
 import { useState } from "react";
-import { ChevronRight, ChevronDown, Copy, Check } from "lucide-react";
+import { ChevronRight, ChevronDown, Copy, Check, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DTCGTokenGroup, DesignToken } from "@/lib/store";
 
 interface TokenViewerProps {
   tokens: DTCGTokenGroup;
   className?: string;
+  expandable?: boolean;
+  showExport?: boolean;
 }
 
-export function TokenViewer({ tokens, className }: TokenViewerProps) {
+export function TokenViewer({ tokens, className, expandable = false, showExport = false }: TokenViewerProps) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(tokens, null, 2));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
+  const handleDownload = () => {
+    const blob = new Blob([JSON.stringify(tokens, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'design-tokens.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
-    <div className={cn("font-mono text-xs bg-muted/30 border border-border rounded-md overflow-hidden", className)}>
+    <div className={cn(
+      "font-mono text-xs bg-muted/30 border border-border rounded-md overflow-hidden",
+      !expandable && "overflow-y-auto",
+      className
+    )}>
       <div className="flex items-center justify-between px-4 py-2 bg-muted/50 border-b border-border">
         <span className="font-medium text-muted-foreground uppercase tracking-wider text-[10px]">W3C DTCG Token Definition</span>
-        <button className="text-muted-foreground hover:text-foreground transition-colors" title="Copy JSON">
-          <Copy size={12} />
-        </button>
+        <div className="flex items-center gap-2">
+          {showExport && (
+            <button 
+              onClick={handleDownload}
+              className="text-muted-foreground hover:text-foreground transition-colors" 
+              title="Download JSON"
+              data-testid="button-download-tokens"
+            >
+              <Download size={12} />
+            </button>
+          )}
+          <button 
+            onClick={handleCopy}
+            className="text-muted-foreground hover:text-foreground transition-colors" 
+            title={copied ? "Copied!" : "Copy JSON"}
+            data-testid="button-copy-tokens"
+          >
+            {copied ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+          </button>
+        </div>
       </div>
-      <div className="p-4 overflow-x-auto overflow-y-auto">
+      <div className={cn("p-4 overflow-x-auto", !expandable && "overflow-y-auto")}>
         <TokenNode node={tokens} label="root" isRoot />
       </div>
     </div>
