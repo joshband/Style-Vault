@@ -63,6 +63,11 @@ Preferred communication style: Simple, everyday language.
   - Deterministic and explainable (no deep learning)
   - Extracts: colors (OKLCH), spacing, border radius, grid, elevation, stroke width
   - Produces W3C DTCG 2025.10 compatible output
+- **Color Analysis** (powered by coloraide):
+  - **Harmony Detection**: Classifies palettes as complementary, analogous, triadic, split-complementary, tetradic, or monochromatic with strength scores (0-1)
+  - **WCAG Contrast Ratios**: All color pairs analyzed for AA (4.5:1), AAA (7:1), and large-text (3:1) compliance
+  - **Temperature Classification**: Palette classified as warm, cool, or neutral based on hue distribution weighted by chroma
+  - Returns `colorAnalysis` object with `harmony`, `contrast`, and `temperature` sub-objects
 - **Elevation/Depth Estimation**:
   - Multi-cue heuristic depth estimation (no deep learning)
   - Three complementary cues weighted and fused:
