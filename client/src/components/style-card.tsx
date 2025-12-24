@@ -2,6 +2,8 @@ import { Style } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { Code, ImageIcon } from "lucide-react";
 import { Link } from "wouter";
+import { useEffect } from "react";
+import { trackStyleView } from "@/lib/suggestions";
 
 interface StyleCardProps {
   style: Style;
@@ -9,6 +11,10 @@ interface StyleCardProps {
 }
 
 export function StyleCard({ style, className }: StyleCardProps) {
+  // Track view on mount
+  useEffect(() => {
+    trackStyleView(style.id);
+  }, [style.id]);
   return (
     <div className={cn("group relative flex flex-col bg-card border border-border rounded-lg overflow-hidden transition-all hover:shadow-md hover:border-primary/20", className)}>
       {/* Preview Area - 3 Column Composite */}
