@@ -28,6 +28,20 @@ export interface MetadataTags {
   texture: string[];
 }
 
+// Mood board collage structure
+export interface MoodBoardAssets {
+  collage: string;
+  status: "pending" | "generating" | "complete" | "failed";
+}
+
+// UI concept mockup structure
+export interface UiConceptAssets {
+  audioPlugin?: string;
+  dashboard?: string;
+  componentLibrary?: string;
+  status: "pending" | "generating" | "complete" | "failed";
+}
+
 // Styles table for persisting visual styles
 export const styles = pgTable("styles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -54,6 +68,13 @@ export const styles = pgTable("styles", {
     subjects: [],
     lighting: [],
     texture: [],
+  }),
+  moodBoard: jsonb("mood_board").$type<MoodBoardAssets>().default({
+    collage: "",
+    status: "pending",
+  }),
+  uiConcepts: jsonb("ui_concepts").$type<UiConceptAssets>().default({
+    status: "pending",
   }),
 });
 

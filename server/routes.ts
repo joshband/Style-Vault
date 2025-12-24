@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { analyzeImageForStyle } from "./analysis";
 import { generateCanonicalPreviews } from "./preview-generation";
 import { generateStyledImage } from "./image-generation";
+import { generateAllMoodBoardAssets } from "./mood-board-generation";
 import { storage } from "./storage";
 import { insertStyleSchema, insertGeneratedImageSchema } from "@shared/schema";
 
@@ -180,6 +181,75 @@ export async function registerRoutes(
       console.error("Error fetching generated images:", error);
       res.status(500).json({
         error: "Failed to fetch generated images",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // Generate mood board and UI concepts for a style
+  app.post("/api/styles/:id/generate-mood-board", async (req, res) => {
+    try {
+      const style = await storage.getStyleById(req.params.id);
+      if (!style) {
+        return res.status(404).json({ error: "Style not found" });
+      }
+
+      // Start generation
+      const { moodBoard, uiConcepts } = await generateAllMoodBoardAssets({
+        styleName: style.name,
+        styleDescription: style.description,
+        tokens: style.tokens,
+        metadataTags: style.metadataTags || {
+          mood: [],
+          colorFamily: [],
+          era: [],
+          medium: [],
+          subjects: [],
+          lighting: [],
+          texture: [],
+        },
+      });
+
+      // Update style with generated assets
+      const updated = await storage.updateStyleMoodBoard(
+        req.params.id,
+        moodBoard,
+        uiConcepts
+      );
+
+      if (!updated) {
+        return res.status(500).json({ error: "Failed to update style" });
+      }
+
+      res.json({
+        moodBoard,
+        uiConcepts,
+      });
+    } catch (error) {
+      console.error("Error generating mood board:", error);
+      res.status(500).json({
+        error: "Failed to generate mood board",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // Get mood board status for a style
+  app.get("/api/styles/:id/mood-board", async (req, res) => {
+    try {
+      const style = await storage.getStyleById(req.params.id);
+      if (!style) {
+        return res.status(404).json({ error: "Style not found" });
+      }
+
+      res.json({
+        moodBoard: style.moodBoard,
+        uiConcepts: style.uiConcepts,
+      });
+    } catch (error) {
+      console.error("Error fetching mood board:", error);
+      res.status(500).json({
+        error: "Failed to fetch mood board",
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
