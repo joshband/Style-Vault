@@ -5,12 +5,18 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 
+import Explorer from "@/pages/Explorer";
+import StyleDetail from "@/pages/StyleDetail";
+import Authoring from "@/pages/Authoring";
+import Generation from "@/pages/Generation";
+
 function Router() {
   return (
     <Switch>
-      {/* Add pages below */}
-      {/* <Route path="/" component={Home}/> */}
-      {/* Fallback to 404 */}
+      <Route path="/" component={Explorer} />
+      <Route path="/style/:id" component={StyleDetail} />
+      <Route path="/create" component={Authoring} />
+      <Route path="/generate" component={Generation} />
       <Route component={NotFound} />
     </Switch>
   );
