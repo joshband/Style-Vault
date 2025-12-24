@@ -2,10 +2,18 @@ import { useRoute, useLocation } from "wouter";
 import { fetchStyleById, type Style } from "@/lib/store";
 import { Layout } from "@/components/layout";
 import { TokenViewer } from "@/components/token-viewer";
-import { ArrowLeft, ImageIcon, Layers, Download, Loader2, Wand2 } from "lucide-react";
+import { ArrowLeft, ImageIcon, Layers, Download, Loader2, Wand2, Palette, Component, Layout as LayoutIcon } from "lucide-react";
 import { Link } from "wouter";
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { cn } from "@/lib/utils";
+import { useStyleTheme } from "@/hooks/useStyleTheme";
+
+const MoodBoard = lazy(() => import("@/components/mood-board"));
+const StylePlayground = lazy(() => import("@/components/style-playground"));
+const AppConcepts = lazy(() => import("@/components/app-concepts"));
+
+type MainView = 'previews' | 'moodboard' | 'components' | 'concepts';
+type DetailTab = 'tokens' | 'scaffolding';
 
 export default function StyleDetail() {
   const [, params] = useRoute("/style/:id");
@@ -13,7 +21,10 @@ export default function StyleDetail() {
   const id = params?.id;
   const [style, setStyle] = useState<Style | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'tokens' | 'scaffolding'>('tokens');
+  const [activeTab, setActiveTab] = useState<DetailTab>('tokens');
+  const [mainView, setMainView] = useState<MainView>('previews');
+  
+  const theme = useStyleTheme(style?.tokens as any);
 
   useEffect(() => {
     if (id) {
@@ -115,66 +126,135 @@ export default function StyleDetail() {
            </div>
         </div>
 
+        {/* Main View Tabs */}
+        <div className="flex gap-1 p-1 bg-muted rounded-sm w-fit">
+          {[
+            { key: 'previews' as MainView, label: 'Previews', icon: ImageIcon },
+            { key: 'moodboard' as MainView, label: 'Mood Board', icon: Palette },
+            { key: 'components' as MainView, label: 'Components', icon: Component },
+            { key: 'concepts' as MainView, label: 'App Concepts', icon: LayoutIcon },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setMainView(tab.key)}
+              data-testid={`tab-${tab.key}`}
+              className={cn(
+                "px-3 py-2 text-xs font-medium rounded-sm transition-colors flex items-center gap-1.5",
+                mainView === tab.key ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <tab.icon size={14} />
+              <span className="hidden sm:inline">{tab.label}</span>
+            </button>
+          ))}
+        </div>
+
         {/* Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
           
           {/* Left Column: Visuals */}
           <div className="col-span-1 lg:col-span-7 space-y-6 md:space-y-8">
-             <div className="space-y-3 md:space-y-4">
-               <h2 className="text-xs md:text-sm font-medium uppercase tracking-wider text-muted-foreground">Canonical Previews</h2>
-               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-4">
-                  <div className="col-span-1 sm:col-span-2 aspect-video bg-muted rounded-sm overflow-hidden border border-border relative group">
-                    {style.previews.landscape && (
-                      <img 
-                        src={style.previews.landscape} 
-                        alt="Landscape preview" 
-                        className="absolute inset-0 w-full h-full object-cover"
-                      />
-                    )}
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                       <span className="text-white text-xs font-mono">16:9 LANDSCAPE</span>
+            {mainView === 'previews' && (
+              <>
+                <div className="space-y-3 md:space-y-4 animate-in fade-in duration-300">
+                  <h2 className="text-xs md:text-sm font-medium uppercase tracking-wider text-muted-foreground">Canonical Previews</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-4">
+                    <div className="col-span-1 sm:col-span-2 aspect-video bg-muted rounded-sm overflow-hidden border border-border relative group">
+                      {style.previews.landscape && (
+                        <img 
+                          src={style.previews.landscape} 
+                          alt="Landscape preview" 
+                          className="absolute inset-0 w-full h-full object-cover"
+                        />
+                      )}
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span className="text-white text-xs font-mono">16:9 LANDSCAPE</span>
+                      </div>
+                    </div>
+                    <div className="aspect-[3/4] bg-muted rounded-sm overflow-hidden border border-border relative group">
+                      {style.previews.portrait && (
+                        <img 
+                          src={style.previews.portrait} 
+                          alt="Portrait preview" 
+                          className="absolute inset-0 w-full h-full object-cover"
+                        />
+                      )}
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span className="text-white text-xs font-mono">3:4 PORTRAIT</span>
+                      </div>
+                    </div>
+                    <div className="aspect-square bg-muted rounded-sm overflow-hidden border border-border relative group">
+                      {style.previews.stillLife && (
+                        <img 
+                          src={style.previews.stillLife} 
+                          alt="Still life preview" 
+                          className="absolute inset-0 w-full h-full object-cover"
+                        />
+                      )}
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span className="text-white text-xs font-mono">1:1 STILL LIFE</span>
+                      </div>
                     </div>
                   </div>
-                  <div className="aspect-[3/4] bg-muted rounded-sm overflow-hidden border border-border relative group">
-                    {style.previews.portrait && (
-                      <img 
-                        src={style.previews.portrait} 
-                        alt="Portrait preview" 
-                        className="absolute inset-0 w-full h-full object-cover"
-                      />
-                    )}
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <span className="text-white text-xs font-mono">3:4 PORTRAIT</span>
-                    </div>
-                  </div>
-                  <div className="aspect-square bg-muted rounded-sm overflow-hidden border border-border relative group">
-                    {style.previews.stillLife && (
-                      <img 
-                        src={style.previews.stillLife} 
-                        alt="Still life preview" 
-                        className="absolute inset-0 w-full h-full object-cover"
-                      />
-                    )}
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <span className="text-white text-xs font-mono">1:1 STILL LIFE</span>
-                    </div>
-                  </div>
-               </div>
-             </div>
+                </div>
 
-             {/* Reference Images */}
-             {style.referenceImages && style.referenceImages.length > 0 && (
-               <div className="space-y-3 md:space-y-4">
-                 <h2 className="text-xs md:text-sm font-medium uppercase tracking-wider text-muted-foreground">Reference Sources</h2>
-                 <div className="flex gap-2 flex-wrap">
-                   {style.referenceImages.map((img, i) => (
-                     <div key={i} className="w-16 h-16 md:w-20 md:h-20 rounded-sm overflow-hidden border border-border">
-                       <img src={img} alt={`Reference ${i + 1}`} className="w-full h-full object-cover" />
-                     </div>
-                   ))}
-                 </div>
-               </div>
-             )}
+                {/* Reference Images */}
+                {style.referenceImages && style.referenceImages.length > 0 && (
+                  <div className="space-y-3 md:space-y-4">
+                    <h2 className="text-xs md:text-sm font-medium uppercase tracking-wider text-muted-foreground">Reference Sources</h2>
+                    <div className="flex gap-2 flex-wrap">
+                      {style.referenceImages.map((img, i) => (
+                        <div key={i} className="w-16 h-16 md:w-20 md:h-20 rounded-sm overflow-hidden border border-border">
+                          <img src={img} alt={`Reference ${i + 1}`} className="w-full h-full object-cover" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {mainView === 'moodboard' && (
+              <Suspense fallback={<div className="flex items-center justify-center h-64"><Loader2 className="animate-spin" /></div>}>
+                {theme ? (
+                  <div className="animate-in fade-in duration-300">
+                    <MoodBoard theme={theme} />
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-64 text-muted-foreground">
+                    Theme data unavailable
+                  </div>
+                )}
+              </Suspense>
+            )}
+
+            {mainView === 'components' && (
+              <Suspense fallback={<div className="flex items-center justify-center h-64"><Loader2 className="animate-spin" /></div>}>
+                {theme ? (
+                  <div className="animate-in fade-in duration-300 rounded-lg overflow-hidden border border-border">
+                    <StylePlayground theme={theme} />
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-64 text-muted-foreground">
+                    Theme data unavailable
+                  </div>
+                )}
+              </Suspense>
+            )}
+
+            {mainView === 'concepts' && (
+              <Suspense fallback={<div className="flex items-center justify-center h-64"><Loader2 className="animate-spin" /></div>}>
+                {theme ? (
+                  <div className="animate-in fade-in duration-300">
+                    <AppConcepts theme={theme} />
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-64 text-muted-foreground">
+                    Theme data unavailable
+                  </div>
+                )}
+              </Suspense>
+            )}
           </div>
 
           {/* Right Column: Technical Data */}
