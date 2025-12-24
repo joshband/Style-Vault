@@ -10,6 +10,33 @@ import { insertStyleSchema, insertGeneratedImageSchema } from "@shared/schema";
 import { db } from "./db";
 import { sql } from "drizzle-orm";
 import { cache, CACHE_KEYS } from "./cache";
+import type { MetadataTags } from "@shared/schema";
+
+function getDefaultMetadataTags(): MetadataTags {
+  return {
+    mood: [],
+    colorFamily: [],
+    lighting: [],
+    texture: [],
+    era: [],
+    artPeriod: [],
+    historicalInfluences: [],
+    similarArtists: [],
+    medium: [],
+    subjects: [],
+    usageExamples: [],
+    narrativeTone: [],
+    sensoryPalette: [],
+    movementRhythm: [],
+    stylisticPrinciples: [],
+    signatureMotifs: [],
+    contrastDynamics: [],
+    psychologicalEffect: [],
+    culturalResonance: [],
+    audiencePerception: [],
+    keywords: [],
+  };
+}
 
 export async function registerRoutes(
   httpServer: Server,
@@ -126,15 +153,7 @@ export async function registerRoutes(
             styleName: style.name,
             styleDescription: style.description,
             tokens: style.tokens,
-            metadataTags: style.metadataTags || {
-              mood: [],
-              colorFamily: [],
-              era: [],
-              medium: [],
-              subjects: [],
-              lighting: [],
-              texture: [],
-            },
+            metadataTags: style.metadataTags || getDefaultMetadataTags(),
             referenceImageBase64: style.referenceImages?.[0],
           });
           
@@ -339,15 +358,7 @@ export async function registerRoutes(
         styleName: style.name,
         styleDescription: style.description,
         tokens: style.tokens,
-        metadataTags: style.metadataTags || {
-          mood: [],
-          colorFamily: [],
-          era: [],
-          medium: [],
-          subjects: [],
-          lighting: [],
-          texture: [],
-        },
+        metadataTags: style.metadataTags || getDefaultMetadataTags(),
       });
 
       // Merge with history

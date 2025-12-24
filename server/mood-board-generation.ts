@@ -230,44 +230,48 @@ export async function generateMoodBoardCollage(
   }
 }
 
+async function generateSingleUiConcept(
+  request: MoodBoardRequest,
+  conceptType: "audioPlugin" | "dashboard"
+): Promise<string | null> {
+  const summary = extractTokenSummary(request.tokens);
+  const prompt = buildUiConceptPrompt(request, summary, conceptType);
+  
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash-image",
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: prompt }],
+        },
+      ],
+      config: {
+        responseModalities: ["image", "text"],
+      },
+    });
+
+    return extractImageFromResponse(response);
+  } catch (error) {
+    console.error(`UI concept ${conceptType} generation failed:`, error);
+    return null;
+  }
+}
+
 export async function generateUiConcepts(
   request: MoodBoardRequest
 ): Promise<UiConceptAssets> {
-  const summary = extractTokenSummary(request.tokens);
-  const result: UiConceptAssets = { status: "generating", history: [] };
+  const [audioPlugin, dashboard] = await Promise.all([
+    generateSingleUiConcept(request, "audioPlugin"),
+    generateSingleUiConcept(request, "dashboard"),
+  ]);
 
-  const conceptTypes: Array<"audioPlugin" | "dashboard"> = [
-    "audioPlugin",
-    "dashboard",
-  ];
-
-  for (const conceptType of conceptTypes) {
-    try {
-      const prompt = buildUiConceptPrompt(request, summary, conceptType);
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash-image",
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: prompt }],
-          },
-        ],
-        config: {
-          responseModalities: ["image", "text"],
-        },
-      });
-
-      const image = extractImageFromResponse(response);
-      if (image) {
-        result[conceptType] = image;
-      }
-    } catch (error) {
-      console.error(`UI concept ${conceptType} generation failed:`, error);
-    }
-  }
-
-  result.status = result.audioPlugin || result.dashboard ? "complete" : "failed";
-  return result;
+  return {
+    audioPlugin: audioPlugin || undefined,
+    dashboard: dashboard || undefined,
+    status: audioPlugin || dashboard ? "complete" : "failed",
+    history: [],
+  };
 }
 
 export async function generateAllMoodBoardAssets(
