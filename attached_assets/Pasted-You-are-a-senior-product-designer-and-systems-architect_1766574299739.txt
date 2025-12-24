@@ -1,0 +1,114 @@
+You are a senior product designer and systems architect.
+
+Design a standalone web application called a “Style Explorer” that manages visual styles as first-class, standards-based artifacts.
+
+This is NOT an image generator UI.
+This is a style intelligence application.
+
+================================================
+NON-NEGOTIABLE INVARIANTS
+================================================
+- Every Style ALWAYS has a comprehensive W3C DTCG 2025.10 design-token JSON.
+- No style may exist without tokens.
+- Tokens are the source of truth, not prompts.
+- Image generation is a consumer of styles, not their definition.
+
+================================================
+CORE CONCEPT
+================================================
+A Style is a reusable, inspectable, comparable object composed of:
+- Reference images
+- Canonical preview images
+- A full W3C DTCG design-token JSON
+- AI prompt scaffolding derived from tokens
+
+The UI must make this obvious.
+
+================================================
+RESPLIT THE APP INTO 3 MODES
+================================================
+
+### 1. STYLE AUTHORING
+Purpose: Create a Style.
+
+User flows:
+- Upload reference image(s)
+- OR generate an image from a prompt (which is immediately tokenized)
+- System ALWAYS generates:
+  - Full DTCG token JSON
+  - Still life preview
+  - Landscape preview
+  - Portrait preview
+
+UI requirements:
+- Clear “Style Creation” boundary
+- Token JSON visible (collapsible, read-only by default)
+- Explicit messaging: “Tokens are canonical”
+- Save is disabled until tokens exist
+
+---
+
+### 2. STYLE EXPLORER
+Purpose: Browse and compare styles (Midjourney-style, but explicit).
+
+UI requirements:
+- Grid of style cards
+- Each card shows:
+  - Still life preview
+  - Landscape preview
+  - Portrait preview
+- Consistent preview prompts across all styles
+- Ability to:
+  - Select a style
+  - Inspect tokens
+  - Compare styles side-by-side
+- Tokens are treated as data, not decoration
+
+The Explorer should feel like a library or vault, not a feed.
+
+---
+
+### 3. STYLE APPLICATION (GENERATION)
+Purpose: Use a style to generate an image.
+
+User flows:
+- Enter a prompt
+- Select exactly one style
+- Generate image using:
+  - Style reference images
+  - Token-derived prompt scaffolding
+
+UI requirements:
+- Prompt input is visually secondary to style selection
+- Clear indication of which style is active
+- Generated image is not a style unless explicitly promoted
+
+---
+
+================================================
+VISUAL DESIGN PRINCIPLES
+================================================
+- Calm, neutral, editorial UI
+- No “AI hype” visuals
+- Data-forward, inspectable layouts
+- Clear hierarchy:
+  Style > Tokens > Images > Prompt
+- Designed for thinking, not scrolling
+
+================================================
+DELIVERABLES
+================================================
+Produce:
+1. App-level information architecture
+2. Screen breakdown for each mode
+3. Key UI components
+4. Interaction rules (what is allowed / disallowed)
+5. Visual tone guidance
+
+Do NOT:
+- Include marketing copy
+- Include animations
+- Include brand fluff
+- Treat tokens as optional
+
+Design this as a serious, long-lived system.
