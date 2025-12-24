@@ -6,11 +6,42 @@ import { generateStyledImage } from "./image-generation";
 import { generateAllMoodBoardAssets } from "./mood-board-generation";
 import { storage } from "./storage";
 import { insertStyleSchema, insertGeneratedImageSchema } from "@shared/schema";
+import { db } from "./db";
+import { sql } from "drizzle-orm";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // Health check endpoint for diagnosing database connectivity
+  app.get("/api/health", async (req, res) => {
+    try {
+      const startTime = Date.now();
+      await db.execute(sql`SELECT 1`);
+      const dbLatency = Date.now() - startTime;
+      
+      const styleCount = await storage.getStyles();
+      
+      res.json({
+        status: "healthy",
+        database: "connected",
+        dbLatencyMs: dbLatency,
+        styleCount: styleCount.length,
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || "unknown",
+      });
+    } catch (error) {
+      console.error("Health check failed:", error);
+      res.status(500).json({
+        status: "unhealthy",
+        database: "disconnected",
+        error: error instanceof Error ? error.message : "Unknown error",
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || "unknown",
+      });
+    }
+  });
+
   // Get all styles
   app.get("/api/styles", async (req, res) => {
     try {
