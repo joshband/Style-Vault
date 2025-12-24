@@ -18,6 +18,17 @@ export interface AnalysisResult {
  */
 export async function analyzeImageForStyle(imageBase64: string): Promise<AnalysisResult> {
   try {
+    // Remove data URL prefix if present
+    let cleanBase64 = imageBase64;
+    if (imageBase64.includes(",")) {
+      cleanBase64 = imageBase64.split(",")[1];
+    }
+    
+    // Ensure we have valid base64
+    if (!cleanBase64 || cleanBase64.length < 100) {
+      throw new Error("Invalid or incomplete image data");
+    }
+
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: [
@@ -30,20 +41,15 @@ export async function analyzeImageForStyle(imageBase64: string): Promise<Analysi
 Return ONLY valid JSON (no markdown, no code blocks) with exactly this structure:
 {
   "styleName": "A creative, concise style name (2-4 words, max 30 chars)",
-  "description": "A 1-2 sentence poetic description of the visual style, color palette, mood, and aesthetic. Focus on the essence of what makes this style unique."
+  "description": "A 1-2 sentence poetic description of the visual style, color palette, mood, and aesthetic."
 }
 
-Consider:
-- Color palette and dominant hues
-- Lighting and atmosphere
-- Texture and surface qualities
-- Compositional balance
-- Overall mood and aesthetic`,
+Consider: Color palette, lighting, atmosphere, texture, surface qualities, compositional balance, and overall mood.`,
             },
             {
               inlineData: {
                 mimeType: "image/jpeg",
-                data: imageBase64.replace(/^data:image\/(jpeg|png|webp|gif);base64,/, ""),
+                data: cleanBase64,
               },
             },
           ],
@@ -51,22 +57,42 @@ Consider:
       ],
     });
 
-    const textContent = response.candidates?.[0]?.content?.parts?.[0];
-    if (!textContent || textContent.type !== "text") {
+    // Handle response - Gemini may return text in parts array
+    let responseText = "";
+    const candidates = response.candidates;
+    if (candidates && candidates.length > 0) {
+      const parts = candidates[0]?.content?.parts;
+      if (parts && parts.length > 0) {
+        for (const part of parts) {
+          if ("text" in part && typeof part.text === "string") {
+            responseText = part.text;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!responseText) {
       throw new Error("No text response from Gemini");
     }
 
     // Clean response - remove markdown code blocks if present
-    let jsonStr = textContent.text
+    let jsonStr = responseText
       .replace(/```json\n?/g, "")
       .replace(/```\n?/g, "")
       .trim();
+
+    // Extract JSON if it's embedded in text
+    const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      jsonStr = jsonMatch[0];
+    }
 
     const result = JSON.parse(jsonStr) as AnalysisResult;
 
     // Validate result
     if (!result.styleName || !result.description) {
-      throw new Error("Invalid response format");
+      throw new Error("Invalid response format from AI");
     }
 
     return {
@@ -75,6 +101,6 @@ Consider:
     };
   } catch (error) {
     console.error("Error analyzing image:", error);
-    throw new Error("Failed to analyze image");
+    throw error;
   }
 }

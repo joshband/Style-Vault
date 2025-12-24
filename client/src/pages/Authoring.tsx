@@ -28,43 +28,44 @@ export default function Authoring() {
       setReferenceImage(dataUrl);
       setIsAnalyzing(true);
       
-      try {
-        // Call backend to analyze image with AI
-        const response = await fetch("/api/analyze-image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ imageBase64: dataUrl }),
-        });
+      // Analyze with AI after a brief delay to ensure state is set
+      setTimeout(async () => {
+        try {
+          // Call backend to analyze image with AI
+          const response = await fetch("/api/analyze-image", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ imageBase64: dataUrl }),
+          });
 
-        if (response.ok) {
-          const { styleName, description } = await response.json();
-          setName(styleName);
-          setPrompt(description);
-        } else {
-          // Fallback if AI analysis fails
-          const fileName = file.name.replace(/\.[^/.]+$/, '');
-          const fallbackName = fileName
-            .split(/[-_]/)
-            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-            .join(' ');
-          setName(fallbackName);
-          setPrompt(`A visual style inspired by ${fileName}. Rich color palette, thoughtful composition, and distinctive lighting that captures the essence of the reference image.`);
+          if (response.ok) {
+            const { styleName, description } = await response.json();
+            setName(styleName);
+            setPrompt(description);
+          } else {
+            const error = await response.json().catch(() => ({}));
+            console.warn("AI analysis failed, using fallback:", error);
+            setFallbackName(file.name);
+          }
+        } catch (error) {
+          console.error("Error analyzing image:", error);
+          setFallbackName(file.name);
+        } finally {
+          setIsAnalyzing(false);
         }
-      } catch (error) {
-        console.error("Error analyzing image:", error);
-        // Fallback silently
-        const fileName = file.name.replace(/\.[^/.]+$/, '');
-        const fallbackName = fileName
-          .split(/[-_]/)
-          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-          .join(' ');
-        setName(fallbackName);
-        setPrompt(`A visual style inspired by ${fileName}.`);
-      } finally {
-        setIsAnalyzing(false);
-      }
+      }, 100);
     };
     reader.readAsDataURL(file);
+  };
+
+  const setFallbackName = (fileName: string) => {
+    const cleanName = fileName.replace(/\.[^/.]+$/, '');
+    const fallbackName = cleanName
+      .split(/[-_]/)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+    setName(fallbackName);
+    setPrompt(`A visual style inspired by ${cleanName}. Rich color palette, thoughtful composition, and distinctive lighting that captures the essence of the reference image.`);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
