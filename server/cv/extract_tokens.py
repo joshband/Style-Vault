@@ -570,13 +570,16 @@ def create_contrast_matrix_visual(colors, contrasts):
 
 def extract_colors(img, k=12):
     """
-    Extract dominant perceptual colors.
+    Extract dominant perceptual colors with harmony, contrast, and temperature analysis.
 
     Strategy:
     - Downscale
     - K-means clustering in RGB
     - Convert to OKLCH
     - Deduplicate by Delta-E
+    - Analyze harmony relationships
+    - Calculate WCAG contrast ratios
+    - Determine color temperature
     """
     img_small = resize_for_speed(img)
     pixels = img_small.reshape(-1, 3).astype(np.float32)
@@ -602,9 +605,15 @@ def extract_colors(img, k=12):
     for c in colors:
         if not any(c.delta_e(u) < 3 for u in unique):
             unique.append(c)
+    
+    unique_8 = unique[:8]
+    
+    harmony = analyze_color_harmony(unique_8)
+    contrasts = analyze_contrast_pairs(unique_8)
+    temperature = analyze_color_temperature(unique_8)
 
     result = []
-    for c in unique[:8]:
+    for c in unique_8:
         hue = c['h']
         if hue is None or (isinstance(hue, float) and np.isnan(hue)):
             hue = 0
@@ -614,7 +623,14 @@ def extract_colors(img, k=12):
             "c": round(c['c'], 3),
             "h": round(hue, 1)
         })
-    return result
+    return {
+        "colors": result,
+        "analysis": {
+            "harmony": harmony,
+            "contrast": contrasts,
+            "temperature": temperature
+        }
+    }
 
 
 # ------------------------------------------------------------
@@ -911,9 +927,12 @@ def extract_design_tokens_sequential(img):
     Sequential extraction pass (fallback).
     """
     img_resized = resize_for_speed(img, 512)
+    
+    color_result = extract_colors(img_resized)
 
     return {
-        "color": extract_colors(img_resized),
+        "color": color_result["colors"],
+        "colorAnalysis": color_result["analysis"],
         "spacing": extract_spacing(img_resized),
         "borderRadius": extract_border_radius(img_resized),
         "grid": extract_grid(img_resized),
@@ -950,7 +969,11 @@ def extract_design_tokens_parallel(img):
         
         for future in as_completed(futures):
             name, result = future.result()
-            results[name] = result
+            if name == "color":
+                results["color"] = result["colors"]
+                results["colorAnalysis"] = result["analysis"]
+            else:
+                results[name] = result
     
     results["meta"] = {
         "method": "heuristic-cv",
@@ -1510,6 +1533,7 @@ def extract_design_tokens_with_walkthrough(img):
     
     tokens = {}
     debug = {}
+    color_analysis = None
     
     try:
         with ProcessPoolExecutor(max_workers=len(extractor_names)) as executor:
@@ -1522,6 +1546,8 @@ def extract_design_tokens_with_walkthrough(img):
                 name, result = future.result()
                 tokens[name] = result["tokens"]
                 debug[name] = result["debug"]
+                if name == "color" and "analysis" in result:
+                    color_analysis = result["analysis"]
     except Exception as e:
         for name in extractor_names:
             img_copy = np.frombuffer(img_bytes, dtype=np.uint8).reshape(img_shape)
@@ -1536,7 +1562,10 @@ def extract_design_tokens_with_walkthrough(img):
             result = extractor(img_copy)
             tokens[name] = result["tokens"]
             debug[name] = result["debug"]
+            if name == "color" and "analysis" in result:
+                color_analysis = result["analysis"]
     
+    tokens["colorAnalysis"] = color_analysis
     tokens["meta"] = {
         "method": "heuristic-cv",
         "confidence": "medium-high",
