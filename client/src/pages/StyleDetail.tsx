@@ -39,7 +39,7 @@ export default function StyleDetail() {
 
   const handleUseStyle = () => {
     if (!style) return;
-    setLocation(`/generate?style=${style.id}`);
+    setLocation(`/generate/${style.id}`);
   };
 
   if (loading) {

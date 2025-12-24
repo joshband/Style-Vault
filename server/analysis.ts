@@ -8,9 +8,20 @@ const ai = new GoogleGenAI({
   },
 });
 
+export interface MetadataTags {
+  mood: string[];
+  colorFamily: string[];
+  era: string[];
+  medium: string[];
+  subjects: string[];
+  lighting: string[];
+  texture: string[];
+}
+
 export interface AnalysisResult {
   styleName: string;
   description: string;
+  metadataTags: MetadataTags;
 }
 
 /**
@@ -36,12 +47,21 @@ export async function analyzeImageForStyle(imageBase64: string): Promise<Analysi
           role: "user",
           parts: [
             {
-              text: `Analyze this image and generate a creative, memorable style name and compelling description.
+              text: `Analyze this image and generate a creative, memorable style name, description, and visual metadata tags.
 
 Return ONLY valid JSON (no markdown, no code blocks) with exactly this structure:
 {
   "styleName": "A creative, concise style name (2-4 words, max 30 chars)",
-  "description": "A 1-2 sentence poetic description of the visual style, color palette, mood, and aesthetic."
+  "description": "A 1-2 sentence poetic description of the visual style, color palette, mood, and aesthetic.",
+  "metadataTags": {
+    "mood": ["2-4 mood descriptors like: serene, dramatic, playful, melancholic, vibrant, nostalgic"],
+    "colorFamily": ["2-4 color families like: warm, cool, monochrome, pastel, earth tones, jewel tones"],
+    "era": ["1-2 era/period like: modern, vintage, retro, futuristic, classical, contemporary"],
+    "medium": ["1-3 medium types like: photography, illustration, 3D render, painting, mixed media"],
+    "subjects": ["2-4 subject types like: portrait, landscape, still life, abstract, architectural"],
+    "lighting": ["1-3 lighting descriptors like: natural, studio, dramatic, soft, golden hour, high contrast"],
+    "texture": ["1-3 texture descriptors like: smooth, grainy, rough, glossy, matte, organic"]
+  }
 }
 
 Consider: Color palette, lighting, atmosphere, texture, surface qualities, compositional balance, and overall mood.`,
@@ -95,9 +115,21 @@ Consider: Color palette, lighting, atmosphere, texture, surface qualities, compo
       throw new Error("Invalid response format from AI");
     }
 
+    // Default metadata tags if not provided
+    const defaultTags: MetadataTags = {
+      mood: [],
+      colorFamily: [],
+      era: [],
+      medium: [],
+      subjects: [],
+      lighting: [],
+      texture: [],
+    };
+
     return {
       styleName: result.styleName.trim(),
       description: result.description.trim(),
+      metadataTags: result.metadataTags || defaultTags,
     };
   } catch (error) {
     console.error("Error analyzing image:", error);

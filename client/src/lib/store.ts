@@ -14,6 +14,16 @@ export interface StylePreview {
   type: 'still-life' | 'landscape' | 'portrait' | 'reference';
 }
 
+export interface MetadataTags {
+  mood: string[];
+  colorFamily: string[];
+  era: string[];
+  medium: string[];
+  subjects: string[];
+  lighting: string[];
+  texture: string[];
+}
+
 export interface Style {
   id: string;
   name: string;
@@ -37,6 +47,9 @@ export interface Style {
     modifiers: string[];
     negative: string;
   };
+
+  // Metadata Tags for visual descriptors
+  metadataTags?: MetadataTags;
 }
 
 export const SAMPLE_TOKENS: DTCGTokenGroup = {

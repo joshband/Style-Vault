@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Style, type InsertStyle, users, styles } from "@shared/schema";
+import { type User, type InsertUser, type Style, type InsertStyle, type GeneratedImage, type InsertGeneratedImage, users, styles, generatedImages } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
 
@@ -13,6 +13,11 @@ export interface IStorage {
   getStyleById(id: string): Promise<Style | undefined>;
   createStyle(style: InsertStyle): Promise<Style>;
   deleteStyle(id: string): Promise<void>;
+  
+  // Generated images operations (admin only)
+  getGeneratedImages(): Promise<GeneratedImage[]>;
+  getGeneratedImagesByStyle(styleId: string): Promise<GeneratedImage[]>;
+  createGeneratedImage(image: InsertGeneratedImage): Promise<GeneratedImage>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -49,6 +54,20 @@ export class DatabaseStorage implements IStorage {
 
   async deleteStyle(id: string): Promise<void> {
     await db.delete(styles).where(eq(styles.id, id));
+  }
+
+  // Generated images operations
+  async getGeneratedImages(): Promise<GeneratedImage[]> {
+    return db.select().from(generatedImages).orderBy(desc(generatedImages.createdAt));
+  }
+
+  async getGeneratedImagesByStyle(styleId: string): Promise<GeneratedImage[]> {
+    return db.select().from(generatedImages).where(eq(generatedImages.styleId, styleId)).orderBy(desc(generatedImages.createdAt));
+  }
+
+  async createGeneratedImage(insertImage: InsertGeneratedImage): Promise<GeneratedImage> {
+    const [image] = await db.insert(generatedImages).values(insertImage).returning();
+    return image;
   }
 }
 

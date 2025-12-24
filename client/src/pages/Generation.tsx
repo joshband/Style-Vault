@@ -1,43 +1,67 @@
 import { Layout } from "@/components/layout";
-import { fetchStyles, type Style } from "@/lib/store";
+import { fetchStyleById, type Style } from "@/lib/store";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { Search, Wand2, ArrowRight, Loader2 } from "lucide-react";
+import { Wand2, ArrowRight, Loader2, Download, ArrowLeft } from "lucide-react";
 import { motion } from "framer-motion";
+import { Link, useParams } from "wouter";
 
 export default function Generation() {
-  const [styles, setStyles] = useState<Style[]>([]);
+  const { styleId } = useParams<{ styleId: string }>();
+  const [style, setStyle] = useState<Style | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedStyleId, setSelectedStyleId] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchStyles()
-      .then((fetchedStyles) => {
-        setStyles(fetchedStyles);
-        // Check URL for pre-selected style
-        const params = new URLSearchParams(window.location.search);
-        const styleParam = params.get("style");
-        if (styleParam && fetchedStyles.some(s => s.id === styleParam)) {
-          setSelectedStyleId(styleParam);
-        }
-      })
-      .finally(() => setLoading(false));
-  }, []);
+    if (styleId) {
+      fetchStyleById(styleId)
+        .then(setStyle)
+        .catch(() => setError("Style not found"))
+        .finally(() => setLoading(false));
+    } else {
+      setLoading(false);
+      setError("No style selected");
+    }
+  }, [styleId]);
 
-  const selectedStyle = styles.find(s => s.id === selectedStyleId);
-
-  const handleGenerate = () => {
-    if (!selectedStyleId || !prompt) return;
+  const handleGenerate = async () => {
+    if (!styleId || !prompt || !style) return;
     setIsGenerating(true);
     setResult(null);
+    setError(null);
     
-    setTimeout(() => {
+    try {
+      const response = await fetch("/api/generate-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt, styleId }),
+      });
+      
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || "Failed to generate image");
+      }
+      
+      const data = await response.json();
+      setResult(`data:image/png;base64,${data.imageBase64}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Generation failed");
+    } finally {
       setIsGenerating(false);
-      setResult("https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?q=80&w=1000&auto=format&fit=crop");
-    }, 2500);
+    }
+  };
+
+  const handleDownload = () => {
+    if (!result) return;
+    const link = document.createElement("a");
+    link.href = result;
+    link.download = `${style?.name || "generated"}-${Date.now()}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   if (loading) {
@@ -50,129 +74,158 @@ export default function Generation() {
     );
   }
 
+  if (!style) {
+    return (
+      <Layout>
+        <div className="flex flex-col items-center justify-center h-64 gap-4">
+          <p className="text-muted-foreground">No style selected. Please select a style from the Style Vault.</p>
+          <Link href="/">
+            <button className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-sm text-sm">
+              <ArrowLeft size={14} />
+              Go to Style Vault
+            </button>
+          </Link>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
-      <div className="flex flex-col h-[calc(100vh-8rem)]">
-        <div className="border-b border-border pb-4 md:pb-6 mb-4 md:mb-6">
-          <h1 className="text-2xl md:text-3xl font-serif font-medium text-foreground">Style Application</h1>
-          <p className="text-muted-foreground text-xs md:text-sm mt-2">
-            Apply a curated style to a new concept. The system will blend your prompt with the style's rigid token definition.
-          </p>
+      <div className="flex flex-col gap-6">
+        {/* Back button */}
+        <Link href={`/style/${styleId}`}>
+          <button className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors" data-testid="button-back">
+            <ArrowLeft size={14} />
+            Back to Style Details
+          </button>
+        </Link>
+
+        {/* Style Preview Header */}
+        <div className="bg-card border border-border rounded-lg p-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            {/* 3 Preview Images */}
+            <div className="flex gap-2 flex-shrink-0">
+              <div className="w-16 h-20 md:w-20 md:h-24 rounded overflow-hidden border border-border/50">
+                <img 
+                  src={style.previews.portrait} 
+                  alt={`${style.name} portrait`}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div className="w-16 h-20 md:w-20 md:h-24 rounded overflow-hidden border border-border/50">
+                <img 
+                  src={style.previews.landscape} 
+                  alt={`${style.name} landscape`}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div className="w-16 h-20 md:w-20 md:h-24 rounded overflow-hidden border border-border/50">
+                <img 
+                  src={style.previews.stillLife} 
+                  alt={`${style.name} still life`}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </div>
+            
+            {/* Style Info */}
+            <div className="flex flex-col justify-center">
+              <h1 className="text-xl md:text-2xl font-serif font-medium text-foreground">{style.name}</h1>
+              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{style.description}</p>
+            </div>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-8 flex-1 min-h-0">
+        {/* Prompt Input */}
+        <div className="space-y-4">
+          <h3 className="text-sm font-medium">Describe Your Concept</h3>
+          <textarea 
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder="e.g., A cozy reading nook with warm lighting and vintage books..."
+            className="w-full resize-none p-4 text-sm bg-background border border-border rounded-lg focus:ring-1 focus:ring-primary/30 outline-none min-h-[120px]"
+            data-testid="input-concept-prompt"
+          />
           
-          {/* Left: Style Selector */}
-          <div className="col-span-1 lg:col-span-4 flex flex-col border-b lg:border-b-0 lg:border-r border-border pb-4 md:pb-6 lg:pb-0 lg:pr-6 overflow-hidden">
-             <div className="flex items-center gap-2 mb-4 bg-muted/30 p-2 rounded-sm border border-border/50">
-               <Search size={14} className="text-muted-foreground" />
-               <input 
-                 type="text" 
-                 placeholder="Filter styles..." 
-                 className="bg-transparent border-none outline-none text-xs w-full"
-                 data-testid="input-filter-styles"
-               />
-             </div>
-             
-             <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-hide">
-               {styles.map((style) => (
-                 <div 
-                   key={style.id}
-                   onClick={() => setSelectedStyleId(style.id)}
-                   data-testid={`card-style-${style.id}`}
-                   className={cn(
-                     "flex gap-3 p-2 rounded-md border cursor-pointer transition-all hover:shadow-sm",
-                     selectedStyleId === style.id 
-                       ? "bg-primary/5 border-primary/40 ring-1 ring-primary/20" 
-                       : "bg-card border-border hover:border-primary/20"
-                   )}
-                 >
-                    <div className="w-16 h-16 rounded-sm bg-muted overflow-hidden flex-shrink-0">
-                      <img src={style.previews.stillLife} className="w-full h-full object-cover" />
-                    </div>
-                    <div className="flex flex-col justify-center min-w-0">
-                      <h4 className={cn("font-medium text-sm truncate", selectedStyleId === style.id && "text-primary")}>{style.name}</h4>
-                      <p className="text-[10px] text-muted-foreground line-clamp-2 mt-1">{style.description}</p>
-                    </div>
-                 </div>
-               ))}
-               
-               {styles.length === 0 && (
-                 <div className="text-center text-muted-foreground text-sm py-8">
-                   No styles available. Create one first.
-                 </div>
-               )}
-             </div>
-          </div>
-
-          {/* Middle: Prompt Input */}
-          <div className="col-span-1 lg:col-span-4 flex flex-col border-b lg:border-b-0 lg:border-r border-border pb-4 md:pb-6 lg:pb-0 lg:px-6">
-             <h3 className="text-sm font-medium mb-4">Describe Your Concept</h3>
-             
-             {selectedStyle && (
-               <div className="mb-4 p-3 bg-muted/50 rounded-sm border border-border/50">
-                 <p className="text-xs text-muted-foreground">Applying style:</p>
-                 <p className="text-sm font-medium">{selectedStyle.name}</p>
-               </div>
-             )}
-             
-             <textarea 
-               value={prompt}
-               onChange={(e) => setPrompt(e.target.value)}
-               placeholder="e.g., A cozy reading nook with warm lighting and vintage books..."
-               className="flex-1 resize-none p-3 text-sm bg-background border border-border rounded-sm focus:ring-1 focus:ring-primary/30 outline-none min-h-[120px]"
-               data-testid="input-concept-prompt"
-             />
-             
-             <button 
-               onClick={handleGenerate}
-               disabled={!selectedStyleId || !prompt || isGenerating}
-               data-testid="button-generate"
-               className={cn(
-                 "mt-4 h-10 flex items-center justify-center gap-2 rounded-sm text-sm font-medium transition-all",
-                 selectedStyleId && prompt && !isGenerating
-                   ? "bg-primary text-primary-foreground hover:opacity-90"
-                   : "bg-muted text-muted-foreground cursor-not-allowed"
-               )}
-             >
-               {isGenerating ? (
-                 <>
-                   <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                   Generating...
-                 </>
-               ) : (
-                 <>
-                   <Wand2 size={14} />
-                   Generate
-                   <ArrowRight size={14} />
-                 </>
-               )}
-             </button>
-          </div>
-
-          {/* Right: Result Preview */}
-          <div className="col-span-1 lg:col-span-4 flex flex-col lg:pl-6">
-             <h3 className="text-sm font-medium mb-4">Result</h3>
-             
-             <div className="flex-1 bg-muted rounded-sm border border-border overflow-hidden relative min-h-[200px]">
-               {result ? (
-                 <motion.img 
-                   initial={{ opacity: 0, scale: 0.95 }}
-                   animate={{ opacity: 1, scale: 1 }}
-                   src={result} 
-                   alt="Generated result" 
-                   className="w-full h-full object-cover"
-                 />
-               ) : (
-                 <div className="absolute inset-0 flex items-center justify-center">
-                   <p className="text-xs text-muted-foreground font-mono text-center px-4">
-                     {isGenerating ? "Processing..." : "Select a style and describe your concept"}
-                   </p>
-                 </div>
-               )}
-             </div>
-          </div>
+          <button 
+            onClick={handleGenerate}
+            disabled={!prompt || isGenerating}
+            data-testid="button-generate"
+            className={cn(
+              "h-12 px-6 flex items-center justify-center gap-2 rounded-lg text-sm font-medium transition-all",
+              prompt && !isGenerating
+                ? "bg-primary text-primary-foreground hover:opacity-90"
+                : "bg-muted text-muted-foreground cursor-not-allowed"
+            )}
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 className="animate-spin" size={16} />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Wand2 size={16} />
+                Generate Image
+                <ArrowRight size={16} />
+              </>
+            )}
+          </button>
         </div>
+
+        {/* Error Display */}
+        {error && (
+          <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            {error}
+          </div>
+        )}
+
+        {/* Result */}
+        {result && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium">Generated Result</h3>
+              <button
+                onClick={handleDownload}
+                data-testid="button-download"
+                className="flex items-center gap-2 px-4 py-2 bg-secondary text-secondary-foreground rounded-lg text-sm hover:bg-secondary/80 transition-colors"
+              >
+                <Download size={14} />
+                Download
+              </button>
+            </div>
+            
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-muted rounded-lg border border-border overflow-hidden"
+            >
+              <img 
+                src={result} 
+                alt="Generated result" 
+                className="w-full max-h-[600px] object-contain"
+              />
+            </motion.div>
+          </div>
+        )}
+
+        {/* Placeholder when no result */}
+        {!result && !isGenerating && (
+          <div className="bg-muted/50 rounded-lg border border-dashed border-border p-12 flex items-center justify-center">
+            <p className="text-sm text-muted-foreground text-center">
+              Enter a prompt and click Generate to create an image in this style
+            </p>
+          </div>
+        )}
+
+        {/* Loading placeholder */}
+        {isGenerating && (
+          <div className="bg-muted/50 rounded-lg border border-border p-12 flex flex-col items-center justify-center gap-4">
+            <Loader2 className="animate-spin text-primary" size={32} />
+            <p className="text-sm text-muted-foreground">Creating your image...</p>
+          </div>
+        )}
       </div>
     </Layout>
   );

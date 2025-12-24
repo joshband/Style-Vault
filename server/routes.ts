@@ -2,8 +2,9 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { analyzeImageForStyle } from "./analysis";
 import { generateCanonicalPreviews } from "./preview-generation";
+import { generateStyledImage } from "./image-generation";
 import { storage } from "./storage";
-import { insertStyleSchema } from "@shared/schema";
+import { insertStyleSchema, insertGeneratedImageSchema } from "@shared/schema";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -109,6 +110,76 @@ export async function registerRoutes(
       console.error("Error generating previews:", error);
       res.status(500).json({
         error: "Failed to generate preview images",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // Generate image with style applied
+  app.post("/api/generate-image", async (req, res) => {
+    try {
+      const { prompt, styleId } = req.body;
+
+      if (!prompt || !styleId) {
+        return res.status(400).json({ error: "Prompt and style ID required" });
+      }
+
+      const style = await storage.getStyleById(styleId);
+      if (!style) {
+        return res.status(404).json({ error: "Style not found" });
+      }
+
+      const result = await generateStyledImage(
+        prompt,
+        style.name,
+        style.description,
+        style.promptScaffolding
+      );
+
+      // Save to database
+      const savedImage = await storage.createGeneratedImage({
+        styleId,
+        prompt,
+        imageData: result.imageBase64,
+        thumbnailData: result.thumbnailBase64,
+      });
+
+      res.json({
+        id: savedImage.id,
+        imageBase64: result.imageBase64,
+      });
+    } catch (error) {
+      console.error("Error generating image:", error);
+      res.status(500).json({
+        error: "Failed to generate image",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // Get all generated images (admin only)
+  app.get("/api/generated-images", async (req, res) => {
+    try {
+      const images = await storage.getGeneratedImages();
+      res.json(images);
+    } catch (error) {
+      console.error("Error fetching generated images:", error);
+      res.status(500).json({
+        error: "Failed to fetch generated images",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // Get generated images by style
+  app.get("/api/generated-images/style/:styleId", async (req, res) => {
+    try {
+      const images = await storage.getGeneratedImagesByStyle(req.params.styleId);
+      res.json(images);
+    } catch (error) {
+      console.error("Error fetching generated images:", error);
+      res.status(500).json({
+        error: "Failed to fetch generated images",
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }

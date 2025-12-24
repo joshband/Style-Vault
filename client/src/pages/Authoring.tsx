@@ -18,6 +18,23 @@ export default function Authoring() {
   const [prompt, setPrompt] = useState("");
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
   const [generatedPreviews, setGeneratedPreviews] = useState<{ stillLife: string; landscape: string; portrait: string } | null>(null);
+  const [metadataTags, setMetadataTags] = useState<{
+    mood: string[];
+    colorFamily: string[];
+    era: string[];
+    medium: string[];
+    subjects: string[];
+    lighting: string[];
+    texture: string[];
+  }>({
+    mood: [],
+    colorFamily: [],
+    era: [],
+    medium: [],
+    subjects: [],
+    lighting: [],
+    texture: [],
+  });
 
   const handleFileSelect = async (file: File) => {
     if (!file.type.startsWith('image/')) return;
@@ -39,9 +56,12 @@ export default function Authoring() {
           });
 
           if (response.ok) {
-            const { styleName, description } = await response.json();
+            const { styleName, description, metadataTags: tags } = await response.json();
             setName(styleName);
             setPrompt(description);
+            if (tags) {
+              setMetadataTags(tags);
+            }
           } else {
             const error = await response.json().catch(() => ({}));
             console.warn("AI analysis failed, using fallback:", error);
@@ -151,7 +171,8 @@ export default function Authoring() {
           base: prompt,
           modifiers: ["extracted-from-reference", "auto-analyzed"],
           negative: "blurry, low quality, distorted"
-        }
+        },
+        metadataTags: metadataTags
       });
       
       setLocation("/");

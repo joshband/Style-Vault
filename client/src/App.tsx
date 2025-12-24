@@ -16,7 +16,7 @@ function Router() {
       <Route path="/" component={Explorer} />
       <Route path="/style/:id" component={StyleDetail} />
       <Route path="/create" component={Authoring} />
-      <Route path="/generate" component={Generation} />
+      <Route path="/generate/:styleId" component={Generation} />
       <Route component={NotFound} />
     </Switch>
   );
