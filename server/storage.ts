@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Style, type InsertStyle, type GeneratedImage, type InsertGeneratedImage, users, styles, generatedImages } from "@shared/schema";
+import { type User, type InsertUser, type Style, type InsertStyle, type GeneratedImage, type InsertGeneratedImage, type MoodBoardAssets, type UiConceptAssets, users, styles, generatedImages } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
 
@@ -13,6 +13,7 @@ export interface IStorage {
   getStyleById(id: string): Promise<Style | undefined>;
   createStyle(style: InsertStyle): Promise<Style>;
   deleteStyle(id: string): Promise<void>;
+  updateStyleMoodBoard(id: string, moodBoard: MoodBoardAssets, uiConcepts: UiConceptAssets): Promise<Style | undefined>;
   
   // Generated images operations (admin only)
   getGeneratedImages(): Promise<GeneratedImage[]>;
@@ -54,6 +55,15 @@ export class DatabaseStorage implements IStorage {
 
   async deleteStyle(id: string): Promise<void> {
     await db.delete(styles).where(eq(styles.id, id));
+  }
+
+  async updateStyleMoodBoard(id: string, moodBoard: MoodBoardAssets, uiConcepts: UiConceptAssets): Promise<Style | undefined> {
+    const [updated] = await db
+      .update(styles)
+      .set({ moodBoard, uiConcepts })
+      .where(eq(styles.id, id))
+      .returning();
+    return updated;
   }
 
   // Generated images operations

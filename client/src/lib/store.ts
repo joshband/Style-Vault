@@ -24,6 +24,18 @@ export interface MetadataTags {
   texture: string[];
 }
 
+export interface MoodBoardAssets {
+  collage: string;
+  status: "pending" | "generating" | "complete" | "failed";
+}
+
+export interface UiConceptAssets {
+  audioPlugin?: string;
+  dashboard?: string;
+  componentLibrary?: string;
+  status: "pending" | "generating" | "complete" | "failed";
+}
+
 export interface Style {
   id: string;
   name: string;
@@ -50,6 +62,10 @@ export interface Style {
 
   // Metadata Tags for visual descriptors
   metadataTags?: MetadataTags;
+
+  // AI-generated mood board and UI concepts
+  moodBoard?: MoodBoardAssets | null;
+  uiConcepts?: UiConceptAssets | null;
 }
 
 export const SAMPLE_TOKENS: DTCGTokenGroup = {

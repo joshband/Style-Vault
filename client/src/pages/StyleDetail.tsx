@@ -7,6 +7,7 @@ import { Link } from "wouter";
 import { useState, useEffect, lazy, Suspense } from "react";
 import { cn } from "@/lib/utils";
 import { useStyleTheme } from "@/hooks/useStyleTheme";
+import { AiMoodBoard } from "@/components/ai-mood-board";
 
 const MoodBoard = lazy(() => import("@/components/mood-board"));
 const StylePlayground = lazy(() => import("@/components/style-playground"));
@@ -215,17 +216,14 @@ export default function StyleDetail() {
             )}
 
             {mainView === 'moodboard' && (
-              <Suspense fallback={<div className="flex items-center justify-center h-64"><Loader2 className="animate-spin" /></div>}>
-                {theme ? (
-                  <div className="animate-in fade-in duration-300">
-                    <MoodBoard theme={theme} />
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center h-64 text-muted-foreground">
-                    Theme data unavailable
-                  </div>
-                )}
-              </Suspense>
+              <div className="animate-in fade-in duration-300">
+                <AiMoodBoard
+                  styleId={style.id}
+                  styleName={style.name}
+                  moodBoard={style.moodBoard}
+                  uiConcepts={style.uiConcepts}
+                />
+              </div>
             )}
 
             {mainView === 'components' && (
