@@ -312,15 +312,15 @@ export default function Authoring() {
                     <div className="flex w-full aspect-[12/4] md:aspect-[16/6]">
                       {/* Portrait Column */}
                       <div className="flex-1 relative overflow-hidden border-r border-border/50">
-                        <img src={generatedPreviews.portrait} className="w-full h-full object-cover" alt="Portrait" />
+                        <img src={generatedPreviews.portrait} className="absolute inset-0 w-full h-full object-cover" alt="Portrait" />
                       </div>
                       {/* Landscape Column */}
                       <div className="flex-1 relative overflow-hidden border-r border-border/50">
-                        <img src={generatedPreviews.landscape} className="w-full h-full object-cover" alt="Landscape" />
+                        <img src={generatedPreviews.landscape} className="absolute inset-0 w-full h-full object-cover" alt="Landscape" />
                       </div>
                       {/* Still Life Column */}
                       <div className="flex-1 relative overflow-hidden">
-                        <img src={generatedPreviews.stillLife} className="w-full h-full object-cover" alt="Still Life" />
+                        <img src={generatedPreviews.stillLife} className="absolute inset-0 w-full h-full object-cover" alt="Still Life" />
                       </div>
                     </div>
                   </div>

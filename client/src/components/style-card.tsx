@@ -83,7 +83,7 @@ export function StyleCard({ style, className, onDelete }: StyleCardProps) {
               <img 
                 src={style.previews.portrait} 
                 alt={`${style.name} - portrait`}
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                 draggable={false}
               />
             </div>
@@ -92,7 +92,7 @@ export function StyleCard({ style, className, onDelete }: StyleCardProps) {
               <img 
                 src={style.previews.landscape} 
                 alt={`${style.name} - landscape`}
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                 draggable={false}
               />
             </div>
@@ -101,7 +101,7 @@ export function StyleCard({ style, className, onDelete }: StyleCardProps) {
               <img 
                 src={style.previews.stillLife} 
                 alt={`${style.name} - still life`}
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                 draggable={false}
               />
             </div>

@@ -128,7 +128,7 @@ export default function StyleDetail() {
                       <img 
                         src={style.previews.landscape} 
                         alt="Landscape preview" 
-                        className="w-full h-full object-cover"
+                        className="absolute inset-0 w-full h-full object-cover"
                       />
                     )}
                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -140,7 +140,7 @@ export default function StyleDetail() {
                       <img 
                         src={style.previews.portrait} 
                         alt="Portrait preview" 
-                        className="w-full h-full object-cover"
+                        className="absolute inset-0 w-full h-full object-cover"
                       />
                     )}
                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -152,7 +152,7 @@ export default function StyleDetail() {
                       <img 
                         src={style.previews.stillLife} 
                         alt="Still life preview" 
-                        className="w-full h-full object-cover"
+                        className="absolute inset-0 w-full h-full object-cover"
                       />
                     )}
                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
