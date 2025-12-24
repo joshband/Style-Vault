@@ -1,14 +1,15 @@
-import { useRoute } from "wouter";
+import { useRoute, useLocation } from "wouter";
 import { fetchStyleById, type Style } from "@/lib/store";
 import { Layout } from "@/components/layout";
 import { TokenViewer } from "@/components/token-viewer";
-import { ArrowLeft, ImageIcon, Layers, Download, Loader2 } from "lucide-react";
+import { ArrowLeft, ImageIcon, Layers, Download, Loader2, Wand2 } from "lucide-react";
 import { Link } from "wouter";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 
 export default function StyleDetail() {
   const [, params] = useRoute("/style/:id");
+  const [, setLocation] = useLocation();
   const id = params?.id;
   const [style, setStyle] = useState<Style | null>(null);
   const [loading, setLoading] = useState(true);
@@ -21,6 +22,25 @@ export default function StyleDetail() {
         .finally(() => setLoading(false));
     }
   }, [id]);
+
+  const handleDownloadTokens = () => {
+    if (!style) return;
+    const tokensJson = JSON.stringify(style.tokens, null, 2);
+    const blob = new Blob([tokensJson], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${style.name.toLowerCase().replace(/\s+/g, "-")}-tokens.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleUseStyle = () => {
+    if (!style) return;
+    setLocation(`/generate?style=${style.id}`);
+  };
 
   if (loading) {
     return (
@@ -60,9 +80,21 @@ export default function StyleDetail() {
                </p>
              </div>
              <div className="flex gap-2 md:gap-3 flex-shrink-0">
-               <button className="h-9 px-2 md:px-4 flex items-center gap-2 border border-border rounded-sm hover:bg-secondary transition-colors text-xs md:text-sm font-medium whitespace-nowrap">
+               <button 
+                 onClick={handleDownloadTokens}
+                 data-testid="button-download-tokens"
+                 className="h-9 px-2 md:px-4 flex items-center gap-2 border border-border rounded-sm hover:bg-secondary transition-colors text-xs md:text-sm font-medium whitespace-nowrap"
+               >
                  <Download size={14} />
-                 <span className="hidden sm:inline">Export</span>
+                 <span className="hidden sm:inline">Download Tokens</span>
+               </button>
+               <button 
+                 onClick={handleUseStyle}
+                 data-testid="button-use-style"
+                 className="h-9 px-2 md:px-4 flex items-center gap-2 bg-primary text-primary-foreground rounded-sm hover:opacity-90 transition-colors text-xs md:text-sm font-medium whitespace-nowrap"
+               >
+                 <Wand2 size={14} />
+                 <span className="hidden sm:inline">Use Style</span>
                </button>
              </div>
            </div>

@@ -15,7 +15,15 @@ export default function Generation() {
 
   useEffect(() => {
     fetchStyles()
-      .then(setStyles)
+      .then((fetchedStyles) => {
+        setStyles(fetchedStyles);
+        // Check URL for pre-selected style
+        const params = new URLSearchParams(window.location.search);
+        const styleParam = params.get("style");
+        if (styleParam && fetchedStyles.some(s => s.id === styleParam)) {
+          setSelectedStyleId(styleParam);
+        }
+      })
       .finally(() => setLoading(false));
   }, []);
 
