@@ -330,11 +330,17 @@ export const MOCK_STYLES: Style[] = [
 
 // API functions for persistent storage
 export async function fetchStyles(): Promise<Style[]> {
-  const response = await fetch("/api/styles");
-  if (!response.ok) {
-    throw new Error("Failed to fetch styles");
+  try {
+    const response = await fetch("/api/styles");
+    if (!response.ok) {
+      console.error("Failed to fetch styles:", response.status, response.statusText);
+      return []; // Return empty array on error instead of throwing
+    }
+    return response.json();
+  } catch (error) {
+    console.error("Network error fetching styles:", error);
+    return []; // Return empty array on network error
   }
-  return response.json();
 }
 
 export async function fetchStyleById(id: string): Promise<Style | null> {
