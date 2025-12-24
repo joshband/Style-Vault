@@ -66,7 +66,14 @@ Preferred communication style: Simple, everyday language.
 
 **Prompt Scaffolding**: Styles include structured prompt templates (base, modifiers, negative) derived from tokens, ensuring consistent application of style characteristics during image generation.
 
-**Background Metadata Enrichment**: After style creation and mood board generation, an AI-powered background worker enriches styles with searchable keywords and tags (mood, color family, era, medium, subjects, lighting, texture). This enables filtering and discovery across the style library via the `/api/tags` endpoint.
+**Background Metadata Enrichment**: After style creation and mood board generation, an AI-powered background worker enriches styles with rich descriptive metadata for discovery and classification. Categories include:
+- **Visual Characteristics**: mood, color family, lighting, texture
+- **Art Historical Context**: era, art period (movements like art-deco, impressionism), historical influences (design schools, cultural movements), similar artists
+- **Technical Aspects**: medium, subjects
+- **Application Guidance**: usage examples (practical applications like album-covers, web-design, brand-identity)
+- **Search**: general keywords
+
+This enables sophisticated filtering and discovery across the style library via the `/api/tags` endpoint.
 
 ## External Dependencies
 
