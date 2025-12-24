@@ -3,11 +3,10 @@ import { StyleCard } from "@/components/style-card";
 import { StyleCardSkeleton } from "@/components/style-card-skeleton";
 import { Layout } from "@/components/layout";
 import { motion, AnimatePresence } from "framer-motion";
-import { getRecommendedStyles, getBrowsingHistory } from "@/lib/suggestions";
-import { Sparkles, RefreshCw } from "lucide-react";
-import { useMemo } from "react";
+import { RefreshCw, PenTool } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link } from "wouter";
 
 export default function Explore() {
   const queryClient = useQueryClient();
@@ -39,24 +38,19 @@ export default function Explore() {
 
   const handleRetry = () => refetch();
 
-  const recommendations = useMemo(() => getRecommendedStyles(styles, 3), [styles]);
-  const hasHistory = getBrowsingHistory().length > 0;
-  const recommendedIds = useMemo(() => new Set(recommendations.map(r => r.id)), [recommendations]);
-  const nonRecommendedStyles = useMemo(() => styles.filter(s => !recommendedIds.has(s.id)), [styles, recommendedIds]);
-
   if (isLoading) {
     return (
       <Layout>
         <div className="flex flex-col gap-6 md:gap-8">
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between border-b border-border pb-4 md:pb-6 gap-4 md:gap-0">
+          <div className="border-b border-border pb-4 md:pb-6">
             <div className="space-y-1">
               <h1 className="text-2xl md:text-3xl font-serif font-medium text-foreground">Style Vault</h1>
-              <p className="text-muted-foreground text-xs sm:text-sm max-w-2xl">
-                Discover and compare visual styles. Click any style to explore its details.
+              <p className="text-muted-foreground text-sm max-w-xl">
+                Your collection of visual styles
               </p>
             </div>
           </div>
-          <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             <StyleCardSkeleton />
             <StyleCardSkeleton className="hidden sm:block" />
             <StyleCardSkeleton className="hidden lg:block" />
@@ -69,25 +63,21 @@ export default function Explore() {
   return (
     <Layout>
       <div className="flex flex-col gap-6 md:gap-8">
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between border-b border-border pb-4 md:pb-6 gap-4 md:gap-0">
+        <div className="border-b border-border pb-4 md:pb-6">
           <div className="space-y-1">
             <h1 className="text-2xl md:text-3xl font-serif font-medium text-foreground">Style Vault</h1>
-            <p className="text-muted-foreground text-xs sm:text-sm max-w-2xl">
-              Discover and compare visual styles. Click any style to explore its details.
+            <p className="text-muted-foreground text-sm max-w-xl">
+              Your collection of visual styles
             </p>
-          </div>
-          
-          <div className="flex items-center gap-2 text-[10px] sm:text-xs font-mono text-muted-foreground flex-shrink-0">
-            <span>{styles.length} STYLES INDEXED</span>
           </div>
         </div>
 
         {/* Error State */}
         {isError && (
-          <div className="py-20 text-center border border-dashed border-destructive/50 rounded-lg bg-destructive/5">
-            <p className="text-destructive mb-2">Failed to load styles</p>
+          <div className="py-16 text-center border border-dashed border-destructive/50 rounded-lg bg-destructive/5">
+            <p className="text-destructive mb-2">Unable to load your styles</p>
             <p className="text-sm text-muted-foreground mb-4">
-              There was a network error. Your styles are still saved.
+              Please check your connection and try again.
             </p>
             <Button 
               variant="outline" 
@@ -102,77 +92,55 @@ export default function Explore() {
 
         {/* Empty State */}
         {!isError && styles.length === 0 && (
-          <div className="py-20 text-center border border-dashed border-border rounded-lg bg-muted/5">
-            <p className="text-muted-foreground mb-2">No styles yet</p>
-            <p className="text-sm text-muted-foreground/70">
-              Create your first style by navigating to the Create page
-            </p>
-          </div>
-        )}
-
-        {/* Recommendations Section */}
-        {hasHistory && recommendations.length > 0 && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Sparkles size={16} className="text-amber-500" />
-              <h2 className="text-sm md:text-base font-medium text-foreground">Recommended For You</h2>
-              <span className="text-[10px] font-mono text-muted-foreground">Based on your browsing history</span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-              <AnimatePresence>
-                {recommendations.map((style, index) => (
-                  <motion.div
-                    key={style.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, x: -100 }}
-                    transition={{ duration: 0.4, delay: index * 0.1, ease: "easeOut" }}
-                    className="relative"
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="py-20 px-6 text-center border border-dashed border-border rounded-xl bg-gradient-to-b from-muted/20 to-transparent"
+          >
+            <div className="max-w-md mx-auto space-y-4">
+              <h2 className="text-xl font-serif font-medium text-foreground">
+                What is a style?
+              </h2>
+              <p className="text-muted-foreground leading-relaxed">
+                A style is a reusable visual language — a captured essence of color, mood, texture, and form. 
+                It's not just an image or a prompt. It's a living artifact you can apply to generate 
+                new visuals that feel cohesive and intentional.
+              </p>
+              <div className="pt-4">
+                <Link href="/create">
+                  <Button 
+                    size="lg" 
+                    className="gap-2"
+                    data-testid="button-create-first-style"
                   >
-                    <div className="absolute -top-2 -right-2 z-10 bg-amber-500 text-white text-[10px] font-bold px-2 py-1 rounded-sm">
-                      SUGGESTED
-                    </div>
-                    <StyleCard style={style} onDelete={handleStyleDelete} />
-                  </motion.div>
-                ))}
-              </AnimatePresence>
+                    <PenTool className="w-4 h-4" />
+                    Create your first style
+                  </Button>
+                </Link>
+              </div>
             </div>
-            <div className="h-px bg-border my-4"></div>
-          </div>
+          </motion.div>
         )}
 
-        {/* All Styles Section */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <h2 className="text-sm md:text-base font-medium text-foreground">
-              {hasHistory && recommendations.length > 0 ? "Other Styles" : "All Styles"}
-            </h2>
-            <span className="text-[10px] font-mono text-muted-foreground">
-              {hasHistory && recommendations.length > 0 ? `${nonRecommendedStyles.length} more` : "Complete collection"}
-            </span>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+        {/* Styles Grid */}
+        {!isError && styles.length > 0 && (
+          <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             <AnimatePresence>
-              {(hasHistory && recommendations.length > 0 ? nonRecommendedStyles : styles).map((style, index) => (
+              {styles.map((style, index) => (
                 <motion.div
                   key={style.id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, x: -100 }}
-                  transition={{ duration: 0.4, delay: index * 0.1, ease: "easeOut" }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.3, delay: index * 0.05, ease: "easeOut" }}
                 >
                   <StyleCard style={style} onDelete={handleStyleDelete} />
                 </motion.div>
               ))}
             </AnimatePresence>
           </div>
-          
-          {styles.length === 0 && (
-             <div className="py-20 text-center text-muted-foreground border border-dashed border-border rounded-lg bg-muted/10">
-               <p>No styles found in the vault.</p>
-             </div>
-          )}
-        </div>
+        )}
       </div>
     </Layout>
   );

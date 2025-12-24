@@ -29,12 +29,10 @@ export function StyleCard({ style, className, onDelete }: StyleCardProps) {
   const [dragX, setDragX] = useState(0);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   
-  // Track view on mount
   useEffect(() => {
     trackStyleView(style.id);
   }, [style.id]);
 
-  // Prefetch style details on hover for faster navigation
   const handlePrefetch = useCallback(() => {
     queryClient.prefetchQuery({
       queryKey: ["/api/styles", style.id],
@@ -42,12 +40,11 @@ export function StyleCard({ style, className, onDelete }: StyleCardProps) {
         const res = await fetch(`/api/styles/${style.id}`);
         return res.json();
       },
-      staleTime: 60000, // Cache for 1 minute
+      staleTime: 60000,
     });
   }, [style.id]);
 
   const handleDragEnd = (info: any) => {
-    // Swipe left to delete - show confirmation dialog
     if (info.offset.x < -100 || info.velocity.x < -500) {
       setShowConfirmDialog(true);
       setDragX(0);
@@ -59,10 +56,6 @@ export function StyleCard({ style, className, onDelete }: StyleCardProps) {
   const handleConfirmDelete = () => {
     onDelete?.(style.id);
     setShowConfirmDialog(false);
-  };
-
-  const handleDelete = () => {
-    setShowConfirmDialog(true);
   };
 
   return (
@@ -81,7 +74,7 @@ export function StyleCard({ style, className, onDelete }: StyleCardProps) {
         }}
         className={cn("relative", className)}
       >
-        {/* Red delete indicator underneath */}
+        {/* Swipe delete indicator */}
         <motion.div
           className="absolute inset-0 bg-red-500 rounded-lg flex items-center justify-end pr-4 overflow-hidden"
           initial={{ opacity: 0 }}
@@ -98,74 +91,67 @@ export function StyleCard({ style, className, onDelete }: StyleCardProps) {
           </motion.div>
         </motion.div>
       
-      <div 
-        className={cn("group relative flex flex-col bg-card border border-border rounded-lg overflow-hidden transition-all hover:shadow-md hover:border-primary/20", isDragging && "cursor-grabbing")}
-        onMouseEnter={handlePrefetch}
-      >
-        {/* Preview Area - Single thumbnail or Placeholder - Clickable */}
-        <Link href={`/style/${style.id}`} className="block">
-          <div className="relative aspect-[16/9] bg-muted overflow-hidden cursor-pointer">
-            {style.thumbnailPreview ? (
-              <img 
-                src={style.thumbnailPreview} 
-                alt={`${style.name} preview`}
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                draggable={false}
-                loading="lazy"
-              />
-            ) : (
-              /* Placeholder when preview not loaded */
-              <div className="flex-1 h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted/50">
-                <Palette className="w-12 h-12 text-muted-foreground/30" />
-              </div>
+        <Link 
+          href={`/style/${style.id}`} 
+          className="block"
+          onMouseEnter={handlePrefetch}
+          data-testid={`card-style-${style.id}`}
+        >
+          <motion.div 
+            className={cn(
+              "relative flex flex-col bg-card border border-border rounded-lg overflow-hidden",
+              "transition-shadow duration-200",
+              isDragging && "cursor-grabbing"
             )}
-
-            {/* Quick Actions */}
-            <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity translate-y-[-10px] group-hover:translate-y-0">
-               <button 
-                 onClick={(e) => {
-                   e.preventDefault();
-                   e.stopPropagation();
-                   handleDelete();
-                 }}
-                 className="h-8 w-8 rounded-full bg-red-500/10 backdrop-blur text-red-600 hover:text-red-700 hover:bg-red-500/20 flex items-center justify-center transition-colors shadow-sm border border-red-500/20 hover:border-red-500/40" 
-                 title="Delete style"
-               >
-                 <Trash2 size={14} />
-               </button>
+            whileHover={{ 
+              scale: 1.015,
+              boxShadow: "0 8px 24px -8px rgba(0, 0, 0, 0.12)"
+            }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+          >
+            {/* Preview Image */}
+            <div className="relative aspect-[16/10] bg-muted overflow-hidden">
+              {style.thumbnailPreview ? (
+                <img 
+                  src={style.thumbnailPreview} 
+                  alt={style.name}
+                  className="absolute inset-0 w-full h-full object-cover"
+                  draggable={false}
+                  loading="lazy"
+                />
+              ) : (
+                <div className="flex-1 h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted/50">
+                  <Palette className="w-10 h-10 text-muted-foreground/20" />
+                </div>
+              )}
             </div>
-          </div>
+
+            {/* Content */}
+            <div className="p-4 flex flex-col gap-2">
+              <h3 className="font-serif font-medium text-base leading-tight text-foreground">
+                {style.name}
+              </h3>
+              
+              <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
+                {style.description}
+              </p>
+
+              <time 
+                dateTime={style.createdAt}
+                className="text-xs text-muted-foreground/70 mt-1"
+              >
+                {new Date(style.createdAt).toLocaleDateString(undefined, { 
+                  month: 'long', 
+                  day: 'numeric',
+                  year: 'numeric'
+                })}
+              </time>
+            </div>
+          </motion.div>
         </Link>
-
-        {/* Info Area */}
-        <div className="p-4 flex flex-col gap-2 flex-1">
-          <div className="flex justify-between items-start">
-            <h3 className="font-serif font-medium text-lg leading-tight group-hover:text-primary transition-colors">
-              <Link href={`/style/${style.id}`}>{style.name}</Link>
-            </h3>
-            <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider border border-border px-1.5 py-0.5 rounded-sm">
-              V1.0
-            </span>
-          </div>
-          
-          <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-            {style.description}
-          </p>
-
-          <div className="mt-auto pt-3 flex items-center justify-between text-xs text-muted-foreground font-mono">
-            <div className="flex items-center gap-1.5">
-               <Palette size={12} />
-               <span>Style</span>
-            </div>
-            <time dateTime={style.createdAt}>
-              {new Date(style.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-            </time>
-          </div>
-        </div>
-      </div>
       </motion.div>
 
-      {/* Confirmation Dialog */}
+      {/* Delete Confirmation Dialog */}
       <AnimatePresence>
         {showConfirmDialog && (
           <motion.div
@@ -198,12 +184,14 @@ export function StyleCard({ style, className, onDelete }: StyleCardProps) {
                 <button
                   onClick={() => setShowConfirmDialog(false)}
                   className="flex-1 px-4 py-2 text-sm font-medium border border-border rounded-lg hover:bg-muted transition-colors text-foreground"
+                  data-testid="button-cancel-delete"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleConfirmDelete}
                   className="flex-1 px-4 py-2 text-sm font-medium bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors flex items-center justify-center gap-2"
+                  data-testid="button-confirm-delete"
                 >
                   <Trash2 size={14} />
                   Delete
