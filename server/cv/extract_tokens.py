@@ -129,6 +129,78 @@ def create_histogram_visual(data, title="", bins=50):
     return hist_img
 
 
+def _percentile_normalize(x):
+    """
+    Normalize array to [0,1] using 2nd/98th percentile for robustness.
+    """
+    x = x.astype(np.float32)
+    mn, mx = np.percentile(x, 2), np.percentile(x, 98)
+    if mx - mn < 1e-6:
+        return np.zeros_like(x)
+    return np.clip((x - mn) / (mx - mn), 0, 1)
+
+
+def heuristic_depth(image_bgr):
+    """
+    Estimate depth from a single image using multi-cue fusion.
+    
+    Combines three heuristic cues:
+    1. Sharpness/focus - sharp areas appear closer
+    2. Shadow near edges - shadows suggest depth layers
+    3. Perspective prior - bottom of image typically closer
+    
+    Returns:
+        depth: float32 HxW in [0..1] (1 = near/foreground)
+        debug_maps: dict of intermediate cue visualizations
+    """
+    h, w = image_bgr.shape[:2]
+    
+    gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
+    
+    lap = cv2.Laplacian(gray, cv2.CV_32F, ksize=3)
+    sharp = cv2.GaussianBlur(np.abs(lap), (0, 0), 1.0)
+    sharp = _percentile_normalize(sharp)
+    
+    edges = cv2.Canny(gray, 80, 160)
+    
+    blur = cv2.GaussianBlur(gray, (7, 7), 0)
+    shadow = blur < (np.mean(blur) * 0.7)
+    shadow = shadow.astype(np.float32)
+    
+    kernel = np.ones((5, 5), np.uint8)
+    edge_dilate = cv2.dilate(edges, kernel)
+    shadow = shadow * (edge_dilate > 0)
+    shadow = _percentile_normalize(shadow)
+    
+    y = np.linspace(1.0, 0.0, h, dtype=np.float32)
+    persp = np.repeat(y[:, None], w, axis=1)
+    
+    depth = (
+        0.45 * sharp +
+        0.35 * shadow +
+        0.20 * persp
+    )
+    depth = _percentile_normalize(depth)
+    
+    debug = {
+        "sharpness": sharp,
+        "shadow": shadow,
+        "perspective": persp,
+        "edges": edges
+    }
+    
+    return depth, debug
+
+
+def create_depth_visualization(depth_map, colormap=cv2.COLORMAP_PLASMA):
+    """
+    Convert depth map to colorized visualization.
+    Plasma colormap: purple=far, yellow=near
+    """
+    depth_uint8 = (depth_map * 255).astype(np.uint8)
+    return cv2.applyColorMap(depth_uint8, colormap)
+
+
 # ------------------------------------------------------------
 # Color Tokens
 # ------------------------------------------------------------
@@ -787,11 +859,20 @@ def extract_grid_with_debug(img):
 
 def extract_shadows_with_debug(img):
     """
-    Extract shadow/elevation with gradient and luminance visualizations.
-    Returns the same structure as extract_shadows plus debug visualizations.
+    Extract shadow/elevation with enhanced multi-cue depth estimation.
+    
+    Uses three complementary approaches:
+    1. Gradient-based shadow detection (traditional)
+    2. Multi-cue heuristic depth (sharpness + shadow + perspective)
+    3. Luminance distribution analysis
+    
+    Returns tokens plus comprehensive debug visualizations.
     """
     lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
     l_channel = lab[:, :, 0].astype(np.float32)
+    h, w = img.shape[:2]
+    
+    depth_map, depth_debug = heuristic_depth(img)
     
     grad_x = cv2.Sobel(l_channel, cv2.CV_32F, 1, 0, ksize=3)
     grad_y = cv2.Sobel(l_channel, cv2.CV_32F, 0, 1, ksize=3)
@@ -799,11 +880,14 @@ def extract_shadows_with_debug(img):
     laplacian = cv2.Laplacian(l_channel, cv2.CV_32F)
     strength = float(np.mean(np.abs(laplacian)))
     
-    if strength < 2:
+    avg_depth = float(np.mean(depth_map))
+    depth_variance = float(np.var(depth_map))
+    
+    if depth_variance < 0.02:
         level = 0
-    elif strength < 5:
+    elif depth_variance < 0.05:
         level = 1
-    elif strength < 12:
+    elif depth_variance < 0.12:
         level = 2
     else:
         level = 3
@@ -841,7 +925,6 @@ def extract_shadows_with_debug(img):
     mag_color = cv2.applyColorMap(mag_norm, cv2.COLORMAP_INFERNO)
     
     arrow_vis = img.copy()
-    h, w = arrow_vis.shape[:2]
     center = (w // 2, h // 2)
     arrow_len = min(w, h) // 4
     rad_angle = np.radians(angle)
@@ -903,6 +986,12 @@ def extract_shadows_with_debug(img):
     else:
         shadow_color_data = None
     
+    depth_vis = create_depth_visualization(depth_map)
+    sharpness_vis = cv2.applyColorMap((depth_debug["sharpness"] * 255).astype(np.uint8), cv2.COLORMAP_HOT)
+    shadow_cue_vis = cv2.applyColorMap((depth_debug["shadow"] * 255).astype(np.uint8), cv2.COLORMAP_BONE)
+    perspective_vis = cv2.applyColorMap((depth_debug["perspective"] * 255).astype(np.uint8), cv2.COLORMAP_COOL)
+    edge_vis = cv2.cvtColor(depth_debug["edges"], cv2.COLOR_GRAY2BGR)
+    
     result = {
         "elevation": level,
         "shadowStrength": round(strength, 2),
@@ -916,24 +1005,36 @@ def extract_shadows_with_debug(img):
             "mid": round(mid_ratio, 2),
             "light": round(light_ratio, 2)
         },
-        "shadowColor": shadow_color_data
+        "shadowColor": shadow_color_data,
+        "depthMetrics": {
+            "averageDepth": round(avg_depth, 3),
+            "depthVariance": round(depth_variance, 4),
+            "hasDepthLayers": depth_variance > 0.03
+        }
     }
     
     return {
         "tokens": result,
         "debug": {
             "visuals": [
-                {"label": "Gradient Magnitude", "description": "Intensity of light/dark transitions (shadows)", "image": encode_image_base64(mag_color)},
+                {"label": "Combined Depth Map", "description": "Final depth estimate: yellow=near, purple=far", "image": encode_image_base64(depth_vis)},
+                {"label": "Sharpness Cue", "description": "Focus/sharpness map - sharp areas appear closer", "image": encode_image_base64(sharpness_vis)},
+                {"label": "Shadow Cue", "description": "Shadow regions near edges suggest depth separation", "image": encode_image_base64(shadow_cue_vis)},
+                {"label": "Perspective Prior", "description": "Bottom of image assumed closer (vertical gradient)", "image": encode_image_base64(perspective_vis)},
+                {"label": "Edge Detection", "description": "Edges used for shadow proximity analysis", "image": encode_image_base64(edge_vis)},
+                {"label": "Gradient Magnitude", "description": "Intensity of light/dark transitions", "image": encode_image_base64(mag_color)},
                 {"label": "Shadow Direction", "description": "Arrow shows dominant light source direction", "image": encode_image_base64(arrow_vis)},
                 {"label": "Luminance Histogram", "description": "Distribution of light and dark values", "image": encode_image_base64(hist_vis)},
             ],
             "steps": [
-                "We convert to LAB color space and analyze the L (lightness) channel",
-                "Sobel operators detect horizontal and vertical gradients (edges)",
-                "Gradient magnitude shows where shadows transition (bright = strong transitions)",
-                "Gradient direction reveals the dominant light source angle",
-                "Luminance histogram shows the balance of dark, mid, and light tones",
-                "We classify the depth style based on this distribution"
+                "Three heuristic cues are combined for depth estimation:",
+                "1. SHARPNESS (45%): We use Laplacian edge detection to find sharp/in-focus areas - these appear closer to the viewer",
+                "2. SHADOW NEAR EDGES (35%): Dark regions adjacent to detected edges suggest shadows cast by elevated elements",
+                "3. PERSPECTIVE PRIOR (20%): Bottom of image is assumed closer (common in photos/UI)",
+                "The three maps are weighted and combined into a unified depth estimate",
+                "We also analyze gradient direction to determine where light is coming from",
+                "Luminance histogram reveals the overall dark/mid/light balance",
+                "Depth variance indicates whether the image has distinct layers or is flat"
             ]
         }
     }
