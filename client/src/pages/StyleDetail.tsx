@@ -2,14 +2,13 @@ import { useRoute, useLocation } from "wouter";
 import { fetchStyleById, type Style } from "@/lib/store";
 import { Layout } from "@/components/layout";
 import { TokenViewer } from "@/components/token-viewer";
-import { ArrowLeft, ImageIcon, Layers, Download, Loader2, Wand2, Palette } from "lucide-react";
+import { ArrowLeft, ImageIcon, Layers, Download, Loader2, Wand2 } from "lucide-react";
 import { Link } from "wouter";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useStyleTheme } from "@/hooks/useStyleTheme";
 import { AiMoodBoard } from "@/components/ai-mood-board";
 
-type MainView = 'previews' | 'ai-assets';
 type DetailTab = 'tokens' | 'scaffolding';
 
 export default function StyleDetail() {
@@ -19,7 +18,6 @@ export default function StyleDetail() {
   const [style, setStyle] = useState<Style | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<DetailTab>('tokens');
-  const [mainView, setMainView] = useState<MainView>('previews');
   
   const theme = useStyleTheme(style?.tokens as any);
 
@@ -123,105 +121,120 @@ export default function StyleDetail() {
            </div>
         </div>
 
-        {/* Main View Tabs */}
-        <div className="flex gap-1 p-1 bg-muted rounded-sm w-fit">
-          {[
-            { key: 'previews' as MainView, label: 'Previews', icon: ImageIcon },
-            { key: 'ai-assets' as MainView, label: 'Generated', icon: Palette },
-          ].map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setMainView(tab.key)}
-              data-testid={`tab-${tab.key}`}
-              className={cn(
-                "px-3 py-2 text-xs font-medium rounded-sm transition-colors flex items-center gap-1.5",
-                mainView === tab.key ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <tab.icon size={14} />
-              <span className="hidden sm:inline">{tab.label}</span>
-            </button>
-          ))}
-        </div>
-
         {/* Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
           
-          {/* Left Column: Visuals */}
+          {/* Left Column: Generated Assets */}
           <div className="col-span-1 lg:col-span-7 space-y-6 md:space-y-8">
-            {mainView === 'previews' && (
-              <>
-                <div className="space-y-3 md:space-y-4 animate-in fade-in duration-300">
-                  <h2 className="text-xs md:text-sm font-medium uppercase tracking-wider text-muted-foreground">Canonical Previews</h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-4">
-                    <div className="col-span-1 sm:col-span-2 aspect-video bg-muted rounded-sm overflow-hidden border border-border relative group">
-                      {style.previews.landscape && (
-                        <img 
-                          src={style.previews.landscape} 
-                          alt="Landscape preview" 
-                          className="absolute inset-0 w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                      )}
-                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <span className="text-white text-xs font-mono">16:9 LANDSCAPE</span>
-                      </div>
-                    </div>
-                    <div className="aspect-[3/4] bg-muted rounded-sm overflow-hidden border border-border relative group">
-                      {style.previews.portrait && (
-                        <img 
-                          src={style.previews.portrait} 
-                          alt="Portrait preview" 
-                          className="absolute inset-0 w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                      )}
-                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <span className="text-white text-xs font-mono">3:4 PORTRAIT</span>
-                      </div>
-                    </div>
-                    <div className="aspect-square bg-muted rounded-sm overflow-hidden border border-border relative group">
-                      {style.previews.stillLife && (
-                        <img 
-                          src={style.previews.stillLife} 
-                          alt="Still life preview" 
-                          className="absolute inset-0 w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                      )}
-                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <span className="text-white text-xs font-mono">1:1 STILL LIFE</span>
-                      </div>
-                    </div>
+            {/* Canonical Previews */}
+            <div className="space-y-3 md:space-y-4 animate-in fade-in duration-300">
+              <h2 className="text-xs md:text-sm font-medium uppercase tracking-wider text-muted-foreground">Canonical Previews</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-4">
+                <div className="col-span-1 sm:col-span-2 aspect-video bg-muted rounded-sm overflow-hidden border border-border relative group">
+                  {style.previews.landscape && (
+                    <>
+                      <img 
+                        src={style.previews.landscape} 
+                        alt="Landscape preview" 
+                        className="absolute inset-0 w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                      <button
+                        onClick={() => {
+                          const link = document.createElement("a");
+                          link.href = style.previews.landscape!;
+                          link.download = `${style.name}-landscape.png`;
+                          link.click();
+                        }}
+                        className="absolute top-2 right-2 p-1.5 rounded-md bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 z-10"
+                        title="Download image"
+                      >
+                        <Download size={14} />
+                      </button>
+                    </>
+                  )}
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                    <span className="text-white text-xs font-mono">16:9 LANDSCAPE</span>
                   </div>
                 </div>
-
-                {/* Reference Images */}
-                {style.referenceImages && style.referenceImages.length > 0 && (
-                  <div className="space-y-3 md:space-y-4">
-                    <h2 className="text-xs md:text-sm font-medium uppercase tracking-wider text-muted-foreground">Reference Sources</h2>
-                    <div className="flex gap-2 flex-wrap">
-                      {style.referenceImages.map((img, i) => (
-                        <div key={i} className="w-16 h-16 md:w-20 md:h-20 rounded-sm overflow-hidden border border-border">
-                          <img src={img} alt={`Reference ${i + 1}`} className="w-full h-full object-cover" loading="lazy" />
-                        </div>
-                      ))}
-                    </div>
+                <div className="aspect-[3/4] bg-muted rounded-sm overflow-hidden border border-border relative group">
+                  {style.previews.portrait && (
+                    <>
+                      <img 
+                        src={style.previews.portrait} 
+                        alt="Portrait preview" 
+                        className="absolute inset-0 w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                      <button
+                        onClick={() => {
+                          const link = document.createElement("a");
+                          link.href = style.previews.portrait!;
+                          link.download = `${style.name}-portrait.png`;
+                          link.click();
+                        }}
+                        className="absolute top-2 right-2 p-1.5 rounded-md bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 z-10"
+                        title="Download image"
+                      >
+                        <Download size={14} />
+                      </button>
+                    </>
+                  )}
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                    <span className="text-white text-xs font-mono">3:4 PORTRAIT</span>
                   </div>
-                )}
-              </>
-            )}
+                </div>
+                <div className="aspect-square bg-muted rounded-sm overflow-hidden border border-border relative group">
+                  {style.previews.stillLife && (
+                    <>
+                      <img 
+                        src={style.previews.stillLife} 
+                        alt="Still life preview" 
+                        className="absolute inset-0 w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                      <button
+                        onClick={() => {
+                          const link = document.createElement("a");
+                          link.href = style.previews.stillLife!;
+                          link.download = `${style.name}-still-life.png`;
+                          link.click();
+                        }}
+                        className="absolute top-2 right-2 p-1.5 rounded-md bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 z-10"
+                        title="Download image"
+                      >
+                        <Download size={14} />
+                      </button>
+                    </>
+                  )}
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                    <span className="text-white text-xs font-mono">1:1 STILL LIFE</span>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-            {mainView === 'ai-assets' && (
-              <div className="animate-in fade-in duration-300">
-                <AiMoodBoard
-                  styleId={style.id}
-                  styleName={style.name}
-                  moodBoard={style.moodBoard}
-                  uiConcepts={style.uiConcepts}
-                />
+            {/* Reference Images */}
+            {style.referenceImages && style.referenceImages.length > 0 && (
+              <div className="space-y-3 md:space-y-4">
+                <h2 className="text-xs md:text-sm font-medium uppercase tracking-wider text-muted-foreground">Reference Sources</h2>
+                <div className="flex gap-2 flex-wrap">
+                  {style.referenceImages.map((img, i) => (
+                    <div key={i} className="w-16 h-16 md:w-20 md:h-20 rounded-sm overflow-hidden border border-border">
+                      <img src={img} alt={`Reference ${i + 1}`} className="w-full h-full object-cover" loading="lazy" />
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
+
+            {/* AI Generated Assets */}
+            <AiMoodBoard
+              styleId={style.id}
+              styleName={style.name}
+              moodBoard={style.moodBoard}
+              uiConcepts={style.uiConcepts}
+            />
           </div>
 
           {/* Right Column: Technical Data */}
