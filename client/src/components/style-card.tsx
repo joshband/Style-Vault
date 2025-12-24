@@ -1,13 +1,28 @@
-import { Style } from "@/lib/store";
 import { cn } from "@/lib/utils";
-import { ImageIcon, Trash2, AlertCircle } from "lucide-react";
+import { ImageIcon, Trash2, AlertCircle, Palette } from "lucide-react";
 import { Link } from "wouter";
 import { useEffect, useState } from "react";
 import { trackStyleView } from "@/lib/suggestions";
 import { motion, AnimatePresence } from "framer-motion";
 
+interface StyleSummary {
+  id: string;
+  name: string;
+  description: string;
+  createdAt: string;
+  metadataTags?: any;
+  moodBoardStatus?: string;
+  uiConceptsStatus?: string;
+  previews?: {
+    stillLife: string;
+    landscape: string;
+    portrait: string;
+  };
+  tokens?: any;
+}
+
 interface StyleCardProps {
-  style: Style;
+  style: StyleSummary;
   className?: string;
   onDelete?: (id: string) => void;
 }
@@ -75,36 +90,45 @@ export function StyleCard({ style, className, onDelete }: StyleCardProps) {
         </motion.div>
       
       <div className={cn("group relative flex flex-col bg-card border border-border rounded-lg overflow-hidden transition-all hover:shadow-md hover:border-primary/20", isDragging && "cursor-grabbing")}>
-        {/* Preview Area - 3 Column Composite - Clickable */}
+        {/* Preview Area - 3 Column Composite or Placeholder - Clickable */}
         <Link href={`/style/${style.id}`} className="block">
           <div className="relative aspect-[12/4] bg-muted overflow-hidden flex cursor-pointer">
-            {/* Portrait Column */}
-            <div className="flex-1 relative overflow-hidden border-r border-border/50">
-              <img 
-                src={style.previews.portrait} 
-                alt={`${style.name} - portrait`}
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                draggable={false}
-              />
-            </div>
-            {/* Landscape Column */}
-            <div className="flex-1 relative overflow-hidden border-r border-border/50">
-              <img 
-                src={style.previews.landscape} 
-                alt={`${style.name} - landscape`}
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                draggable={false}
-              />
-            </div>
-            {/* Still Life Column */}
-            <div className="flex-1 relative overflow-hidden">
-              <img 
-                src={style.previews.stillLife} 
-                alt={`${style.name} - still life`}
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                draggable={false}
-              />
-            </div>
+            {style.previews ? (
+              <>
+                {/* Portrait Column */}
+                <div className="flex-1 relative overflow-hidden border-r border-border/50">
+                  <img 
+                    src={style.previews.portrait} 
+                    alt={`${style.name} - portrait`}
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    draggable={false}
+                  />
+                </div>
+                {/* Landscape Column */}
+                <div className="flex-1 relative overflow-hidden border-r border-border/50">
+                  <img 
+                    src={style.previews.landscape} 
+                    alt={`${style.name} - landscape`}
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    draggable={false}
+                  />
+                </div>
+                {/* Still Life Column */}
+                <div className="flex-1 relative overflow-hidden">
+                  <img 
+                    src={style.previews.stillLife} 
+                    alt={`${style.name} - still life`}
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    draggable={false}
+                  />
+                </div>
+              </>
+            ) : (
+              /* Placeholder when previews not loaded */
+              <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-muted to-muted/50">
+                <Palette className="w-12 h-12 text-muted-foreground/30" />
+              </div>
+            )}
 
             {/* Quick Actions */}
             <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity translate-y-[-10px] group-hover:translate-y-0">
@@ -140,8 +164,8 @@ export function StyleCard({ style, className, onDelete }: StyleCardProps) {
 
           <div className="mt-auto pt-3 flex items-center justify-between text-xs text-muted-foreground font-mono">
             <div className="flex items-center gap-1.5">
-               <ImageIcon size={12} />
-               <span>{Object.keys(style.tokens).length} Token Groups</span>
+               <Palette size={12} />
+               <span>Style</span>
             </div>
             <time dateTime={style.createdAt}>
               {new Date(style.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}

@@ -2,6 +2,16 @@ import { type User, type InsertUser, type Style, type InsertStyle, type Generate
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
 
+export interface StyleSummary {
+  id: string;
+  name: string;
+  description: string;
+  createdAt: Date;
+  metadataTags: any;
+  moodBoardStatus: string;
+  uiConceptsStatus: string;
+}
+
 export interface IStorage {
   // User operations
   getUser(id: string): Promise<User | undefined>;
@@ -10,6 +20,7 @@ export interface IStorage {
   
   // Style operations
   getStyles(): Promise<Style[]>;
+  getStyleSummaries(): Promise<StyleSummary[]>;
   getStyleById(id: string): Promise<Style | undefined>;
   createStyle(style: InsertStyle): Promise<Style>;
   deleteStyle(id: string): Promise<void>;
@@ -41,6 +52,31 @@ export class DatabaseStorage implements IStorage {
   // Style operations
   async getStyles(): Promise<Style[]> {
     return db.select().from(styles).orderBy(desc(styles.createdAt));
+  }
+
+  async getStyleSummaries(): Promise<StyleSummary[]> {
+    const allStyles = await db
+      .select({
+        id: styles.id,
+        name: styles.name,
+        description: styles.description,
+        createdAt: styles.createdAt,
+        metadataTags: styles.metadataTags,
+        moodBoard: styles.moodBoard,
+        uiConcepts: styles.uiConcepts,
+      })
+      .from(styles)
+      .orderBy(desc(styles.createdAt));
+    
+    return allStyles.map(s => ({
+      id: s.id,
+      name: s.name,
+      description: s.description,
+      createdAt: s.createdAt,
+      metadataTags: s.metadataTags,
+      moodBoardStatus: (s.moodBoard as any)?.status || "pending",
+      uiConceptsStatus: (s.uiConcepts as any)?.status || "pending",
+    }));
   }
 
   async getStyleById(id: string): Promise<Style | undefined> {

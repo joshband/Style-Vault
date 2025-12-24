@@ -20,7 +20,7 @@ export async function registerRoutes(
       await db.execute(sql`SELECT 1`);
       const dbLatency = Date.now() - startTime;
       
-      const styleCount = await storage.getStyles();
+      const styleCount = await storage.getStyleSummaries();
       
       res.json({
         status: "healthy",
@@ -42,10 +42,10 @@ export async function registerRoutes(
     }
   });
 
-  // Get all styles
+  // Get all styles (lightweight summaries for list view)
   app.get("/api/styles", async (req, res) => {
     try {
-      const styles = await storage.getStyles();
+      const styles = await storage.getStyleSummaries();
       res.json(styles);
     } catch (error) {
       console.error("Error fetching styles:", error);
