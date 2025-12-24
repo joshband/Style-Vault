@@ -84,7 +84,7 @@ export async function generateCanonicalPreviews(
     // Generate portrait (3:4) - fixed subject: artist in atelier
     try {
       const portraitResponse = await ai.models.generateContent({
-        model: "gemini-2.5-flash-preview-05-20",
+        model: "gemini-2.5-flash-image",
         contents: [
           {
             role: "user",
@@ -117,7 +117,7 @@ The image should clearly demonstrate this style's color palette, lighting approa
     // Generate landscape (16:9) - fixed subject: elevated promenade overlooking cityscape
     try {
       const landscapeResponse = await ai.models.generateContent({
-        model: "gemini-2.5-flash-preview-05-20",
+        model: "gemini-2.5-flash-image",
         contents: [
           {
             role: "user",
@@ -150,7 +150,7 @@ The image should clearly demonstrate this style's color palette, atmospheric tre
     // Generate still life (1:1) - fixed subject: curated desk arrangement
     try {
       const stillLifeResponse = await ai.models.generateContent({
-        model: "gemini-2.5-flash-preview-05-20",
+        model: "gemini-2.5-flash-image",
         contents: [
           {
             role: "user",
