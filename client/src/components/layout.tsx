@@ -98,11 +98,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 className="bg-transparent border-none outline-none text-xs sm:text-sm w-full placeholder:text-muted-foreground/60"
               />
             </div>
-            <div className="flex items-center gap-4 flex-shrink-0">
-              <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center text-xs font-medium">
-                JD
-              </div>
-            </div>
          </header>
 
          <div className="flex-1 p-4 sm:p-6 md:p-8 max-w-7xl mx-auto w-full overflow-auto">
