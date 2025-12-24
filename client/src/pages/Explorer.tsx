@@ -3,18 +3,54 @@ import { StyleCard } from "@/components/style-card";
 import { Layout } from "@/components/layout";
 import { motion, AnimatePresence } from "framer-motion";
 import { getRecommendedStyles, getBrowsingHistory } from "@/lib/suggestions";
-import { Sparkles, Loader2 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Sparkles, Loader2, RefreshCw } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Button } from "@/components/ui/button";
 
 export default function Explorer() {
   const [styles, setStyles] = useState<Style[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+
+  const loadStyles = useCallback(async (isRetry = false) => {
+    setLoading(true);
+    setError(false);
+    
+    const maxRetries = 3;
+    let attempts = 0;
+    
+    while (attempts < maxRetries) {
+      try {
+        const response = await fetch("/api/styles");
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const data = await response.json();
+        setStyles(data);
+        setLoading(false);
+        return;
+      } catch (err) {
+        attempts++;
+        console.error(`Fetch attempt ${attempts} failed:`, err);
+        if (attempts < maxRetries) {
+          await new Promise(r => setTimeout(r, 500 * attempts));
+        }
+      }
+    }
+    
+    setError(true);
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
-    fetchStyles()
-      .then(setStyles)
-      .finally(() => setLoading(false));
-  }, []);
+    loadStyles();
+  }, [loadStyles]);
+
+  const handleRetry = () => {
+    setRetryCount(c => c + 1);
+    loadStyles(true);
+  };
 
   const recommendations = getRecommendedStyles(styles, 3);
   const hasHistory = getBrowsingHistory().length > 0;
@@ -56,8 +92,26 @@ export default function Explorer() {
           </div>
         </div>
 
+        {/* Error State */}
+        {error && (
+          <div className="py-20 text-center border border-dashed border-destructive/50 rounded-lg bg-destructive/5">
+            <p className="text-destructive mb-2">Failed to load styles</p>
+            <p className="text-sm text-muted-foreground mb-4">
+              There was a network error. Your styles are still saved.
+            </p>
+            <Button 
+              variant="outline" 
+              onClick={handleRetry}
+              data-testid="button-retry-load"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Try Again
+            </Button>
+          </div>
+        )}
+
         {/* Empty State */}
-        {styles.length === 0 && (
+        {!error && styles.length === 0 && (
           <div className="py-20 text-center border border-dashed border-border rounded-lg bg-muted/5">
             <p className="text-muted-foreground mb-2">No styles yet</p>
             <p className="text-sm text-muted-foreground/70">
