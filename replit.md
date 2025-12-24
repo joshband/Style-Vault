@@ -51,6 +51,7 @@ Preferred communication style: Simple, everyday language.
   - Image analysis for style extraction (`server/analysis.ts`)
   - Canonical preview generation (`server/preview-generation.ts`)
   - Styled image generation (`server/image-generation.ts`)
+  - Metadata enrichment for searchable tags (`server/metadata-enrichment.ts`)
 
 ### Design Token System
 - **Standard**: W3C DTCG (Design Token Community Group) 2025.10 format
@@ -64,6 +65,8 @@ Preferred communication style: Simple, everyday language.
 **Canonical Preview System**: Each style generates three standardized preview images (portrait, landscape, still-life) using fixed subjects. This enables meaningful cross-style comparison.
 
 **Prompt Scaffolding**: Styles include structured prompt templates (base, modifiers, negative) derived from tokens, ensuring consistent application of style characteristics during image generation.
+
+**Background Metadata Enrichment**: After style creation and mood board generation, an AI-powered background worker enriches styles with searchable keywords and tags (mood, color family, era, medium, subjects, lighting, texture). This enables filtering and discovery across the style library via the `/api/tags` endpoint.
 
 ## External Dependencies
 
