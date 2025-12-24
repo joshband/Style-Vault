@@ -101,16 +101,10 @@ export default function Authoring() {
       if (response.ok) {
         const { previews } = await response.json();
         
-        // Convert 9 previews into still life, landscape, portrait for backward compatibility
-        const previewMap = new Map();
-        previews.forEach((p: any, idx: number) => {
-          previewMap.set(idx, p.url);
-        });
-
         setGeneratedPreviews({
-          stillLife: previewMap.get(2) || previewMap.get(0) || "",
-          landscape: previewMap.get(1) || previewMap.get(0) || "",
-          portrait: previewMap.get(0) || "",
+          stillLife: previews.stillLife || "",
+          landscape: previews.landscape || "",
+          portrait: previews.portrait || "",
         });
 
         setStep(2);
