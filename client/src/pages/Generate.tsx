@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 import { Link, useParams } from "wouter";
 import { InfoTooltip, FEATURE_EXPLANATIONS } from "@/components/info-tooltip";
 
-export default function Generation() {
+export default function Generate() {
   const { styleId } = useParams<{ styleId: string }>();
   const [style, setStyle] = useState<Style | null>(null);
   const [loading, setLoading] = useState(true);

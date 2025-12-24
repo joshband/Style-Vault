@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { compressImage, getImageSizeKB } from "@/lib/image-utils";
 import { InfoTooltip, FEATURE_EXPLANATIONS } from "@/components/info-tooltip";
 
-export default function Authoring() {
+export default function Author() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [step, setStep] = useState<1 | 2>(1);

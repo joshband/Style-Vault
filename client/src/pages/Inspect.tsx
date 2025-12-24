@@ -13,7 +13,7 @@ import { InfoTooltip, FEATURE_EXPLANATIONS } from "@/components/info-tooltip";
 
 type DetailTab = 'tokens' | 'scaffolding' | 'explorer';
 
-export default function StyleDetail() {
+export default function Inspect() {
   const [, params] = useRoute("/style/:id");
   const [, setLocation] = useLocation();
   const id = params?.id;
