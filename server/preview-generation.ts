@@ -20,6 +20,13 @@ interface PreviewImage {
   stillLife: string;
 }
 
+// Fixed canonical subjects for consistent cross-style comparison
+const CANONICAL_SUBJECTS = {
+  portrait: "an artist standing in their sunlit atelier studio, wearing a paint-stained apron, holding a palette and brush, with an easel and canvas visible behind them",
+  landscape: "an elevated stone promenade with ornate railings overlooking a layered cityscape at golden hour, with rooftops, spires, and distant mountains visible on the horizon",
+  stillLife: "a curated arrangement on a wooden studio desk featuring an open leather-bound sketchbook, glass jars of colorful pigments, a small sculpted bust, dried flowers in a ceramic vase, and natural light from a nearby window",
+};
+
 function generateStyledPlaceholder(
   width: number,
   height: number,
@@ -74,7 +81,7 @@ export async function generateCanonicalPreviews(
   };
 
   try {
-    // Generate portrait (3:4) - a person/figure showcasing the style
+    // Generate portrait (3:4) - fixed subject: artist in atelier
     try {
       const portraitResponse = await ai.models.generateContent({
         model: "gemini-2.5-flash-preview-05-20",
@@ -83,11 +90,13 @@ export async function generateCanonicalPreviews(
             role: "user",
             parts: [
               {
-                text: `Generate a portrait image (3:4 aspect ratio, vertical orientation) showcasing the "${styleName}" visual style. 
+                text: `Generate a portrait image (3:4 vertical aspect ratio) rendered in the "${styleName}" visual style.
 
-Style characteristics: ${styleDescription}
+Subject: ${CANONICAL_SUBJECTS.portrait}
 
-The portrait should feature a person or figure that demonstrates this aesthetic. Focus on composition, lighting, color palette, and mood that embody this style.`,
+Apply these style characteristics to the rendering: ${styleDescription}
+
+The image should clearly demonstrate this style's color palette, lighting approach, texture treatment, and overall mood.`,
               },
             ],
           },
@@ -105,7 +114,7 @@ The portrait should feature a person or figure that demonstrates this aesthetic.
       console.warn("Portrait generation failed:", error instanceof Error ? error.message : String(error));
     }
 
-    // Generate landscape (16:9) - a scenic view showcasing the style
+    // Generate landscape (16:9) - fixed subject: elevated promenade overlooking cityscape
     try {
       const landscapeResponse = await ai.models.generateContent({
         model: "gemini-2.5-flash-preview-05-20",
@@ -114,11 +123,13 @@ The portrait should feature a person or figure that demonstrates this aesthetic.
             role: "user",
             parts: [
               {
-                text: `Generate a landscape image (16:9 aspect ratio, horizontal orientation) showcasing the "${styleName}" visual style.
+                text: `Generate a landscape image (16:9 horizontal aspect ratio) rendered in the "${styleName}" visual style.
 
-Style characteristics: ${styleDescription}
+Subject: ${CANONICAL_SUBJECTS.landscape}
 
-The landscape should feature a scenic environment or vista that demonstrates this aesthetic. Focus on composition, lighting, color palette, and atmosphere that embody this style.`,
+Apply these style characteristics to the rendering: ${styleDescription}
+
+The image should clearly demonstrate this style's color palette, atmospheric treatment, spatial depth, and overall mood.`,
               },
             ],
           },
@@ -136,7 +147,7 @@ The landscape should feature a scenic environment or vista that demonstrates thi
       console.warn("Landscape generation failed:", error instanceof Error ? error.message : String(error));
     }
 
-    // Generate still life (1:1) - an arrangement of objects showcasing the style
+    // Generate still life (1:1) - fixed subject: curated desk arrangement
     try {
       const stillLifeResponse = await ai.models.generateContent({
         model: "gemini-2.5-flash-preview-05-20",
@@ -145,11 +156,13 @@ The landscape should feature a scenic environment or vista that demonstrates thi
             role: "user",
             parts: [
               {
-                text: `Generate a still life image (1:1 square aspect ratio) showcasing the "${styleName}" visual style.
+                text: `Generate a still life image (1:1 square aspect ratio) rendered in the "${styleName}" visual style.
 
-Style characteristics: ${styleDescription}
+Subject: ${CANONICAL_SUBJECTS.stillLife}
 
-The still life should feature an arrangement of objects that demonstrates this aesthetic. Focus on composition, lighting, color palette, and textures that embody this style.`,
+Apply these style characteristics to the rendering: ${styleDescription}
+
+The image should clearly demonstrate this style's color palette, material textures, lighting approach, and overall mood.`,
               },
             ],
           },
