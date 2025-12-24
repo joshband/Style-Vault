@@ -128,9 +128,26 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateStyleMetadata(id: string, metadataTags: MetadataTags, status: MetadataEnrichmentStatus): Promise<Style | undefined> {
+    const normalizedTags: MetadataTags = {
+      mood: metadataTags.mood || [],
+      colorFamily: metadataTags.colorFamily || [],
+      lighting: metadataTags.lighting || [],
+      texture: metadataTags.texture || [],
+      era: metadataTags.era || [],
+      artPeriod: metadataTags.artPeriod || [],
+      historicalInfluences: metadataTags.historicalInfluences || [],
+      similarArtists: metadataTags.similarArtists || [],
+      medium: metadataTags.medium || [],
+      subjects: metadataTags.subjects || [],
+      usageExamples: metadataTags.usageExamples || [],
+      keywords: metadataTags.keywords || [],
+      version: metadataTags.version,
+      lastAnalyzedAt: metadataTags.lastAnalyzedAt,
+    };
+    
     const [updated] = await db
       .update(styles)
-      .set({ metadataTags, metadataEnrichmentStatus: status })
+      .set({ metadataTags: normalizedTags, metadataEnrichmentStatus: status })
       .where(eq(styles.id, id))
       .returning();
     return updated;

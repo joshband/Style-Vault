@@ -19,14 +19,29 @@ export type User = typeof users.$inferSelect;
 
 // Metadata tags for visual descriptors and AI-generated keywords
 export interface MetadataTags {
+  // Core visual characteristics
   mood: string[];
   colorFamily: string[];
-  era: string[];
-  medium: string[];
-  subjects: string[];
   lighting: string[];
   texture: string[];
+  
+  // Art historical context
+  era: string[];
+  artPeriod: string[];
+  historicalInfluences: string[];
+  similarArtists: string[];
+  
+  // Technical aspects
+  medium: string[];
+  subjects: string[];
+  
+  // Application guidance
+  usageExamples: string[];
+  
+  // Search keywords
   keywords: string[];
+  
+  // Metadata versioning
   version?: number;
   lastAnalyzedAt?: string;
 }
@@ -84,11 +99,15 @@ export const styles = pgTable("styles", {
   metadataTags: jsonb("metadata_tags").$type<MetadataTags>().default({
     mood: [],
     colorFamily: [],
-    era: [],
-    medium: [],
-    subjects: [],
     lighting: [],
     texture: [],
+    era: [],
+    artPeriod: [],
+    historicalInfluences: [],
+    similarArtists: [],
+    medium: [],
+    subjects: [],
+    usageExamples: [],
     keywords: [],
   }),
   metadataEnrichmentStatus: text("metadata_enrichment_status").$type<MetadataEnrichmentStatus>().default("pending"),

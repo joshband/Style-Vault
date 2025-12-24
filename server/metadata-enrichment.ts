@@ -11,20 +11,33 @@ const ai = new GoogleGenAI({
 });
 
 interface EnrichmentResult {
+  // Core visual characteristics
   mood: string[];
   colorFamily: string[];
-  era: string[];
-  medium: string[];
-  subjects: string[];
   lighting: string[];
   texture: string[];
+  
+  // Art historical context
+  era: string[];
+  artPeriod: string[];
+  historicalInfluences: string[];
+  similarArtists: string[];
+  
+  // Technical aspects
+  medium: string[];
+  subjects: string[];
+  
+  // Application guidance
+  usageExamples: string[];
+  
+  // Search keywords
   keywords: string[];
 }
 
 function buildEnrichmentPrompt(style: Style): string {
   const tokensPreview = JSON.stringify(style.tokens, null, 2).slice(0, 2000);
   
-  return `Analyze this visual style and generate descriptive metadata tags for search and filtering.
+  return `You are an art historian and design expert. Analyze this visual style and generate rich descriptive metadata for discovery and classification.
 
 Style Name: ${style.name}
 Description: ${style.description}
@@ -32,31 +45,39 @@ Description: ${style.description}
 Design Tokens (excerpt):
 ${tokensPreview}
 
-Generate tags in these categories. Use lowercase, hyphenated keywords (e.g., "warm-tones", "mid-century").
+Generate tags in these categories. Use lowercase, hyphenated keywords where appropriate.
 
 Respond with ONLY valid JSON in this exact format:
 {
   "mood": ["tag1", "tag2", "tag3"],
   "colorFamily": ["tag1", "tag2"],
-  "era": ["tag1", "tag2"],
-  "medium": ["tag1", "tag2"],
-  "subjects": ["tag1", "tag2", "tag3"],
   "lighting": ["tag1", "tag2"],
   "texture": ["tag1", "tag2"],
+  "era": ["tag1", "tag2"],
+  "artPeriod": ["tag1", "tag2"],
+  "historicalInfluences": ["influence1", "influence2"],
+  "similarArtists": ["artist1", "artist2"],
+  "medium": ["tag1", "tag2"],
+  "subjects": ["tag1", "tag2"],
+  "usageExamples": ["example1", "example2", "example3"],
   "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"]
 }
 
 Guidelines:
-- mood: emotional qualities (e.g., "serene", "energetic", "nostalgic", "playful")
-- colorFamily: color palettes (e.g., "earth-tones", "pastels", "monochrome", "vibrant")
-- era: time period influences (e.g., "retro", "modern", "vintage", "futuristic", "mid-century")
-- medium: artistic medium feel (e.g., "photographic", "illustrated", "painterly", "digital")
-- subjects: common subject matter (e.g., "nature", "urban", "portraits", "abstract")
-- lighting: lighting characteristics (e.g., "soft", "dramatic", "natural", "studio")
-- texture: surface qualities (e.g., "smooth", "grainy", "textured", "matte")
+- mood: emotional qualities (e.g., "serene", "melancholic", "energetic", "nostalgic", "whimsical", "dramatic")
+- colorFamily: color palettes (e.g., "earth-tones", "pastels", "monochrome", "jewel-tones", "muted", "high-contrast")
+- lighting: lighting characteristics (e.g., "soft-diffused", "dramatic-chiaroscuro", "golden-hour", "flat", "rim-lit")
+- texture: surface qualities (e.g., "smooth", "grainy", "impasto", "organic", "geometric")
+- era: time period (e.g., "1920s", "1970s", "contemporary", "ancient", "medieval", "renaissance")
+- artPeriod: art movement or period (e.g., "art-deco", "art-nouveau", "impressionism", "bauhaus", "pop-art", "minimalism")
+- historicalInfluences: art movements, cultural movements, or design schools that influenced this style (e.g., "japanese-woodblock", "bauhaus-school", "memphis-design", "swiss-style")
+- similarArtists: artists or designers with comparable aesthetics (e.g., "monet", "warhol", "mucha", "saul-bass", "yayoi-kusama")
+- medium: artistic medium feel (e.g., "oil-painting", "watercolor", "photography", "digital-illustration", "collage")
+- subjects: common subject matter (e.g., "landscapes", "portraits", "still-life", "abstract", "architectural")
+- usageExamples: practical applications (e.g., "album-covers", "book-illustrations", "brand-identity", "editorial", "packaging", "web-design", "fashion-photography")
 - keywords: 5-10 general search terms combining all aspects
 
-Be specific and descriptive. Generate 2-4 tags per category.`;
+Be specific, knowledgeable, and descriptive. Generate 2-5 tags per category.`;
 }
 
 function normalizeTag(tag: string): string {
@@ -81,13 +102,26 @@ function parseEnrichmentResponse(text: string): EnrichmentResult | null {
     const parsed = JSON.parse(jsonMatch[0]);
     
     return {
+      // Core visual characteristics
       mood: normalizeArray(parsed.mood || []),
       colorFamily: normalizeArray(parsed.colorFamily || []),
-      era: normalizeArray(parsed.era || []),
-      medium: normalizeArray(parsed.medium || []),
-      subjects: normalizeArray(parsed.subjects || []),
       lighting: normalizeArray(parsed.lighting || []),
       texture: normalizeArray(parsed.texture || []),
+      
+      // Art historical context
+      era: normalizeArray(parsed.era || []),
+      artPeriod: normalizeArray(parsed.artPeriod || []),
+      historicalInfluences: normalizeArray(parsed.historicalInfluences || []),
+      similarArtists: normalizeArray(parsed.similarArtists || []),
+      
+      // Technical aspects
+      medium: normalizeArray(parsed.medium || []),
+      subjects: normalizeArray(parsed.subjects || []),
+      
+      // Application guidance
+      usageExamples: normalizeArray(parsed.usageExamples || []),
+      
+      // Search keywords
       keywords: normalizeArray(parsed.keywords || []),
     };
   } catch (error) {
@@ -182,25 +216,40 @@ export async function getTagsSummary(): Promise<Record<string, Record<string, nu
   const styles = await storage.getStyles();
   
   const summary: Record<string, Record<string, number>> = {
+    // Core visual characteristics
     mood: {},
     colorFamily: {},
-    era: {},
-    medium: {},
-    subjects: {},
     lighting: {},
     texture: {},
+    
+    // Art historical context
+    era: {},
+    artPeriod: {},
+    historicalInfluences: {},
+    similarArtists: {},
+    
+    // Technical aspects
+    medium: {},
+    subjects: {},
+    
+    // Application guidance
+    usageExamples: {},
+    
+    // Search keywords
     keywords: {},
   };
   
   for (const style of styles) {
-    const tags = style.metadataTags as MetadataTags | null;
+    const tags = style.metadataTags as Partial<MetadataTags> | null;
     if (!tags) continue;
     
-    for (const [category, categoryTags] of Object.entries(summary)) {
-      const styleTags = (tags as any)[category];
+    for (const category of Object.keys(summary)) {
+      const styleTags = (tags as Record<string, unknown>)[category];
       if (Array.isArray(styleTags)) {
         for (const tag of styleTags) {
-          summary[category][tag] = (summary[category][tag] || 0) + 1;
+          if (typeof tag === "string" && tag.length > 0) {
+            summary[category][tag] = (summary[category][tag] || 0) + 1;
+          }
         }
       }
     }
