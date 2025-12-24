@@ -2,7 +2,8 @@ import { useRoute, useLocation } from "wouter";
 import { fetchStyleById, type Style } from "@/lib/store";
 import { Layout } from "@/components/layout";
 import { TokenViewer } from "@/components/token-viewer";
-import { ArrowLeft, ImageIcon, Layers, Download, Loader2, Wand2 } from "lucide-react";
+import { CVTokenExplorer } from "@/components/cv-token-explorer";
+import { ArrowLeft, ImageIcon, Layers, Download, Loader2, Wand2, Eye } from "lucide-react";
 import { Link } from "wouter";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -10,7 +11,7 @@ import { useStyleTheme } from "@/hooks/useStyleTheme";
 import { AiMoodBoard } from "@/components/ai-mood-board";
 import { InfoTooltip, FEATURE_EXPLANATIONS } from "@/components/info-tooltip";
 
-type DetailTab = 'tokens' | 'scaffolding';
+type DetailTab = 'tokens' | 'scaffolding' | 'explorer';
 
 export default function StyleDetail() {
   const [, params] = useRoute("/style/:id");
@@ -280,27 +281,42 @@ export default function StyleDetail() {
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span>Technical Data</span>
                 <InfoTooltip side="right" testId="tooltip-technical-data">
-                  {activeTab === 'tokens' ? FEATURE_EXPLANATIONS.designTokens : FEATURE_EXPLANATIONS.promptScaffolding}
+                  {activeTab === 'tokens' ? FEATURE_EXPLANATIONS.designTokens : 
+                   activeTab === 'explorer' ? 'Analyze the reference image using computer vision to extract design tokens like colors, spacing, and border radius.' :
+                   FEATURE_EXPLANATIONS.promptScaffolding}
                 </InfoTooltip>
               </div>
               <div className="flex gap-1 p-1 bg-muted rounded-sm">
                 <button 
                   onClick={() => setActiveTab('tokens')}
+                  data-testid="tab-design-tokens"
                   className={cn(
                     "flex-1 py-2 text-xs font-medium rounded-sm transition-colors",
                     activeTab === 'tokens' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  DESIGN TOKENS
+                  TOKENS
+                </button>
+                <button 
+                  onClick={() => setActiveTab('explorer')}
+                  data-testid="tab-token-explorer"
+                  className={cn(
+                    "flex-1 py-2 text-xs font-medium rounded-sm transition-colors flex items-center justify-center gap-1",
+                    activeTab === 'explorer' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Eye size={12} />
+                  EXPLORER
                 </button>
                 <button 
                   onClick={() => setActiveTab('scaffolding')}
+                  data-testid="tab-prompt-scaffolding"
                   className={cn(
                     "flex-1 py-2 text-xs font-medium rounded-sm transition-colors",
                     activeTab === 'scaffolding' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  PROMPT SCAFFOLDING
+                  PROMPTS
                 </button>
               </div>
             </div>
@@ -308,6 +324,15 @@ export default function StyleDetail() {
             {activeTab === 'tokens' && (
               <div className="bg-card border border-border rounded-md p-3 md:p-4 animate-in fade-in duration-300">
                 <TokenViewer tokens={style.tokens} />
+              </div>
+            )}
+
+            {activeTab === 'explorer' && (
+              <div className="bg-card border border-border rounded-md p-3 md:p-4 animate-in fade-in duration-300">
+                <CVTokenExplorer 
+                  referenceImage={style.referenceImages?.[0]} 
+                  styleName={style.name}
+                />
               </div>
             )}
 

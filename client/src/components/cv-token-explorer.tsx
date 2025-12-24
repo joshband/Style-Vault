@@ -1,0 +1,384 @@
+import { useState } from "react";
+import { Loader2, Palette, Grid3X3, BoxSelect, Layers, PenTool, AlertCircle, Eye } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+interface CVColorToken {
+  space: string;
+  l: number;
+  c: number;
+  h: number;
+}
+
+interface CVGridToken {
+  columns: number;
+  rows: number;
+}
+
+interface CVElevationToken {
+  elevation: number;
+  shadowStrength: number;
+}
+
+interface CVExtractedTokens {
+  color: CVColorToken[];
+  spacing: number[];
+  borderRadius: number[];
+  grid: CVGridToken;
+  elevation: CVElevationToken;
+  strokeWidth: number[];
+  meta: {
+    method: string;
+    confidence: string;
+    realtimeSafe: boolean;
+  };
+}
+
+interface CVTokenExplorerProps {
+  referenceImage?: string;
+  styleName: string;
+}
+
+function oklchToCSS(color: CVColorToken): string {
+  return `oklch(${color.l} ${color.c} ${color.h})`;
+}
+
+function ColorSection({ colors }: { colors: CVColorToken[] }) {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        <Palette size={14} />
+        <span>Extracted Colors</span>
+        <span className="text-[10px] font-normal normal-case">({colors.length} unique)</span>
+      </div>
+      <div className="grid grid-cols-4 gap-2">
+        {colors.map((color, i) => (
+          <div
+            key={i}
+            className="relative group"
+            onMouseEnter={() => setHoveredIndex(i)}
+            onMouseLeave={() => setHoveredIndex(null)}
+          >
+            <div
+              className="aspect-square rounded-md border border-border shadow-sm transition-transform group-hover:scale-105"
+              style={{ backgroundColor: oklchToCSS(color) }}
+              data-testid={`color-swatch-${i}`}
+            />
+            {hoveredIndex === i && (
+              <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 bg-popover border border-border rounded-md px-2 py-1 text-[10px] font-mono whitespace-nowrap z-10 shadow-lg">
+                <div>L: {color.l.toFixed(2)}</div>
+                <div>C: {color.c.toFixed(3)}</div>
+                <div>H: {color.h.toFixed(0)}°</div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="text-[10px] text-muted-foreground font-mono">
+        Color space: OKLCH (perceptually uniform)
+      </div>
+    </div>
+  );
+}
+
+function SpacingSection({ spacing }: { spacing: number[] }) {
+  const maxSpacing = Math.max(...spacing, 64);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        <Grid3X3 size={14} />
+        <span>Spacing Scale</span>
+      </div>
+      {spacing.length > 0 ? (
+        <div className="space-y-2">
+          {spacing.map((value, i) => (
+            <div key={i} className="flex items-center gap-3">
+              <div
+                className="h-3 bg-primary/60 rounded-sm transition-all"
+                style={{ width: `${(value / maxSpacing) * 100}%`, minWidth: '8px' }}
+                data-testid={`spacing-bar-${value}`}
+              />
+              <span className="text-xs font-mono text-muted-foreground w-12">{value}px</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-xs text-muted-foreground">No spacing patterns detected</div>
+      )}
+    </div>
+  );
+}
+
+function BorderRadiusSection({ radii }: { radii: number[] }) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        <BoxSelect size={14} />
+        <span>Border Radius</span>
+      </div>
+      {radii.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {radii.map((radius, i) => (
+            <div
+              key={i}
+              className="w-12 h-12 border-2 border-primary/60 bg-primary/10 flex items-center justify-center text-xs font-mono"
+              style={{ borderRadius: `${radius}px` }}
+              data-testid={`radius-sample-${radius}`}
+            >
+              {radius}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-xs text-muted-foreground">No border radii detected</div>
+      )}
+    </div>
+  );
+}
+
+function ElevationSection({ elevation }: { elevation: CVElevationToken }) {
+  const levels = ['Flat', 'Subtle', 'Elevated'];
+  const shadows = [
+    'none',
+    '0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08)',
+    '0 4px 6px rgba(0,0,0,0.12), 0 2px 4px rgba(0,0,0,0.08)'
+  ];
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        <Layers size={14} />
+        <span>Elevation</span>
+      </div>
+      <div className="flex gap-3">
+        {[0, 1, 2].map((level) => (
+          <div
+            key={level}
+            className={cn(
+              "w-16 h-16 rounded-md bg-card border border-border flex items-center justify-center text-xs font-mono transition-all",
+              elevation.elevation === level && "ring-2 ring-primary"
+            )}
+            style={{ boxShadow: shadows[level] }}
+            data-testid={`elevation-level-${level}`}
+          >
+            {levels[level]}
+          </div>
+        ))}
+      </div>
+      <div className="text-[10px] text-muted-foreground font-mono">
+        Detected: {levels[elevation.elevation]} (strength: {elevation.shadowStrength.toFixed(1)})
+      </div>
+    </div>
+  );
+}
+
+function StrokeSection({ strokes }: { strokes: number[] }) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        <PenTool size={14} />
+        <span>Stroke Widths</span>
+      </div>
+      {strokes.length > 0 ? (
+        <div className="flex flex-wrap items-end gap-4">
+          {strokes.map((width, i) => (
+            <div key={i} className="flex flex-col items-center gap-1">
+              <div
+                className="w-12 bg-foreground rounded-full"
+                style={{ height: `${width}px` }}
+                data-testid={`stroke-sample-${width}`}
+              />
+              <span className="text-xs font-mono text-muted-foreground">{width}px</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-xs text-muted-foreground">No stroke widths detected</div>
+      )}
+    </div>
+  );
+}
+
+function GridSection({ grid }: { grid: CVGridToken }) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        <Grid3X3 size={14} />
+        <span>Grid Structure</span>
+      </div>
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          <span className="text-2xl font-mono font-bold text-primary">{grid.columns}</span>
+          <span className="text-xs text-muted-foreground">columns</span>
+        </div>
+        <div className="text-muted-foreground">×</div>
+        <div className="flex items-center gap-2">
+          <span className="text-2xl font-mono font-bold text-primary">{grid.rows}</span>
+          <span className="text-xs text-muted-foreground">rows</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function CVTokenExplorer({ referenceImage, styleName }: CVTokenExplorerProps) {
+  const [tokens, setTokens] = useState<CVExtractedTokens | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [cvEnabled, setCvEnabled] = useState<boolean | null>(null);
+
+  const checkStatus = async () => {
+    try {
+      const res = await fetch('/api/cv-status');
+      const data = await res.json();
+      setCvEnabled(data.enabled);
+      return data.enabled;
+    } catch {
+      setCvEnabled(false);
+      return false;
+    }
+  };
+
+  const extractTokens = async () => {
+    if (!referenceImage) {
+      setError("No reference image available");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const enabled = await checkStatus();
+      if (!enabled) {
+        setError("CV extraction is not enabled on this server");
+        setLoading(false);
+        return;
+      }
+
+      const res = await fetch('/api/analyze-image-cv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: referenceImage }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || 'CV extraction failed');
+      }
+
+      const data = await res.json();
+      setTokens(data.rawTokens);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to extract tokens');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!referenceImage) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <AlertCircle className="text-muted-foreground mb-3" size={32} />
+        <p className="text-sm text-muted-foreground">No reference image available for this style</p>
+      </div>
+    );
+  }
+
+  if (!tokens && !loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-8 text-center space-y-4">
+        <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+          <Eye className="text-primary" size={24} />
+        </div>
+        <div className="space-y-2">
+          <h3 className="text-sm font-medium">CV Token Extraction</h3>
+          <p className="text-xs text-muted-foreground max-w-xs">
+            Analyze the reference image to extract design tokens using computer vision. 
+            This is fast, deterministic, and runs entirely on CPU.
+          </p>
+        </div>
+        <button
+          onClick={extractTokens}
+          disabled={loading}
+          data-testid="button-extract-cv-tokens"
+          className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+        >
+          {loading ? (
+            <span className="flex items-center gap-2">
+              <Loader2 size={14} className="animate-spin" />
+              Analyzing...
+            </span>
+          ) : (
+            'Extract Tokens'
+          )}
+        </button>
+        {error && (
+          <p className="text-xs text-destructive">{error}</p>
+        )}
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <Loader2 className="animate-spin text-primary mb-3" size={32} />
+        <p className="text-sm text-muted-foreground">Analyzing image with CV...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <AlertCircle className="text-destructive mb-3" size={32} />
+        <p className="text-sm text-destructive">{error}</p>
+        <button
+          onClick={extractTokens}
+          className="mt-4 text-xs underline text-muted-foreground hover:text-foreground"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
+
+  if (!tokens) return null;
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-300">
+      <div className="flex items-center justify-between">
+        <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">
+          Extracted via {tokens.meta.method} • Confidence: {tokens.meta.confidence}
+        </div>
+        <button
+          onClick={extractTokens}
+          className="text-[10px] underline text-muted-foreground hover:text-foreground"
+          data-testid="button-refresh-cv-tokens"
+        >
+          Re-analyze
+        </button>
+      </div>
+
+      <ColorSection colors={tokens.color} />
+      <div className="border-t border-border pt-6">
+        <SpacingSection spacing={tokens.spacing} />
+      </div>
+      <div className="border-t border-border pt-6">
+        <BorderRadiusSection radii={tokens.borderRadius} />
+      </div>
+      <div className="border-t border-border pt-6">
+        <ElevationSection elevation={tokens.elevation} />
+      </div>
+      <div className="border-t border-border pt-6">
+        <StrokeSection strokes={tokens.strokeWidth} />
+      </div>
+      <div className="border-t border-border pt-6">
+        <GridSection grid={tokens.grid} />
+      </div>
+    </div>
+  );
+}
