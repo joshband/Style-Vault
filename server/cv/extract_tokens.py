@@ -271,25 +271,29 @@ def analyze_color_harmony(colors):
     if hue_range < 15:
         harmony_type = "monochromatic"
         strength = 1.0 - (hue_range / 15)
-    elif harmony_scores["complementary"] > 0 and harmony_scores["analogous"] > 0:
-        harmony_type = "split-complementary"
-        strength = 0.8
-    elif harmony_scores["complementary"] >= harmony_scores["analogous"]:
-        if harmony_scores["complementary"] > 0:
-            harmony_type = "complementary"
-            strength = min(1.0, harmony_scores["complementary"] / len(hues))
-        else:
-            harmony_type = "analogous"
-            strength = 0.5
-    elif harmony_scores["triadic"] >= 2:
-        harmony_type = "triadic"
-        strength = min(1.0, harmony_scores["triadic"] / 3)
     elif harmony_scores["tetradic"] >= 3:
         harmony_type = "tetradic"
         strength = min(1.0, harmony_scores["tetradic"] / 4)
-    else:
+    elif harmony_scores["triadic"] >= 2:
+        harmony_type = "triadic"
+        strength = min(1.0, harmony_scores["triadic"] / 3)
+    elif harmony_scores["complementary"] > 0 and harmony_scores["analogous"] > 0:
+        harmony_type = "split-complementary"
+        strength = 0.8
+    elif harmony_scores["complementary"] > 0:
+        harmony_type = "complementary"
+        strength = min(1.0, harmony_scores["complementary"] / max(1, len(hues) - 1))
+    elif harmony_scores["analogous"] > 0:
         harmony_type = "analogous"
         strength = min(1.0, harmony_scores["analogous"] / max(1, len(hues) - 1))
+    else:
+        best_type = max(harmony_scores, key=harmony_scores.get)
+        if harmony_scores[best_type] > 0:
+            harmony_type = best_type
+            strength = 0.5
+        else:
+            harmony_type = "mixed"
+            strength = 0.3
     
     return {
         "type": harmony_type,
