@@ -165,22 +165,22 @@ export const SAMPLE_TOKENS: DTCGTokenGroup = {
       "$type": "string", 
       "$value": "diffuse-studio",
       "$description": "Primary lighting setup type"
-    },
+    } as DesignToken,
     "direction": { 
       "$type": "string", 
       "$value": "top-left",
       "$description": "Primary light direction"
-    },
+    } as DesignToken,
     "intensity": {
-      "$type": "number",
-      "$value": 0.8,
+      "$type": "dimension",
+      "$value": "0.8",
       "$description": "Light intensity multiplier (0-1)"
-    },
+    } as DesignToken,
     "ambientOcclusion": {
-      "$type": "boolean",
-      "$value": true,
+      "$type": "string",
+      "$value": "enabled",
       "$description": "Enable ambient occlusion for depth"
-    }
+    } as DesignToken
   },
   "composition": {
     "aspectRatio": {

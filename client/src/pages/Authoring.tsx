@@ -10,6 +10,7 @@ export default function Authoring() {
   const [, setLocation] = useLocation();
   const [step, setStep] = useState<1 | 2>(1);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Form State
@@ -18,23 +19,50 @@ export default function Authoring() {
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
   const [generatedPreviews, setGeneratedPreviews] = useState<{ stillLife: string; landscape: string; portrait: string } | null>(null);
 
-  const handleFileSelect = (file: File) => {
+  const handleFileSelect = async (file: File) => {
     if (!file.type.startsWith('image/')) return;
     
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const dataUrl = e.target?.result as string;
       setReferenceImage(dataUrl);
+      setIsAnalyzing(true);
       
-      // Auto-populate name and description from image
-      const fileName = file.name.replace(/\.[^/.]+$/, '');
-      const styleName = fileName
-        .split(/[-_]/)
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ');
-      
-      setName(styleName);
-      setPrompt(`A visual style inspired by ${fileName}. Rich color palette, thoughtful composition, and distinctive lighting that captures the essence of the reference image.`);
+      try {
+        // Call backend to analyze image with AI
+        const response = await fetch("/api/analyze-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ imageBase64: dataUrl }),
+        });
+
+        if (response.ok) {
+          const { styleName, description } = await response.json();
+          setName(styleName);
+          setPrompt(description);
+        } else {
+          // Fallback if AI analysis fails
+          const fileName = file.name.replace(/\.[^/.]+$/, '');
+          const fallbackName = fileName
+            .split(/[-_]/)
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+          setName(fallbackName);
+          setPrompt(`A visual style inspired by ${fileName}. Rich color palette, thoughtful composition, and distinctive lighting that captures the essence of the reference image.`);
+        }
+      } catch (error) {
+        console.error("Error analyzing image:", error);
+        // Fallback silently
+        const fileName = file.name.replace(/\.[^/.]+$/, '');
+        const fallbackName = fileName
+          .split(/[-_]/)
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ');
+        setName(fallbackName);
+        setPrompt(`A visual style inspired by ${fileName}.`);
+      } finally {
+        setIsAnalyzing(false);
+      }
     };
     reader.readAsDataURL(file);
   };
@@ -186,20 +214,22 @@ export default function Authoring() {
                  <textarea 
                    value={prompt}
                    onChange={(e) => setPrompt(e.target.value)}
-                   disabled={!referenceImage}
+                   disabled={!referenceImage || isAnalyzing}
                    className="w-full bg-background border border-border rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary min-h-[120px] disabled:opacity-50"
-                   placeholder="Waiting for image upload..."
+                   placeholder={isAnalyzing ? "AI analyzing image..." : "Waiting for image upload..."}
                  />
-                 <p className="text-[10px] text-muted-foreground">Edit the auto-populated name and description as needed.</p>
+                 <p className="text-[10px] text-muted-foreground">
+                   {isAnalyzing ? "✨ AI is analyzing your image..." : "Edit the AI-generated name and description as needed."}
+                 </p>
                </div>
 
                <button 
                  onClick={generateVariations}
-                 disabled={!referenceImage || !name || isGenerating}
+                 disabled={!referenceImage || !name || isGenerating || isAnalyzing}
                  className="w-full bg-primary text-primary-foreground h-10 rounded-sm flex items-center justify-center gap-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors"
                >
                  {isGenerating ? <Loader2 className="animate-spin" size={16} /> : <Wand2 size={16} />}
-                 {isGenerating ? "Analyzing..." : "Extract Tokens & Generate Previews"}
+                 {isGenerating ? "Extracting Tokens..." : "Extract Tokens & Generate Previews"}
                </button>
              </div>
           </div>
