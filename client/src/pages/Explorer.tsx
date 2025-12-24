@@ -1,5 +1,6 @@
 import { fetchStyles, deleteStyleApi, type Style } from "@/lib/store";
 import { StyleCard } from "@/components/style-card";
+import { StyleCardSkeleton } from "@/components/style-card-skeleton";
 import { Layout } from "@/components/layout";
 import { motion, AnimatePresence } from "framer-motion";
 import { getRecommendedStyles, getBrowsingHistory } from "@/lib/suggestions";
@@ -69,8 +70,20 @@ export default function Explorer() {
   if (loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="animate-spin text-muted-foreground" size={32} />
+        <div className="flex flex-col gap-6 md:gap-8">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between border-b border-border pb-4 md:pb-6 gap-4 md:gap-0">
+            <div className="space-y-1">
+              <h1 className="text-2xl md:text-3xl font-serif font-medium text-foreground">Style Vault</h1>
+              <p className="text-muted-foreground text-xs sm:text-sm max-w-2xl">
+                A curated library of visual intelligence artifacts. Inspect tokens, compare aesthetics, and analyze prompt scaffolding.
+              </p>
+            </div>
+          </div>
+          <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            <StyleCardSkeleton />
+            <StyleCardSkeleton className="hidden sm:block" />
+            <StyleCardSkeleton className="hidden lg:block" />
+          </div>
         </div>
       </Layout>
     );

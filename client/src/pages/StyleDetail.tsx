@@ -160,6 +160,7 @@ export default function StyleDetail() {
                           src={style.previews.landscape} 
                           alt="Landscape preview" 
                           className="absolute inset-0 w-full h-full object-cover"
+                          loading="lazy"
                         />
                       )}
                       <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -172,6 +173,7 @@ export default function StyleDetail() {
                           src={style.previews.portrait} 
                           alt="Portrait preview" 
                           className="absolute inset-0 w-full h-full object-cover"
+                          loading="lazy"
                         />
                       )}
                       <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -184,6 +186,7 @@ export default function StyleDetail() {
                           src={style.previews.stillLife} 
                           alt="Still life preview" 
                           className="absolute inset-0 w-full h-full object-cover"
+                          loading="lazy"
                         />
                       )}
                       <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -200,7 +203,7 @@ export default function StyleDetail() {
                     <div className="flex gap-2 flex-wrap">
                       {style.referenceImages.map((img, i) => (
                         <div key={i} className="w-16 h-16 md:w-20 md:h-20 rounded-sm overflow-hidden border border-border">
-                          <img src={img} alt={`Reference ${i + 1}`} className="w-full h-full object-cover" />
+                          <img src={img} alt={`Reference ${i + 1}`} className="w-full h-full object-cover" loading="lazy" />
                         </div>
                       ))}
                     </div>
