@@ -6,18 +6,18 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorBoundary } from "@/components/error-boundary";
 import NotFound from "@/pages/not-found";
 
-import Explorer from "@/pages/Explorer";
-import StyleDetail from "@/pages/StyleDetail";
-import Authoring from "@/pages/Authoring";
-import Generation from "@/pages/Generation";
+import Explore from "@/pages/Explore";
+import Inspect from "@/pages/Inspect";
+import Author from "@/pages/Author";
+import Generate from "@/pages/Generate";
 
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Explorer} />
-      <Route path="/style/:id" component={StyleDetail} />
-      <Route path="/create" component={Authoring} />
-      <Route path="/generate/:styleId" component={Generation} />
+      <Route path="/" component={Explore} />
+      <Route path="/style/:id" component={Inspect} />
+      <Route path="/create" component={Author} />
+      <Route path="/generate/:styleId" component={Generate} />
       <Route component={NotFound} />
     </Switch>
   );
