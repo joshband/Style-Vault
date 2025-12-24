@@ -308,3 +308,6 @@ export const addStyle = (style: Style) => {
   styles = [style, ...styles];
   return style;
 };
+export const deleteStyle = (id: string) => {
+  styles = styles.filter(s => s.id !== id);
+};

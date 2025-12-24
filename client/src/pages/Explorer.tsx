@@ -4,11 +4,16 @@ import { Layout } from "@/components/layout";
 import { motion } from "framer-motion";
 import { getRecommendedStyles, getBrowsingHistory } from "@/lib/suggestions";
 import { Sparkles } from "lucide-react";
+import { useState } from "react";
 
 export default function Explorer() {
-  const styles = getStyles();
-  const recommendations = getRecommendedStyles(styles, 3);
+  const [displayedStyles, setDisplayedStyles] = useState(getStyles());
+  const recommendations = getRecommendedStyles(displayedStyles, 3);
   const hasHistory = getBrowsingHistory().length > 0;
+
+  const handleStyleDelete = (deletedId: string) => {
+    setDisplayedStyles(displayedStyles.filter(s => s.id !== deletedId));
+  };
 
   return (
     <Layout>
@@ -22,7 +27,7 @@ export default function Explorer() {
           </div>
           
           <div className="flex items-center gap-2 text-[10px] sm:text-xs font-mono text-muted-foreground flex-shrink-0">
-            <span>{styles.length} STYLES INDEXED</span>
+            <span>{displayedStyles.length} STYLES INDEXED</span>
           </div>
         </div>
 
@@ -40,13 +45,14 @@ export default function Explorer() {
                   key={style.id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, x: -100 }}
                   transition={{ duration: 0.4, delay: index * 0.1, ease: "easeOut" }}
                   className="relative"
                 >
                   <div className="absolute -top-2 -right-2 z-10 bg-amber-500 text-white text-[10px] font-bold px-2 py-1 rounded-sm">
                     SUGGESTED
                   </div>
-                  <StyleCard style={style} />
+                  <StyleCard style={style} onDelete={handleStyleDelete} />
                 </motion.div>
               ))}
             </div>
@@ -61,19 +67,20 @@ export default function Explorer() {
             <span className="text-[10px] font-mono text-muted-foreground">Complete collection</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-            {styles.map((style, index) => (
+            {displayedStyles.map((style, index) => (
               <motion.div
                 key={style.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, x: -100 }}
                 transition={{ duration: 0.4, delay: index * 0.1, ease: "easeOut" }}
               >
-                <StyleCard style={style} />
+                <StyleCard style={style} onDelete={handleStyleDelete} />
               </motion.div>
             ))}
           </div>
           
-          {styles.length === 0 && (
+          {displayedStyles.length === 0 && (
              <div className="py-20 text-center text-muted-foreground border border-dashed border-border rounded-lg bg-muted/10">
                <p>No styles found in the vault.</p>
              </div>
