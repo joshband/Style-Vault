@@ -28,18 +28,34 @@ export interface MetadataTags {
   texture: string[];
 }
 
-// Mood board collage structure
-export interface MoodBoardAssets {
+// Single mood board generation entry
+export interface MoodBoardEntry {
   collage: string;
-  status: "pending" | "generating" | "complete" | "failed";
+  generatedAt: string;
 }
 
-// UI concept mockup structure
-export interface UiConceptAssets {
+// Single UI concepts generation entry
+export interface UiConceptEntry {
   audioPlugin?: string;
   dashboard?: string;
   componentLibrary?: string;
+  generatedAt: string;
+}
+
+// Mood board with history (current generation status + history of completed generations)
+export interface MoodBoardAssets {
   status: "pending" | "generating" | "complete" | "failed";
+  collage?: string;
+  history: MoodBoardEntry[];
+}
+
+// UI concepts with history
+export interface UiConceptAssets {
+  status: "pending" | "generating" | "complete" | "failed";
+  audioPlugin?: string;
+  dashboard?: string;
+  componentLibrary?: string;
+  history: UiConceptEntry[];
 }
 
 // Styles table for persisting visual styles
@@ -70,11 +86,12 @@ export const styles = pgTable("styles", {
     texture: [],
   }),
   moodBoard: jsonb("mood_board").$type<MoodBoardAssets>().default({
-    collage: "",
     status: "pending",
+    history: [],
   }),
   uiConcepts: jsonb("ui_concepts").$type<UiConceptAssets>().default({
     status: "pending",
+    history: [],
   }),
 });
 

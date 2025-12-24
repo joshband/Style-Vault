@@ -114,8 +114,8 @@ export async function registerRoutes(
           // Mark as generating
           await storage.updateStyleMoodBoard(
             style.id,
-            { collage: "", status: "generating" },
-            { status: "generating" }
+            { collage: "", status: "generating", history: [] },
+            { status: "generating", history: [] }
           );
           cache.delete(CACHE_KEYS.STYLE_DETAIL(style.id));
           cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
@@ -145,8 +145,8 @@ export async function registerRoutes(
           console.error(`Background mood board generation failed for ${style.id}:`, error);
           await storage.updateStyleMoodBoard(
             style.id,
-            { collage: "", status: "failed" },
-            { status: "failed" }
+            { collage: "", status: "failed", history: [] },
+            { status: "failed", history: [] }
           );
           cache.delete(CACHE_KEYS.STYLE_DETAIL(style.id));
           cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
@@ -306,8 +306,32 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Style not found" });
       }
 
+      // Build history from existing assets (push current to history before regenerating)
+      const existingMoodBoard = style.moodBoard as any || { status: "pending", history: [] };
+      const existingUiConcepts = style.uiConcepts as any || { status: "pending", history: [] };
+      
+      const moodBoardHistory = [...(existingMoodBoard.history || [])];
+      const uiConceptsHistory = [...(existingUiConcepts.history || [])];
+      
+      // If current generation was complete, add it to history
+      if (existingMoodBoard.status === "complete" && existingMoodBoard.collage) {
+        moodBoardHistory.unshift({
+          collage: existingMoodBoard.collage,
+          generatedAt: new Date().toISOString(),
+        });
+      }
+      
+      if (existingUiConcepts.status === "complete" && (existingUiConcepts.audioPlugin || existingUiConcepts.dashboard)) {
+        uiConceptsHistory.unshift({
+          audioPlugin: existingUiConcepts.audioPlugin,
+          dashboard: existingUiConcepts.dashboard,
+          componentLibrary: existingUiConcepts.componentLibrary,
+          generatedAt: new Date().toISOString(),
+        });
+      }
+
       // Start generation
-      const { moodBoard, uiConcepts } = await generateAllMoodBoardAssets({
+      const { moodBoard: newMoodBoard, uiConcepts: newUiConcepts } = await generateAllMoodBoardAssets({
         styleName: style.name,
         styleDescription: style.description,
         tokens: style.tokens,
@@ -322,11 +346,22 @@ export async function registerRoutes(
         },
       });
 
-      // Update style with generated assets
+      // Merge with history
+      const moodBoardWithHistory = {
+        ...newMoodBoard,
+        history: moodBoardHistory,
+      };
+      
+      const uiConceptsWithHistory = {
+        ...newUiConcepts,
+        history: uiConceptsHistory,
+      };
+
+      // Update style with generated assets including history
       const updated = await storage.updateStyleMoodBoard(
         req.params.id,
-        moodBoard,
-        uiConcepts
+        moodBoardWithHistory,
+        uiConceptsWithHistory
       );
       
       // Invalidate cache
@@ -338,8 +373,8 @@ export async function registerRoutes(
       }
 
       res.json({
-        moodBoard,
-        uiConcepts,
+        moodBoard: moodBoardWithHistory,
+        uiConcepts: uiConceptsWithHistory,
       });
     } catch (error) {
       console.error("Error generating mood board:", error);
