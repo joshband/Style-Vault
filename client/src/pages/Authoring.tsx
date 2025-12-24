@@ -25,10 +25,16 @@ export default function Authoring() {
     reader.onload = (e) => {
       const dataUrl = e.target?.result as string;
       setReferenceImage(dataUrl);
-      // Auto-fill prompt with file name suggestion
-      if (!prompt) {
-        setPrompt(`Style inspired by: ${file.name.replace(/\.[^/.]+$/, '')}`);
-      }
+      
+      // Auto-populate name and description from image
+      const fileName = file.name.replace(/\.[^/.]+$/, '');
+      const styleName = fileName
+        .split(/[-_]/)
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+      
+      setName(styleName);
+      setPrompt(`A visual style inspired by ${fileName}. Rich color palette, thoughtful composition, and distinctive lighting that captures the essence of the reference image.`);
     };
     reader.readAsDataURL(file);
   };
@@ -104,58 +110,20 @@ export default function Authoring() {
         <div className="flex items-center gap-2 md:gap-4 text-xs md:text-sm font-mono border-b border-border pb-4 md:pb-8 overflow-x-auto">
            <div className={cn("flex items-center gap-2 whitespace-nowrap", step === 1 ? "text-primary" : "text-muted-foreground")}>
              <span className="w-5 h-5 rounded-full border border-current flex items-center justify-center text-[10px] flex-shrink-0">1</span>
-             <span>DEFINITION</span>
+             <span>UPLOAD & ANALYZE</span>
            </div>
            <div className="h-px w-6 md:w-8 bg-border flex-shrink-0"></div>
            <div className={cn("flex items-center gap-2 whitespace-nowrap", step === 2 ? "text-primary" : "text-muted-foreground")}>
              <span className="w-5 h-5 rounded-full border border-current flex items-center justify-center text-[10px] flex-shrink-0">2</span>
-             <span>TOKENIZATION</span>
+             <span>REVIEW & COMMIT</span>
            </div>
         </div>
 
         {step === 1 && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-             {/* Left: Inputs */}
-             <div className="space-y-6">
-               <div className="space-y-2">
-                 <label className="text-sm font-medium">Style Name</label>
-                 <input 
-                   type="text" 
-                   value={name}
-                   onChange={(e) => setName(e.target.value)}
-                   className="w-full bg-background border border-border rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-                   placeholder="e.g. Kinetic Typographic Clay"
-                 />
-               </div>
-
-               <div className="space-y-2">
-                 <label className="text-sm font-medium">Style Description</label>
-                 <textarea 
-                   value={prompt}
-                   onChange={(e) => setPrompt(e.target.value)}
-                   className="w-full bg-background border border-border rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary min-h-[120px]"
-                   placeholder="Describe the visual characteristics, color palette, lighting, texture, and mood..."
-                 />
-               </div>
-
-               <div className="pt-4">
-                  <button 
-                    onClick={generateVariations}
-                    disabled={!referenceImage || !name || isGenerating}
-                    className="w-full bg-primary text-primary-foreground h-10 rounded-sm flex items-center justify-center gap-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors"
-                  >
-                    {isGenerating ? <Loader2 className="animate-spin" size={16} /> : <Wand2 size={16} />}
-                    {isGenerating ? "Extracting Tokens & Generating Previews..." : "Analyze & Generate Previews"}
-                  </button>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Upload an image first. System will extract design tokens and generate 3 canonical preview images.
-                  </p>
-               </div>
-             </div>
-
-             {/* Right: Reference */}
+             {/* Left: Upload */}
              <div className="space-y-4 flex flex-col">
-                <label className="text-sm font-medium">Reference Image</label>
+                <label className="text-sm font-medium">Step 1: Upload Reference Image</label>
                 {referenceImage ? (
                   <div className="relative aspect-square border border-border rounded-sm overflow-hidden bg-muted">
                     <img src={referenceImage} alt="Reference" className="w-full h-full object-cover" />
@@ -195,6 +163,44 @@ export default function Authoring() {
                 <p className="text-xs text-muted-foreground">
                   Upload a reference image to extract visual style. The system will analyze color palette, texture, lighting, and compositional patterns to generate design tokens.
                 </p>
+             </div>
+
+             {/* Right: Auto-filled Details */}
+             <div className="space-y-4 flex flex-col">
+               <label className="text-sm font-medium">Step 2: Refine Details (Auto-populated)</label>
+               
+               <div className="space-y-2">
+                 <label className="text-xs font-medium text-muted-foreground">Style Name</label>
+                 <input 
+                   type="text" 
+                   value={name}
+                   onChange={(e) => setName(e.target.value)}
+                   disabled={!referenceImage}
+                   className="w-full bg-background border border-border rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+                   placeholder="Waiting for image upload..."
+                 />
+               </div>
+
+               <div className="space-y-2 flex-1">
+                 <label className="text-xs font-medium text-muted-foreground">Style Description</label>
+                 <textarea 
+                   value={prompt}
+                   onChange={(e) => setPrompt(e.target.value)}
+                   disabled={!referenceImage}
+                   className="w-full bg-background border border-border rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary min-h-[120px] disabled:opacity-50"
+                   placeholder="Waiting for image upload..."
+                 />
+                 <p className="text-[10px] text-muted-foreground">Edit the auto-populated name and description as needed.</p>
+               </div>
+
+               <button 
+                 onClick={generateVariations}
+                 disabled={!referenceImage || !name || isGenerating}
+                 className="w-full bg-primary text-primary-foreground h-10 rounded-sm flex items-center justify-center gap-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors"
+               >
+                 {isGenerating ? <Loader2 className="animate-spin" size={16} /> : <Wand2 size={16} />}
+                 {isGenerating ? "Analyzing..." : "Extract Tokens & Generate Previews"}
+               </button>
              </div>
           </div>
         )}

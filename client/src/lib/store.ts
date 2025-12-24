@@ -41,23 +41,192 @@ export interface Style {
 
 export const SAMPLE_TOKENS: DTCGTokenGroup = {
   "color": {
-    "palette": {
-      "primary": { "$type": "color", "$value": "#2A2A2A" },
-      "accent": { "$type": "color", "$value": "#FF4D4D" },
-      "background": { "$type": "color", "$value": "#F5F5F5" }
+    "primary": { 
+      "$type": "color", 
+      "$value": "#2A2A2A",
+      "$description": "Primary dominant color from image"
+    },
+    "secondary": { 
+      "$type": "color", 
+      "$value": "#6B5B4D",
+      "$description": "Secondary color supporting primary"
+    },
+    "accent": { 
+      "$type": "color", 
+      "$value": "#FF4D4D",
+      "$description": "Accent color for highlights and emphasis"
+    },
+    "background": { 
+      "$type": "color", 
+      "$value": "#F5F5F5",
+      "$description": "Background neutral tone"
+    },
+    "surface": {
+      "$type": "color",
+      "$value": "#FFFFFF",
+      "$description": "Surface layer color"
+    },
+    "neutral": {
+      "$type": "color",
+      "$value": "#E0E0E0",
+      "$description": "Neutral gray for borders and dividers"
     }
   },
   "typography": {
-    "fontFamily": { "$type": "fontFamily", "$value": "Helvetica Neue" },
-    "fontSize": { "$type": "dimension", "$value": "16px" }
+    "fontFamily": {
+      "serif": { 
+        "$type": "fontFamily", 
+        "$value": "Lora, Georgia, serif",
+        "$description": "Serif font for headings and emphasis"
+      },
+      "sans": { 
+        "$type": "fontFamily", 
+        "$value": "Inter, -apple-system, sans-serif",
+        "$description": "Sans-serif font for body and UI"
+      },
+      "mono": { 
+        "$type": "fontFamily", 
+        "$value": "JetBrains Mono, Courier, monospace",
+        "$description": "Monospace font for code and technical content"
+      }
+    },
+    "fontSize": {
+      "xs": { "$type": "dimension", "$value": "12px" },
+      "sm": { "$type": "dimension", "$value": "14px" },
+      "base": { "$type": "dimension", "$value": "16px" },
+      "lg": { "$type": "dimension", "$value": "18px" },
+      "xl": { "$type": "dimension", "$value": "20px" },
+      "2xl": { "$type": "dimension", "$value": "24px" },
+      "3xl": { "$type": "dimension", "$value": "30px" },
+      "4xl": { "$type": "dimension", "$value": "36px" }
+    },
+    "fontWeight": {
+      "light": { "$type": "number", "$value": 300 },
+      "regular": { "$type": "number", "$value": 400 },
+      "medium": { "$type": "number", "$value": 500 },
+      "semibold": { "$type": "number", "$value": 600 },
+      "bold": { "$type": "number", "$value": 700 }
+    },
+    "lineHeight": {
+      "tight": { "$type": "number", "$value": 1.2 },
+      "normal": { "$type": "number", "$value": 1.5 },
+      "relaxed": { "$type": "number", "$value": 1.75 }
+    }
+  },
+  "spacing": {
+    "xs": { "$type": "dimension", "$value": "4px" },
+    "sm": { "$type": "dimension", "$value": "8px" },
+    "md": { "$type": "dimension", "$value": "16px" },
+    "lg": { "$type": "dimension", "$value": "24px" },
+    "xl": { "$type": "dimension", "$value": "32px" },
+    "2xl": { "$type": "dimension", "$value": "48px" },
+    "3xl": { "$type": "dimension", "$value": "64px" }
+  },
+  "borderRadius": {
+    "none": { "$type": "dimension", "$value": "0px" },
+    "sm": { "$type": "dimension", "$value": "2px" },
+    "md": { "$type": "dimension", "$value": "4px" },
+    "lg": { "$type": "dimension", "$value": "8px" },
+    "full": { "$type": "dimension", "$value": "9999px" }
+  },
+  "shadow": {
+    "xs": {
+      "$type": "shadow",
+      "$value": { "offsetX": "0px", "offsetY": "1px", "blur": "2px", "color": "rgba(0, 0, 0, 0.05)" }
+    },
+    "sm": {
+      "$type": "shadow",
+      "$value": { "offsetX": "0px", "offsetY": "4px", "blur": "6px", "color": "rgba(0, 0, 0, 0.1)" }
+    },
+    "md": {
+      "$type": "shadow",
+      "$value": { "offsetX": "0px", "offsetY": "10px", "blur": "15px", "color": "rgba(0, 0, 0, 0.15)" }
+    }
   },
   "texture": {
-    "grain": { "$type": "string", "$value": "fine-noise" },
-    "finish": { "$type": "string", "$value": "matte" }
+    "grain": { 
+      "$type": "string", 
+      "$value": "fine-noise",
+      "$description": "Subtle grain pattern applied to surfaces"
+    },
+    "finish": { 
+      "$type": "string", 
+      "$value": "matte",
+      "$description": "Surface finish: matte, glossy, satin"
+    },
+    "roughness": {
+      "$type": "number",
+      "$value": 0.65,
+      "$description": "Surface roughness for 3D materials (0-1)"
+    }
   },
   "lighting": {
-    "type": { "$type": "string", "$value": "diffuse-studio" },
-    "direction": { "$type": "string", "$value": "top-left" }
+    "type": { 
+      "$type": "string", 
+      "$value": "diffuse-studio",
+      "$description": "Primary lighting setup type"
+    },
+    "direction": { 
+      "$type": "string", 
+      "$value": "top-left",
+      "$description": "Primary light direction"
+    },
+    "intensity": {
+      "$type": "number",
+      "$value": 0.8,
+      "$description": "Light intensity multiplier (0-1)"
+    },
+    "ambientOcclusion": {
+      "$type": "boolean",
+      "$value": true,
+      "$description": "Enable ambient occlusion for depth"
+    }
+  },
+  "composition": {
+    "aspectRatio": {
+      "landscape": { "$type": "string", "$value": "16:9" },
+      "square": { "$type": "string", "$value": "1:1" },
+      "portrait": { "$type": "string", "$value": "3:4" }
+    },
+    "alignment": {
+      "$type": "string",
+      "$value": "grid-based",
+      "$description": "Alignment system: grid-based, modular"
+    },
+    "depth": {
+      "$type": "number",
+      "$value": 3,
+      "$description": "Number of depth layers in composition"
+    }
+  },
+  "motion": {
+    "duration": {
+      "fast": { "$type": "dimension", "$value": "150ms" },
+      "normal": { "$type": "dimension", "$value": "300ms" },
+      "slow": { "$type": "dimension", "$value": "500ms" }
+    },
+    "easing": {
+      "$type": "string",
+      "$value": "cubic-bezier(0.4, 0, 0.2, 1)",
+      "$description": "Default easing function for transitions"
+    }
+  },
+  "mood": {
+    "tone": { 
+      "$type": "string", 
+      "$value": "editorial",
+      "$description": "Overall tone: editorial, playful, minimal, bold"
+    },
+    "saturation": {
+      "$type": "number",
+      "$value": 0.85,
+      "$description": "Color saturation level (0-1)"
+    },
+    "contrast": {
+      "$type": "number",
+      "$value": 1.1,
+      "$description": "Contrast multiplier (1.0 = normal)"
+    }
   }
 };
 

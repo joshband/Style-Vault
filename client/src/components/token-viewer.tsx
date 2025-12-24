@@ -17,7 +17,7 @@ export function TokenViewer({ tokens, className }: TokenViewerProps) {
           <Copy size={12} />
         </button>
       </div>
-      <div className="p-4 overflow-x-auto max-h-[500px] overflow-y-auto">
+      <div className="p-4 overflow-x-auto overflow-y-auto">
         <TokenNode node={tokens} label="root" isRoot />
       </div>
     </div>
