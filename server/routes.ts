@@ -30,7 +30,7 @@ export async function registerRoutes(
   // Generate canonical preview images for a style
   app.post("/api/generate-previews", async (req, res) => {
     try {
-      const { styleName, styleDescription } = req.body;
+      const { styleName, styleDescription, referenceImageBase64 } = req.body;
 
       if (!styleName || !styleDescription) {
         return res.status(400).json({ error: "Style name and description required" });
@@ -39,6 +39,7 @@ export async function registerRoutes(
       const previews = await generateCanonicalPreviews({
         styleName,
         styleDescription,
+        referenceImageBase64,
       });
 
       res.json({ previews });

@@ -11,6 +11,7 @@ const ai = new GoogleGenAI({
 interface PreviewGenerationRequest {
   styleName: string;
   styleDescription: string;
+  referenceImageBase64?: string;
 }
 
 interface PreviewImage {
@@ -66,12 +67,79 @@ function generateStyledPlaceholder(
 }
 
 /**
- * Generate 3 canonical preview images using Gemini Nano Banana (super fast image generation)
+ * Determine the subject from the image using Gemini's vision capabilities
+ */
+async function determineSubject(referenceImageBase64?: string, styleDescription?: string): Promise<string> {
+  try {
+    // If we have a reference image, analyze it to determine the subject
+    if (referenceImageBase64) {
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                inlineData: {
+                  mimeType: "image/jpeg",
+                  data: referenceImageBase64.split(",")[1] || referenceImageBase64,
+                },
+              },
+              {
+                text: "What is the main subject or object in this image? Respond with just 2-3 words describing the subject.",
+              },
+            ],
+          },
+        ],
+      });
+
+      const candidate = response.candidates?.[0];
+      if (candidate?.content?.parts?.[0]?.text) {
+        const subject = candidate.content.parts[0].text.trim();
+        if (subject.length > 0 && subject.length < 50) {
+          return subject;
+        }
+      }
+    }
+
+    // Fallback: try to extract subject from description
+    if (styleDescription) {
+      // Look for common subjects mentioned in descriptions
+      const subjectPatterns = [
+        /a (portrait|photo|image) of ([a-z\s]+)/i,
+        /featuring ([a-z\s]+)/i,
+        /showing ([a-z\s]+)/i,
+      ];
+
+      for (const pattern of subjectPatterns) {
+        const match = styleDescription.match(pattern);
+        if (match) {
+          return match[2] || match[1];
+        }
+      }
+
+      // Extract the most descriptive noun phrase from the first sentence
+      const firstSentence = styleDescription.split(/[.!?]/)[0];
+      const words = firstSentence.split(" ").slice(0, 5).join(" ");
+      if (words.length > 3) {
+        return words;
+      }
+    }
+
+    return "subject in a specific style";
+  } catch (error) {
+    console.warn("Failed to determine subject:", error instanceof Error ? error.message : String(error));
+    return "subject in a specific style";
+  }
+}
+
+/**
+ * Generate 3 canonical preview images with consistent subject but varying compositions
  */
 export async function generateCanonicalPreviews(
   request: PreviewGenerationRequest
 ): Promise<PreviewImage> {
-  const { styleName, styleDescription } = request;
+  const { styleName, styleDescription, referenceImageBase64 } = request;
 
   const result: PreviewImage = {
     portrait: generateStyledPlaceholder(384, 512, styleName, "portrait"),
@@ -80,7 +148,10 @@ export async function generateCanonicalPreviews(
   };
 
   try {
-    // Generate portrait
+    // Determine the subject from the reference image
+    const subject = await determineSubject(referenceImageBase64, styleDescription);
+
+    // Generate portrait with same subject
     try {
       const portraitResponse = await ai.models.generateContent({
         model: "gemini-2.5-flash-image",
@@ -89,7 +160,7 @@ export async function generateCanonicalPreviews(
             role: "user",
             parts: [
               {
-                text: `Generate a portrait photograph in the "${styleName}" style. ${styleDescription}. Keep the image clean and professional. Portrait orientation.`,
+                text: `Create a portrait-oriented photograph of ${subject} in the "${styleName}" style. Style details: ${styleDescription}. Keep the composition focused on the subject in portrait orientation (vertical).`,
               },
             ],
           },
@@ -101,10 +172,10 @@ export async function generateCanonicalPreviews(
         result.portrait = portraitImage;
       }
     } catch (error) {
-      console.warn("Portrait generation failed, using fallback:", error instanceof Error ? error.message : String(error));
+      console.warn("Portrait generation failed:", error instanceof Error ? error.message : String(error));
     }
 
-    // Generate landscape
+    // Generate landscape with same subject
     try {
       const landscapeResponse = await ai.models.generateContent({
         model: "gemini-2.5-flash-image",
@@ -113,7 +184,7 @@ export async function generateCanonicalPreviews(
             role: "user",
             parts: [
               {
-                text: `Generate a landscape photograph in the "${styleName}" style. ${styleDescription}. Keep the image clean and professional. Landscape orientation.`,
+                text: `Create a landscape-oriented photograph of ${subject} in the "${styleName}" style. Style details: ${styleDescription}. Keep the composition focused on the subject in landscape orientation (horizontal).`,
               },
             ],
           },
@@ -125,10 +196,10 @@ export async function generateCanonicalPreviews(
         result.landscape = landscapeImage;
       }
     } catch (error) {
-      console.warn("Landscape generation failed, using fallback:", error instanceof Error ? error.message : String(error));
+      console.warn("Landscape generation failed:", error instanceof Error ? error.message : String(error));
     }
 
-    // Generate still life
+    // Generate still life with same subject
     try {
       const stillLifeResponse = await ai.models.generateContent({
         model: "gemini-2.5-flash-image",
@@ -137,7 +208,7 @@ export async function generateCanonicalPreviews(
             role: "user",
             parts: [
               {
-                text: `Generate a still life photograph in the "${styleName}" style. ${styleDescription}. Keep the image clean and professional. Square composition.`,
+                text: `Create a still life photograph of ${subject} in the "${styleName}" style. Style details: ${styleDescription}. Keep the composition focused on the subject in square format.`,
               },
             ],
           },
@@ -149,7 +220,7 @@ export async function generateCanonicalPreviews(
         result.stillLife = stillLifeImage;
       }
     } catch (error) {
-      console.warn("Still life generation failed, using fallback:", error instanceof Error ? error.message : String(error));
+      console.warn("Still life generation failed:", error instanceof Error ? error.message : String(error));
     }
   } catch (error) {
     console.error("Error in preview generation:", error instanceof Error ? error.message : String(error));

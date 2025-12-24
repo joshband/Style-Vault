@@ -95,6 +95,7 @@ export default function Authoring() {
         body: JSON.stringify({
           styleName: name,
           styleDescription: prompt,
+          referenceImageBase64: referenceImage,
         }),
       });
 
