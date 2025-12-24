@@ -105,7 +105,7 @@ Make this feel like a premium design agency's style exploration - editorial, ref
 function buildUiConceptPrompt(
   request: MoodBoardRequest,
   summary: TokenSummary,
-  conceptType: "audioPlugin" | "dashboard" | "componentLibrary"
+  conceptType: "audioPlugin" | "dashboard"
 ): string {
   const { styleName, styleDescription, metadataTags } = request;
   const colorList = summary.colors.map((c) => `${c.name}: ${c.hex}`).join(", ");
@@ -177,38 +177,6 @@ VISUAL TREATMENT:
 - The entire interface should be cohesive with the style's visual language
 
 This should look like a real, polished application that demonstrates how ${styleName} translates into functional UI.`,
-
-    componentLibrary: `Create a beautiful UI component showcase poster that perfectly embodies the "${styleName}" visual style.
-
-STYLE TO CAPTURE: ${styleDescription}
-
-CRITICAL - Every component must LOOK and FEEL like ${styleName}:
-- Surfaces and elements should have: ${textureKeywords}
-- Lighting/rendering should feel: ${lightingKeywords}
-- Overall mood should be: ${moodKeywords}
-- Visual era/aesthetic: ${eraKeywords}
-
-COLOR PALETTE - USE THESE EXACT COLORS:
-${summary.colors.map((c) => `- ${c.name}: ${c.hex}`).join("\n")}
-
-LAYOUT: A 3:4 portrait design system poster.
-
-REQUIRED ELEMENTS (each deeply styled):
-- Large typography specimen: Display text that LOOKS like the style
-- Alphabet/character set specimen
-- Button components (primary, secondary, disabled states) - styled with textures
-- Icon set (play, pause, settings, arrows) - styled appropriately
-- Form elements (toggles, sliders, checkboxes, inputs) - with style's texture
-- Color palette strip with swatches
-- A small UI fragment showing components in context
-
-VISUAL TREATMENT:
-- This should look like a premium design system documentation page
-- Every element should reinforce the ${styleName} aesthetic
-- Typography, shadows, borders - all should feel cohesive
-- The poster itself should feel like art - beautiful and inspirational
-
-Make this look like something from a top design agency - polished, cohesive, and deeply evocative of the style.`,
   };
 
   return conceptPrompts[conceptType];
@@ -267,10 +235,9 @@ export async function generateUiConcepts(
   const summary = extractTokenSummary(request.tokens);
   const result: UiConceptAssets = { status: "generating" };
 
-  const conceptTypes: Array<"audioPlugin" | "dashboard" | "componentLibrary"> = [
+  const conceptTypes: Array<"audioPlugin" | "dashboard"> = [
     "audioPlugin",
     "dashboard",
-    "componentLibrary",
   ];
 
   for (const conceptType of conceptTypes) {
@@ -298,7 +265,7 @@ export async function generateUiConcepts(
     }
   }
 
-  result.status = result.audioPlugin || result.dashboard || result.componentLibrary ? "complete" : "failed";
+  result.status = result.audioPlugin || result.dashboard ? "complete" : "failed";
   return result;
 }
 

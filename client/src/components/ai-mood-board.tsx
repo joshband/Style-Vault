@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, RefreshCw, Image as ImageIcon, Layout, Palette, Component } from "lucide-react";
+import { Loader2, RefreshCw, Image as ImageIcon, Layout, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { MoodBoardAssets, UiConceptAssets } from "@/lib/store";
@@ -33,7 +33,7 @@ export function AiMoodBoard({
   className,
 }: AiMoodBoardProps) {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<"collage" | "audio" | "dashboard" | "components">("collage");
+  const [activeTab, setActiveTab] = useState<"collage" | "audio" | "dashboard">("collage");
 
   const isGenerating = moodBoard?.status === "generating" || uiConcepts?.status === "generating";
   const isPending = moodBoard?.status === "pending" || uiConcepts?.status === "pending";
@@ -66,8 +66,7 @@ export function AiMoodBoard({
   const hasCollage = moodBoard?.status === "complete" && moodBoard.collage;
   const hasAudioPlugin = uiConcepts?.status === "complete" && uiConcepts.audioPlugin;
   const hasDashboard = uiConcepts?.status === "complete" && uiConcepts.dashboard;
-  const hasComponentLibrary = uiConcepts?.status === "complete" && uiConcepts.componentLibrary;
-  const hasAnyAssets = hasCollage || hasAudioPlugin || hasDashboard || hasComponentLibrary;
+  const hasAnyAssets = hasCollage || hasAudioPlugin || hasDashboard;
 
   // Show loading state when generating
   if (isGenerating || isPending) {
@@ -112,10 +111,9 @@ export function AiMoodBoard({
 
   // Show content when assets are available
   const tabs = [
-    { id: "collage" as const, label: "Mood Board", icon: Palette, available: hasCollage },
-    { id: "components" as const, label: "Components", icon: Component, available: hasComponentLibrary },
-    { id: "audio" as const, label: "Audio Plugin", icon: Layout, available: hasAudioPlugin },
-    { id: "dashboard" as const, label: "Dashboard", icon: ImageIcon, available: hasDashboard },
+    { id: "collage" as const, label: "AI Mood Board", icon: Palette, available: hasCollage },
+    { id: "audio" as const, label: "AI Audio Plugin", icon: Layout, available: hasAudioPlugin },
+    { id: "dashboard" as const, label: "AI Dashboard", icon: ImageIcon, available: hasDashboard },
   ].filter((tab) => tab.available);
 
   // If no tabs available but not generating, default to first available or show empty
@@ -151,8 +149,6 @@ export function AiMoodBoard({
         return uiConcepts?.audioPlugin;
       case "dashboard":
         return uiConcepts?.dashboard;
-      case "components":
-        return uiConcepts?.componentLibrary;
       default:
         return null;
     }
@@ -210,9 +206,8 @@ export function AiMoodBoard({
 
       <div className="text-center text-xs text-muted-foreground">
         {validActiveTab === "collage" && "AI-generated mood board collage showing color palette, textures, typography, and visual references"}
-        {validActiveTab === "audio" && "UI concept: Audio plugin interface styled with extracted design tokens"}
-        {validActiveTab === "dashboard" && "UI concept: Dashboard interface styled with extracted design tokens"}
-        {validActiveTab === "components" && "UI concept: Component library showcase styled with extracted design tokens"}
+        {validActiveTab === "audio" && "AI-generated audio plugin interface styled with extracted design tokens"}
+        {validActiveTab === "dashboard" && "AI-generated dashboard interface styled with extracted design tokens"}
       </div>
     </div>
   );
