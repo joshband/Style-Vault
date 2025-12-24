@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Loader2, Palette, Grid3X3, BoxSelect, Layers, PenTool, AlertCircle, Eye } from "lucide-react";
+import { Loader2, Palette, Grid3X3, BoxSelect, Layers, PenTool, AlertCircle, Eye, ChevronDown, ChevronRight, Microscope, Lightbulb } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface CVColorToken {
   space: string;
@@ -49,10 +50,30 @@ interface CVExtractedTokens {
   };
 }
 
+interface CVDebugVisual {
+  label: string;
+  description: string;
+  image: string;
+}
+
+interface CVDebugInfo {
+  visuals: CVDebugVisual[];
+  steps: string[];
+}
+
 interface CVTokenExplorerProps {
   referenceImage?: string;
   styleName: string;
 }
+
+const WALKTHROUGH_TITLES: Record<string, { title: string; icon: typeof Palette }> = {
+  color: { title: "How We Extract Colors", icon: Palette },
+  spacing: { title: "How We Detect Spacing", icon: Grid3X3 },
+  borderRadius: { title: "How We Find Border Radii", icon: BoxSelect },
+  grid: { title: "How We Analyze Grid Structure", icon: Grid3X3 },
+  elevation: { title: "How We Measure Shadows & Depth", icon: Layers },
+  strokeWidth: { title: "How We Detect Stroke Widths", icon: PenTool },
+};
 
 function oklchToCSS(color: CVColorToken): string {
   return `oklch(${color.l} ${color.c} ${color.h})`;
@@ -375,11 +396,114 @@ function GridSection({ grid }: { grid: CVGridToken }) {
   );
 }
 
+function WalkthroughSection({ tokenType, debug }: { tokenType: string; debug: CVDebugInfo }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const config = WALKTHROUGH_TITLES[tokenType];
+  
+  if (!config || !debug) return null;
+  
+  const IconComponent = config.icon;
+  
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <CollapsibleTrigger className="flex items-center gap-2 w-full p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors text-left" data-testid={`walkthrough-toggle-${tokenType}`}>
+        {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+        <IconComponent size={16} className="text-primary" />
+        <span className="text-sm font-medium flex-1">{config.title}</span>
+        <span className="text-[10px] text-muted-foreground">{debug.steps.length} steps</span>
+      </CollapsibleTrigger>
+      
+      <CollapsibleContent className="pt-4 animate-in slide-in-from-top-2 duration-200">
+        <div className="space-y-4 pl-2 border-l-2 border-primary/20 ml-2">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              <Lightbulb size={12} />
+              <span>How It Works</span>
+            </div>
+            <ol className="space-y-2 pl-4">
+              {debug.steps.map((step, i) => (
+                <li key={i} className="text-sm text-foreground/80 list-decimal">
+                  {step}
+                </li>
+              ))}
+            </ol>
+          </div>
+          
+          {debug.visuals.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <Microscope size={12} />
+                <span>Intermediate Visualizations</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {debug.visuals.map((visual, i) => (
+                  <div key={i} className="space-y-1.5" data-testid={`walkthrough-visual-${tokenType}-${i}`}>
+                    <div className="aspect-video rounded-md border border-border overflow-hidden bg-black/5">
+                      <img 
+                        src={visual.image} 
+                        alt={visual.label}
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                    <div className="text-xs font-medium">{visual.label}</div>
+                    <div className="text-[10px] text-muted-foreground leading-tight">{visual.description}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+function AlgorithmWalkthrough({ debug }: { debug: Record<string, CVDebugInfo> }) {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  const tokenOrder = ['color', 'spacing', 'borderRadius', 'grid', 'elevation', 'strokeWidth'];
+  const availableTokens = tokenOrder.filter(t => debug[t]);
+  
+  if (availableTokens.length === 0) return null;
+  
+  return (
+    <div className="border border-border rounded-lg overflow-hidden" data-testid="algorithm-walkthrough">
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CollapsibleTrigger className="flex items-center gap-3 w-full p-4 bg-gradient-to-r from-primary/5 to-transparent hover:from-primary/10 transition-colors text-left">
+          {isOpen ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+          <Microscope size={18} className="text-primary" />
+          <div className="flex-1">
+            <div className="text-sm font-semibold">Algorithm Walkthrough</div>
+            <div className="text-[10px] text-muted-foreground">
+              See how each token type was extracted with step-by-step explanations and visualizations
+            </div>
+          </div>
+        </CollapsibleTrigger>
+        
+        <CollapsibleContent className="p-4 pt-2 border-t border-border bg-muted/20">
+          <div className="space-y-3">
+            {availableTokens.map(tokenType => (
+              <WalkthroughSection 
+                key={tokenType} 
+                tokenType={tokenType} 
+                debug={debug[tokenType]} 
+              />
+            ))}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+    </div>
+  );
+}
+
 export function CVTokenExplorer({ referenceImage, styleName }: CVTokenExplorerProps) {
   const [tokens, setTokens] = useState<CVExtractedTokens | null>(null);
+  const [debug, setDebug] = useState<Record<string, CVDebugInfo> | null>(null);
   const [loading, setLoading] = useState(false);
+  const [walkthroughLoading, setWalkthroughLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cvEnabled, setCvEnabled] = useState<boolean | null>(null);
+  const [walkthroughEnabled, setWalkthroughEnabled] = useState(false);
 
   const checkStatus = async () => {
     try {
@@ -393,13 +517,17 @@ export function CVTokenExplorer({ referenceImage, styleName }: CVTokenExplorerPr
     }
   };
 
-  const extractTokens = async () => {
+  const extractTokens = async (withWalkthrough = false) => {
     if (!referenceImage) {
       setError("No reference image available");
       return;
     }
 
-    setLoading(true);
+    if (withWalkthrough) {
+      setWalkthroughLoading(true);
+    } else {
+      setLoading(true);
+    }
     setError(null);
 
     try {
@@ -407,13 +535,17 @@ export function CVTokenExplorer({ referenceImage, styleName }: CVTokenExplorerPr
       if (!enabled) {
         setError("CV extraction is not enabled on this server");
         setLoading(false);
+        setWalkthroughLoading(false);
         return;
       }
 
       const res = await fetch('/api/analyze-image-cv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: referenceImage }),
+        body: JSON.stringify({ 
+          imageBase64: referenceImage,
+          includeWalkthrough: withWalkthrough 
+        }),
       });
 
       if (!res.ok) {
@@ -423,11 +555,20 @@ export function CVTokenExplorer({ referenceImage, styleName }: CVTokenExplorerPr
 
       const data = await res.json();
       setTokens(data.rawTokens);
+      if (data.debug) {
+        setDebug(data.debug);
+        setWalkthroughEnabled(true);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to extract tokens');
     } finally {
       setLoading(false);
+      setWalkthroughLoading(false);
     }
+  };
+
+  const loadWalkthrough = async () => {
+    await extractTokens(true);
   };
 
   if (!referenceImage) {
@@ -453,7 +594,7 @@ export function CVTokenExplorer({ referenceImage, styleName }: CVTokenExplorerPr
           </p>
         </div>
         <button
-          onClick={extractTokens}
+          onClick={() => extractTokens(false)}
           disabled={loading}
           data-testid="button-extract-cv-tokens"
           className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
@@ -489,7 +630,7 @@ export function CVTokenExplorer({ referenceImage, styleName }: CVTokenExplorerPr
         <AlertCircle className="text-destructive mb-3" size={32} />
         <p className="text-sm text-destructive">{error}</p>
         <button
-          onClick={extractTokens}
+          onClick={() => extractTokens(false)}
           className="mt-4 text-xs underline text-muted-foreground hover:text-foreground"
         >
           Try again
@@ -502,18 +643,40 @@ export function CVTokenExplorer({ referenceImage, styleName }: CVTokenExplorerPr
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">
           Extracted via {tokens.meta.method} • Confidence: {tokens.meta.confidence}
         </div>
-        <button
-          onClick={extractTokens}
-          className="text-[10px] underline text-muted-foreground hover:text-foreground"
-          data-testid="button-refresh-cv-tokens"
-        >
-          Re-analyze
-        </button>
+        <div className="flex items-center gap-3">
+          {!debug && !walkthroughLoading && (
+            <button
+              onClick={loadWalkthrough}
+              className="text-[10px] text-primary hover:underline flex items-center gap-1"
+              data-testid="button-load-walkthrough"
+            >
+              <Microscope size={12} />
+              Load Walkthrough
+            </button>
+          )}
+          {walkthroughLoading && (
+            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <Loader2 size={12} className="animate-spin" />
+              Loading walkthrough...
+            </span>
+          )}
+          <button
+            onClick={() => extractTokens(false)}
+            className="text-[10px] underline text-muted-foreground hover:text-foreground"
+            data-testid="button-refresh-cv-tokens"
+          >
+            Re-analyze
+          </button>
+        </div>
       </div>
+
+      {debug && (
+        <AlgorithmWalkthrough debug={debug} />
+      )}
 
       <ColorSection colors={tokens.color} />
       <div className="border-t border-border pt-6">

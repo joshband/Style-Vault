@@ -65,7 +65,14 @@ Preferred communication style: Simple, everyday language.
   - Produces W3C DTCG 2025.10 compatible output
 - **API Endpoints**:
   - `GET /api/cv-status` - Check if CV extraction is enabled
-  - `POST /api/analyze-image-cv` - Extract tokens from image using CV
+  - `POST /api/analyze-image-cv` - Extract tokens from image using CV (supports `includeWalkthrough: true` for debug visualizations)
+- **Algorithm Walkthrough Feature**:
+  - Opt-in educational mode showing intermediate CV processing steps
+  - Generates debug visualizations: edge maps, color cluster mosaics, histograms, distance transforms, gradient maps
+  - Plain-language step-by-step explanations for each token extraction algorithm
+  - UI: Collapsible "Algorithm Walkthrough" panel with subsections per token type (color, spacing, border radius, grid, elevation, stroke width)
+  - Uses `--with-visuals` flag internally; adds ~5-15 seconds to extraction time
+  - Custom `NumpyEncoder` handles JSON serialization of numpy types
 
 ### Design Token System
 - **Standard**: W3C DTCG (Design Token Community Group) 2025.10 format
