@@ -8,6 +8,7 @@ import { storage } from "./storage";
 import { insertStyleSchema, insertGeneratedImageSchema } from "@shared/schema";
 import { db } from "./db";
 import { sql } from "drizzle-orm";
+import { cache, CACHE_KEYS } from "./cache";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -45,7 +46,16 @@ export async function registerRoutes(
   // Get all styles (lightweight summaries for list view)
   app.get("/api/styles", async (req, res) => {
     try {
-      const styles = await storage.getStyleSummaries();
+      // Check cache first
+      let styles = cache.get<any[]>(CACHE_KEYS.STYLE_SUMMARIES);
+      
+      if (!styles) {
+        styles = await storage.getStyleSummaries();
+        cache.set(CACHE_KEYS.STYLE_SUMMARIES, styles, 30 * 1000); // 30 second TTL
+      }
+      
+      // Add cache headers for browser/CDN caching
+      res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
       res.json(styles);
     } catch (error) {
       console.error("Error fetching styles:", error);
@@ -59,10 +69,24 @@ export async function registerRoutes(
   // Get a single style by ID
   app.get("/api/styles/:id", async (req, res) => {
     try {
-      const style = await storage.getStyleById(req.params.id);
+      const styleId = req.params.id;
+      
+      // Check cache first
+      let style = cache.get<any>(CACHE_KEYS.STYLE_DETAIL(styleId));
+      
+      if (!style) {
+        style = await storage.getStyleById(styleId);
+        if (style) {
+          cache.set(CACHE_KEYS.STYLE_DETAIL(styleId), style, 5 * 60 * 1000); // 5 minute TTL
+        }
+      }
+      
       if (!style) {
         return res.status(404).json({ error: "Style not found" });
       }
+      
+      // Add cache headers
+      res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
       res.json(style);
     } catch (error) {
       console.error("Error fetching style:", error);
@@ -79,6 +103,9 @@ export async function registerRoutes(
       const validatedData = insertStyleSchema.parse(req.body);
       const style = await storage.createStyle(validatedData);
       
+      // Invalidate cache
+      cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
+      
       // Auto-trigger mood board generation in background (don't await)
       setImmediate(async () => {
         try {
@@ -90,6 +117,8 @@ export async function registerRoutes(
             { collage: "", status: "generating" },
             { status: "generating" }
           );
+          cache.delete(CACHE_KEYS.STYLE_DETAIL(style.id));
+          cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
           
           // Generate all assets
           const { moodBoard, uiConcepts } = await generateAllMoodBoardAssets({
@@ -109,6 +138,8 @@ export async function registerRoutes(
           });
           
           await storage.updateStyleMoodBoard(style.id, moodBoard, uiConcepts);
+          cache.delete(CACHE_KEYS.STYLE_DETAIL(style.id));
+          cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
           console.log(`Mood board generation complete for style: ${style.id}`);
         } catch (error) {
           console.error(`Background mood board generation failed for ${style.id}:`, error);
@@ -117,6 +148,8 @@ export async function registerRoutes(
             { collage: "", status: "failed" },
             { status: "failed" }
           );
+          cache.delete(CACHE_KEYS.STYLE_DETAIL(style.id));
+          cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
         }
       });
       
@@ -133,7 +166,13 @@ export async function registerRoutes(
   // Delete a style
   app.delete("/api/styles/:id", async (req, res) => {
     try {
-      await storage.deleteStyle(req.params.id);
+      const styleId = req.params.id;
+      await storage.deleteStyle(styleId);
+      
+      // Invalidate cache
+      cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
+      cache.delete(CACHE_KEYS.STYLE_DETAIL(styleId));
+      
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting style:", error);
@@ -289,6 +328,10 @@ export async function registerRoutes(
         moodBoard,
         uiConcepts
       );
+      
+      // Invalidate cache
+      cache.delete(CACHE_KEYS.STYLE_DETAIL(req.params.id));
+      cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
 
       if (!updated) {
         return res.status(500).json({ error: "Failed to update style" });

@@ -6,6 +6,7 @@ import { createStyle, SAMPLE_TOKENS } from "@/lib/store";
 import { TokenViewer } from "@/components/token-viewer";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { compressImage, getImageSizeKB } from "@/lib/image-utils";
 
 export default function Authoring() {
   const [, setLocation] = useLocation();
@@ -41,43 +42,46 @@ export default function Authoring() {
   const handleFileSelect = async (file: File) => {
     if (!file.type.startsWith('image/')) return;
     
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const dataUrl = e.target?.result as string;
-      setReferenceImage(dataUrl);
-      setIsAnalyzing(true);
+    setIsAnalyzing(true);
+    
+    try {
+      // Compress and resize image before processing
+      const compressedDataUrl = await compressImage(file);
+      const sizeKB = getImageSizeKB(compressedDataUrl);
+      console.log(`Image compressed to ${sizeKB}KB`);
       
-      // Analyze with AI after a brief delay to ensure state is set
-      setTimeout(async () => {
-        try {
-          // Call backend to analyze image with AI
-          const response = await fetch("/api/analyze-image", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ imageBase64: dataUrl }),
-          });
+      setReferenceImage(compressedDataUrl);
+      
+      // Analyze with AI
+      try {
+        const response = await fetch("/api/analyze-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ imageBase64: compressedDataUrl }),
+        });
 
-          if (response.ok) {
-            const { styleName, description, metadataTags: tags } = await response.json();
-            setName(styleName);
-            setPrompt(description);
-            if (tags) {
-              setMetadataTags(tags);
-            }
-          } else {
-            const error = await response.json().catch(() => ({}));
-            console.warn("AI analysis failed, using fallback:", error);
-            setFallbackName(file.name);
+        if (response.ok) {
+          const { styleName, description, metadataTags: tags } = await response.json();
+          setName(styleName);
+          setPrompt(description);
+          if (tags) {
+            setMetadataTags(tags);
           }
-        } catch (error) {
-          console.error("Error analyzing image:", error);
+        } else {
+          const error = await response.json().catch(() => ({}));
+          console.warn("AI analysis failed, using fallback:", error);
           setFallbackName(file.name);
-        } finally {
-          setIsAnalyzing(false);
         }
-      }, 100);
-    };
-    reader.readAsDataURL(file);
+      } catch (error) {
+        console.error("Error analyzing image:", error);
+        setFallbackName(file.name);
+      }
+    } catch (error) {
+      console.error("Error compressing image:", error);
+      setFallbackName(file.name);
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const setFallbackName = (fileName: string) => {
