@@ -1,6 +1,6 @@
 import { Style } from "@/lib/store";
 import { cn } from "@/lib/utils";
-import { Code, ImageIcon, Trash2, AlertCircle } from "lucide-react";
+import { ImageIcon, Trash2, AlertCircle } from "lucide-react";
 import { Link } from "wouter";
 import { useEffect, useState } from "react";
 import { trackStyleView } from "@/lib/suggestions";
@@ -75,53 +75,53 @@ export function StyleCard({ style, className, onDelete }: StyleCardProps) {
         </motion.div>
       
       <div className={cn("group relative flex flex-col bg-card border border-border rounded-lg overflow-hidden transition-all hover:shadow-md hover:border-primary/20", isDragging && "cursor-grabbing")}>
-        {/* Preview Area - 3 Column Composite */}
-        <div className="relative aspect-[12/4] bg-muted overflow-hidden flex">
-          {/* Portrait Column */}
-          <div className="flex-1 relative overflow-hidden border-r border-border/50">
-            <img 
-              src={style.previews.portrait} 
-              alt={`${style.name} - portrait`}
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-              draggable={false}
-            />
-          </div>
-          {/* Landscape Column */}
-          <div className="flex-1 relative overflow-hidden border-r border-border/50">
-            <img 
-              src={style.previews.landscape} 
-              alt={`${style.name} - landscape`}
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-              draggable={false}
-            />
-          </div>
-          {/* Still Life Column */}
-          <div className="flex-1 relative overflow-hidden">
-            <img 
-              src={style.previews.stillLife} 
-              alt={`${style.name} - still life`}
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-              draggable={false}
-            />
-          </div>
+        {/* Preview Area - 3 Column Composite - Clickable */}
+        <Link href={`/style/${style.id}`} className="block">
+          <div className="relative aspect-[12/4] bg-muted overflow-hidden flex cursor-pointer">
+            {/* Portrait Column */}
+            <div className="flex-1 relative overflow-hidden border-r border-border/50">
+              <img 
+                src={style.previews.portrait} 
+                alt={`${style.name} - portrait`}
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                draggable={false}
+              />
+            </div>
+            {/* Landscape Column */}
+            <div className="flex-1 relative overflow-hidden border-r border-border/50">
+              <img 
+                src={style.previews.landscape} 
+                alt={`${style.name} - landscape`}
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                draggable={false}
+              />
+            </div>
+            {/* Still Life Column */}
+            <div className="flex-1 relative overflow-hidden">
+              <img 
+                src={style.previews.stillLife} 
+                alt={`${style.name} - still life`}
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                draggable={false}
+              />
+            </div>
 
-          {/* Quick Actions */}
-          <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity translate-y-[-10px] group-hover:translate-y-0">
-             <button className="h-8 w-8 rounded-full bg-white/90 backdrop-blur text-black flex items-center justify-center hover:bg-white transition-colors shadow-sm" title="Inspect Tokens">
-               <Code size={14} />
-             </button>
-             <button 
-               onClick={(e) => {
-                 e.preventDefault();
-                 handleDelete();
-               }}
-               className="h-8 w-8 rounded-full bg-red-500/10 backdrop-blur text-red-600 hover:text-red-700 hover:bg-red-500/20 flex items-center justify-center transition-colors shadow-sm border border-red-500/20 hover:border-red-500/40" 
-               title="Delete style"
-             >
-               <Trash2 size={14} />
-             </button>
+            {/* Quick Actions */}
+            <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity translate-y-[-10px] group-hover:translate-y-0">
+               <button 
+                 onClick={(e) => {
+                   e.preventDefault();
+                   e.stopPropagation();
+                   handleDelete();
+                 }}
+                 className="h-8 w-8 rounded-full bg-red-500/10 backdrop-blur text-red-600 hover:text-red-700 hover:bg-red-500/20 flex items-center justify-center transition-colors shadow-sm border border-red-500/20 hover:border-red-500/40" 
+                 title="Delete style"
+               >
+                 <Trash2 size={14} />
+               </button>
+            </div>
           </div>
-        </div>
+        </Link>
 
         {/* Info Area */}
         <div className="p-4 flex flex-col gap-2 flex-1">

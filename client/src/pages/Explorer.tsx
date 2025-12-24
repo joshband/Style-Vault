@@ -20,6 +20,8 @@ export default function Explorer() {
 
   const recommendations = getRecommendedStyles(styles, 3);
   const hasHistory = getBrowsingHistory().length > 0;
+  const recommendedIds = new Set(recommendations.map(r => r.id));
+  const nonRecommendedStyles = styles.filter(s => !recommendedIds.has(s.id));
 
   const handleStyleDelete = async (deletedId: string) => {
     try {
@@ -100,12 +102,16 @@ export default function Explorer() {
         {/* All Styles Section */}
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <h2 className="text-sm md:text-base font-medium text-foreground">All Styles</h2>
-            <span className="text-[10px] font-mono text-muted-foreground">Complete collection</span>
+            <h2 className="text-sm md:text-base font-medium text-foreground">
+              {hasHistory && recommendations.length > 0 ? "Other Styles" : "All Styles"}
+            </h2>
+            <span className="text-[10px] font-mono text-muted-foreground">
+              {hasHistory && recommendations.length > 0 ? `${nonRecommendedStyles.length} more` : "Complete collection"}
+            </span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             <AnimatePresence>
-              {styles.map((style, index) => (
+              {(hasHistory && recommendations.length > 0 ? nonRecommendedStyles : styles).map((style, index) => (
                 <motion.div
                   key={style.id}
                   initial={{ opacity: 0, y: 20 }}
