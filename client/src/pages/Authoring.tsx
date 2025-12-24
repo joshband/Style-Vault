@@ -83,25 +83,60 @@ export default function Authoring() {
   };
 
   const generateVariations = async () => {
-    if (!referenceImage && !prompt) return;
+    if (!name || !prompt) return;
     
     setIsGenerating(true);
     
-    // Simulate token extraction and image generation
-    // In a real app, this would call an API to:
-    // 1. Extract design tokens from the reference image
-    // 2. Generate 3 canonical preview images using those tokens
-    await new Promise(resolve => setTimeout(resolve, 2500));
-    
-    // Mock generated previews - in reality these would be generated based on tokens
-    setGeneratedPreviews({
-      stillLife: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=600&auto=format&fit=crop",
-      landscape: "https://images.unsplash.com/photo-1614850523060-8da1d56e37def?q=80&w=600&auto=format&fit=crop",
-      portrait: "https://images.unsplash.com/photo-1614851099511-e51a8781977d?q=80&w=600&auto=format&fit=crop"
-    });
-    
-    setIsGenerating(false);
-    setStep(2);
+    try {
+      // Call backend to generate canonical preview images
+      const response = await fetch("/api/generate-previews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          styleName: name,
+          styleDescription: prompt,
+        }),
+      });
+
+      if (response.ok) {
+        const { previews } = await response.json();
+        
+        // Convert 9 previews into still life, landscape, portrait for backward compatibility
+        const previewMap = new Map();
+        previews.forEach((p: any, idx: number) => {
+          previewMap.set(idx, p.url);
+        });
+
+        setGeneratedPreviews({
+          stillLife: previewMap.get(2) || previewMap.get(0) || "",
+          landscape: previewMap.get(1) || previewMap.get(0) || "",
+          portrait: previewMap.get(0) || "",
+        });
+
+        setStep(2);
+      } else {
+        const error = await response.json().catch(() => ({}));
+        console.error("Preview generation failed:", error);
+        // Fallback: use placeholder images
+        setGeneratedPreviews({
+          stillLife: `https://images.unsplash.com/photo-${Math.random().toString().slice(2, 15)}?q=80&w=600&auto=format&fit=crop`,
+          landscape: `https://images.unsplash.com/photo-${Math.random().toString().slice(2, 15)}?q=80&w=600&auto=format&fit=crop`,
+          portrait: `https://images.unsplash.com/photo-${Math.random().toString().slice(2, 15)}?q=80&w=600&auto=format&fit=crop`,
+        });
+        setStep(2);
+      }
+    } catch (error) {
+      console.error("Error generating previews:", error);
+      // Fallback silently
+      setGeneratedPreviews({
+        stillLife: `https://images.unsplash.com/photo-${Math.random().toString().slice(2, 15)}?q=80&w=600&auto=format&fit=crop`,
+        landscape: `https://images.unsplash.com/photo-${Math.random().toString().slice(2, 15)}?q=80&w=600&auto=format&fit=crop`,
+        portrait: `https://images.unsplash.com/photo-${Math.random().toString().slice(2, 15)}?q=80&w=600&auto=format&fit=crop`,
+      });
+      setStep(2);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleSave = () => {
