@@ -92,29 +92,29 @@ export default function Authoring() {
 
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto space-y-8">
-        <div className="border-b border-border pb-6">
-          <h1 className="text-3xl font-serif font-medium text-foreground">Style Authoring</h1>
-          <p className="text-muted-foreground text-sm mt-2">
+      <div className="max-w-4xl mx-auto space-y-6 md:space-y-8">
+        <div className="border-b border-border pb-4 md:pb-6">
+          <h1 className="text-2xl md:text-3xl font-serif font-medium text-foreground">Style Authoring</h1>
+          <p className="text-muted-foreground text-xs md:text-sm mt-2">
             Create a new immutable style artifact. System will automatically generate canonical previews and W3C tokens.
           </p>
         </div>
 
         {/* Step Indicator */}
-        <div className="flex items-center gap-4 text-sm font-mono border-b border-border pb-8">
-           <div className={cn("flex items-center gap-2", step === 1 ? "text-primary" : "text-muted-foreground")}>
-             <span className="w-5 h-5 rounded-full border border-current flex items-center justify-center text-[10px]">1</span>
+        <div className="flex items-center gap-2 md:gap-4 text-xs md:text-sm font-mono border-b border-border pb-4 md:pb-8 overflow-x-auto">
+           <div className={cn("flex items-center gap-2 whitespace-nowrap", step === 1 ? "text-primary" : "text-muted-foreground")}>
+             <span className="w-5 h-5 rounded-full border border-current flex items-center justify-center text-[10px] flex-shrink-0">1</span>
              <span>DEFINITION</span>
            </div>
-           <div className="h-px w-8 bg-border"></div>
-           <div className={cn("flex items-center gap-2", step === 2 ? "text-primary" : "text-muted-foreground")}>
-             <span className="w-5 h-5 rounded-full border border-current flex items-center justify-center text-[10px]">2</span>
-             <span>TOKENIZATION & PREVIEW</span>
+           <div className="h-px w-6 md:w-8 bg-border flex-shrink-0"></div>
+           <div className={cn("flex items-center gap-2 whitespace-nowrap", step === 2 ? "text-primary" : "text-muted-foreground")}>
+             <span className="w-5 h-5 rounded-full border border-current flex items-center justify-center text-[10px] flex-shrink-0">2</span>
+             <span>TOKENIZATION</span>
            </div>
         </div>
 
         {step === 1 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
              {/* Left: Inputs */}
              <div className="space-y-6">
                <div className="space-y-2">
@@ -200,21 +200,21 @@ export default function Authoring() {
         )}
 
         {step === 2 && generatedPreviews && (
-          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
              
-             <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-sm text-green-700 dark:text-green-400 text-sm flex items-center gap-3">
-               <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center text-white text-xs">✓</div>
+             <div className="p-3 md:p-4 bg-green-500/10 border border-green-500/20 rounded-sm text-green-700 dark:text-green-400 text-xs md:text-sm flex items-start gap-2 md:gap-3">
+               <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center text-white text-xs flex-shrink-0">✓</div>
                <span>Analysis complete. Design tokens extracted and 3 canonical previews generated in a single immutable artifact.</span>
              </div>
 
-             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
                 {/* Generated Previews - Composite Grid */}
-                <div className="space-y-4">
-                  <h3 className="text-sm font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                    <ImageIcon size={14} /> Canonical Preview Set (Gallery Thumbnail)
+                <div className="space-y-3 md:space-y-4">
+                  <h3 className="text-xs md:text-sm font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                    <ImageIcon size={14} /> Canonical Preview Set
                   </h3>
-                  <div className="grid grid-cols-2 gap-3 p-3 border border-border rounded-sm bg-muted/20">
-                     <div className="col-span-2 aspect-video bg-muted rounded-sm border border-border/50 relative overflow-hidden shadow-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-3 p-2 md:p-3 border border-border rounded-sm bg-muted/20">
+                     <div className="col-span-1 sm:col-span-2 aspect-video bg-muted rounded-sm border border-border/50 relative overflow-hidden shadow-sm">
                         <img src={generatedPreviews.landscape} className="w-full h-full object-cover" alt="Landscape" />
                         <span className="absolute bottom-2 left-2 text-[10px] bg-black/70 text-white px-1.5 py-0.5 rounded-sm backdrop-blur-sm">LANDSCAPE 16:9</span>
                      </div>
@@ -227,38 +227,38 @@ export default function Authoring() {
                         <span className="absolute bottom-2 left-2 text-[10px] bg-black/70 text-white px-1.5 py-0.5 rounded-sm backdrop-blur-sm">PORTRAIT 3:4</span>
                      </div>
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-[10px] md:text-xs text-muted-foreground">
                     These 3 previews are generated from the extracted tokens and serve as the style's visual signature across different aspect ratios.
                   </p>
                 </div>
 
                 {/* Generated Tokens */}
-                <div className="space-y-4">
-                  <h3 className="text-sm font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                <div className="space-y-3 md:space-y-4">
+                  <h3 className="text-xs md:text-sm font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                     <Code size={14} /> W3C DTCG Design Tokens
                   </h3>
-                  <TokenViewer tokens={SAMPLE_TOKENS} className="h-[400px]" />
-                  <p className="text-xs text-muted-foreground">
+                  <TokenViewer tokens={SAMPLE_TOKENS} className="h-[300px] md:h-[400px]" />
+                  <p className="text-[10px] md:text-xs text-muted-foreground">
                     Extracted from the reference image using vision analysis and standardized in W3C Design Token Community Group format.
                   </p>
                 </div>
              </div>
 
-             <div className="flex justify-end gap-4 pt-6 border-t border-border">
+             <div className="flex flex-col sm:flex-row gap-3 md:gap-4 pt-4 md:pt-6 border-t border-border">
                 <button 
                    onClick={() => {
                      setStep(1);
                      setGeneratedPreviews(null);
                    }}
-                   className="px-4 py-2 text-sm font-medium hover:bg-secondary rounded-sm transition-colors"
+                   className="order-2 sm:order-1 px-4 py-2 text-xs md:text-sm font-medium hover:bg-secondary rounded-sm transition-colors border border-border"
                 >
-                  Back & Upload Different Image
+                  Back & Upload
                 </button>
                 <button 
                    onClick={handleSave}
-                   className="bg-primary text-primary-foreground px-6 py-2 rounded-sm flex items-center gap-2 text-sm font-medium hover:bg-primary/90 transition-colors"
+                   className="order-1 sm:order-2 bg-primary text-primary-foreground px-4 md:px-6 py-2 rounded-sm flex items-center justify-center gap-2 text-xs md:text-sm font-medium hover:bg-primary/90 transition-colors"
                 >
-                  Commit to Vault <ArrowRight size={16} />
+                  Commit to Vault <ArrowRight size={14} />
                 </button>
              </div>
           </div>

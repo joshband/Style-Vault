@@ -26,53 +26,53 @@ export default function StyleDetail() {
 
   return (
     <Layout>
-      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
         {/* Header */}
-        <div className="flex flex-col gap-6">
-           <Link href="/" className="inline-flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors uppercase tracking-wider font-mono mb-2">
+        <div className="flex flex-col gap-4 md:gap-6">
+           <Link href="/" className="inline-flex items-center gap-2 text-[10px] sm:text-xs text-muted-foreground hover:text-foreground transition-colors uppercase tracking-wider font-mono mb-2 w-fit">
              <ArrowLeft size={12} /> Back to Vault
            </Link>
            
-           <div className="flex items-start justify-between">
-             <div className="space-y-2">
-               <h1 className="text-4xl font-serif font-medium text-foreground">{style.name}</h1>
-               <p className="text-muted-foreground max-w-2xl text-lg font-light leading-relaxed">
+           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 md:gap-0">
+             <div className="space-y-2 flex-1 min-w-0">
+               <h1 className="text-2xl md:text-4xl font-serif font-medium text-foreground break-words">{style.name}</h1>
+               <p className="text-muted-foreground max-w-2xl text-sm md:text-lg font-light leading-relaxed">
                  {style.description}
                </p>
              </div>
-             <div className="flex gap-3">
-               <button className="h-9 px-4 flex items-center gap-2 border border-border rounded-sm hover:bg-secondary transition-colors text-sm font-medium">
+             <div className="flex gap-2 md:gap-3 flex-shrink-0">
+               <button className="h-9 px-2 md:px-4 flex items-center gap-2 border border-border rounded-sm hover:bg-secondary transition-colors text-xs md:text-sm font-medium whitespace-nowrap">
                  <Download size={14} />
-                 Export Bundle
+                 <span className="hidden sm:inline">Export</span>
                </button>
              </div>
            </div>
            
-           <div className="flex gap-4 text-xs font-mono text-muted-foreground border-b border-border pb-6">
+           <div className="flex flex-wrap gap-2 md:gap-4 text-[10px] md:text-xs font-mono text-muted-foreground border-b border-border pb-4 md:pb-6">
              <div className="flex items-center gap-1.5 px-2 py-1 bg-muted rounded-sm">
-                <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                <span>ID: {style.id}</span>
+                <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0"></span>
+                <span className="truncate">ID: {style.id}</span>
              </div>
              <div className="flex items-center gap-1.5 px-2 py-1 bg-muted rounded-sm">
-                <Layers size={12} />
+                <Layers size={12} className="flex-shrink-0" />
                 <span>v1.0.0</span>
              </div>
              <div className="flex items-center gap-1.5 px-2 py-1 bg-muted rounded-sm">
-                <ImageIcon size={12} />
-                <span>Standardized DTCG</span>
+                <ImageIcon size={12} className="flex-shrink-0" />
+                <span className="hidden sm:inline">DTCG</span>
              </div>
            </div>
         </div>
 
         {/* Content Grid */}
-        <div className="grid grid-cols-12 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
           
           {/* Left Column: Visuals */}
-          <div className="col-span-12 lg:col-span-7 space-y-8">
-             <div className="space-y-4">
-               <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Canonical Previews</h2>
-               <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2 aspect-video bg-muted rounded-sm overflow-hidden border border-border relative group">
+          <div className="col-span-1 lg:col-span-7 space-y-6 md:space-y-8">
+             <div className="space-y-3 md:space-y-4">
+               <h2 className="text-xs md:text-sm font-medium uppercase tracking-wider text-muted-foreground">Canonical Previews</h2>
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-4">
+                  <div className="col-span-1 sm:col-span-2 aspect-video bg-muted rounded-sm overflow-hidden border border-border relative group">
                     <img src={style.previews.landscape} className="w-full h-full object-cover" alt="Landscape" />
                     <div className="absolute bottom-2 left-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded-sm backdrop-blur-sm">
                       LANDSCAPE 16:9
@@ -93,9 +93,9 @@ export default function StyleDetail() {
                </div>
              </div>
 
-             <div className="space-y-4 pt-8 border-t border-border">
-                <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Reference Artifacts</h2>
-                <div className="grid grid-cols-4 gap-4">
+             <div className="space-y-3 md:space-y-4 pt-6 md:pt-8 border-t border-border">
+                <h2 className="text-xs md:text-sm font-medium uppercase tracking-wider text-muted-foreground">Reference Artifacts</h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 md:gap-4">
                   {style.referenceImages.map((img, i) => (
                     <div key={i} className="aspect-square bg-muted rounded-sm overflow-hidden border border-border opacity-80 hover:opacity-100 transition-opacity cursor-zoom-in">
                        <img src={img} className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-500" alt="Reference" />
@@ -106,26 +106,26 @@ export default function StyleDetail() {
           </div>
 
           {/* Right Column: Data */}
-          <div className="col-span-12 lg:col-span-5 flex flex-col h-full">
-            <div className="sticky top-20 space-y-4">
-              <div className="flex items-center gap-4 border-b border-border">
+          <div className="col-span-1 lg:col-span-5 flex flex-col">
+            <div className="space-y-3 md:space-y-4">
+              <div className="flex items-center gap-2 md:gap-4 border-b border-border overflow-x-auto">
                 <button 
                   onClick={() => setActiveTab('tokens')}
                   className={cn(
-                    "pb-2 text-sm font-medium transition-colors border-b-2 translate-y-[1px]", 
+                    "pb-2 text-xs md:text-sm font-medium transition-colors border-b-2 translate-y-[1px] whitespace-nowrap", 
                     activeTab === 'tokens' ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  Design Tokens
+                  Tokens
                 </button>
                 <button 
                   onClick={() => setActiveTab('scaffolding')}
                   className={cn(
-                    "pb-2 text-sm font-medium transition-colors border-b-2 translate-y-[1px]", 
+                    "pb-2 text-xs md:text-sm font-medium transition-colors border-b-2 translate-y-[1px] whitespace-nowrap", 
                     activeTab === 'scaffolding' ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  Prompt Scaffolding
+                  Scaffolding
                 </button>
               </div>
 

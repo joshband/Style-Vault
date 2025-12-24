@@ -8,21 +8,21 @@ export default function Explorer() {
 
   return (
     <Layout>
-      <div className="flex flex-col gap-8">
-        <div className="flex items-end justify-between border-b border-border pb-6">
+      <div className="flex flex-col gap-6 md:gap-8">
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between border-b border-border pb-4 md:pb-6 gap-4 md:gap-0">
           <div className="space-y-1">
-            <h1 className="text-3xl font-serif font-medium text-foreground">Style Vault</h1>
-            <p className="text-muted-foreground text-sm max-w-2xl">
+            <h1 className="text-2xl md:text-3xl font-serif font-medium text-foreground">Style Vault</h1>
+            <p className="text-muted-foreground text-xs sm:text-sm max-w-2xl">
               A curated library of visual intelligence artifacts. Inspect tokens, compare aesthetics, and analyze prompt scaffolding.
             </p>
           </div>
           
-          <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground">
+          <div className="flex items-center gap-2 text-[10px] sm:text-xs font-mono text-muted-foreground flex-shrink-0">
             <span>{styles.length} STYLES INDEXED</span>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           {styles.map((style, index) => (
             <motion.div
               key={style.id}

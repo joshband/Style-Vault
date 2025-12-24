@@ -29,17 +29,17 @@ export default function Generation() {
   return (
     <Layout>
       <div className="flex flex-col h-[calc(100vh-8rem)]">
-        <div className="border-b border-border pb-6 mb-6">
-          <h1 className="text-3xl font-serif font-medium text-foreground">Style Application</h1>
-          <p className="text-muted-foreground text-sm mt-2">
+        <div className="border-b border-border pb-4 md:pb-6 mb-4 md:mb-6">
+          <h1 className="text-2xl md:text-3xl font-serif font-medium text-foreground">Style Application</h1>
+          <p className="text-muted-foreground text-xs md:text-sm mt-2">
             Apply a curated style to a new concept. The system will blend your prompt with the style's rigid token definition.
           </p>
         </div>
 
-        <div className="grid grid-cols-12 gap-8 flex-1 min-h-0">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-8 flex-1 min-h-0">
           
           {/* Left: Style Selector */}
-          <div className="col-span-4 flex flex-col border-r border-border pr-6 overflow-hidden">
+          <div className="col-span-1 lg:col-span-4 flex flex-col border-b lg:border-b-0 lg:border-r border-border pb-4 md:pb-6 lg:pb-0 lg:pr-6 overflow-hidden">
              <div className="flex items-center gap-2 mb-4 bg-muted/30 p-2 rounded-sm border border-border/50">
                <Search size={14} className="text-muted-foreground" />
                <input 
@@ -74,7 +74,7 @@ export default function Generation() {
           </div>
 
           {/* Middle/Right: Composition & Result */}
-          <div className="col-span-8 flex flex-col gap-6 overflow-y-auto">
+          <div className="col-span-1 lg:col-span-8 flex flex-col gap-4 md:gap-6 overflow-y-auto">
              
              {/* Prompt Input */}
              <div className="space-y-4 flex-shrink-0">
