@@ -212,28 +212,123 @@ def extract_grid(img):
 
 def extract_shadows(img):
     """
-    Heuristic shadow detection.
+    Enhanced shadow and depth detection.
 
     Strategy:
-    - Analyze luminance falloff
-    - Detect dark halos around shapes
+    - Analyze luminance gradients for shadow strength
+    - Detect shadow direction from gradient orientation
+    - Estimate blur radius from edge softness
+    - Analyze contrast distribution for depth layers
+    - Extract shadow color from dark regions
     """
     lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
-    l = lab[:, :, 0].astype(np.float32)
-
-    grad = cv2.Laplacian(l, cv2.CV_32F)
-    strength = np.mean(np.abs(grad))
-
+    l_channel = lab[:, :, 0].astype(np.float32)
+    
+    grad_x = cv2.Sobel(l_channel, cv2.CV_32F, 1, 0, ksize=3)
+    grad_y = cv2.Sobel(l_channel, cv2.CV_32F, 0, 1, ksize=3)
+    
+    laplacian = cv2.Laplacian(l_channel, cv2.CV_32F)
+    strength = np.mean(np.abs(laplacian))
+    
     if strength < 2:
         level = 0
     elif strength < 5:
         level = 1
-    else:
+    elif strength < 12:
         level = 2
+    else:
+        level = 3
+    
+    magnitude = np.sqrt(grad_x**2 + grad_y**2)
+    threshold = np.percentile(magnitude, 90)
+    strong_grads = magnitude > threshold
+    
+    if np.sum(strong_grads) > 0:
+        avg_grad_x = np.mean(grad_x[strong_grads])
+        avg_grad_y = np.mean(grad_y[strong_grads])
+        angle = np.degrees(np.arctan2(avg_grad_y, avg_grad_x))
+        
+        if -22.5 <= angle < 22.5:
+            direction = "right"
+        elif 22.5 <= angle < 67.5:
+            direction = "bottom-right"
+        elif 67.5 <= angle < 112.5:
+            direction = "bottom"
+        elif 112.5 <= angle < 157.5:
+            direction = "bottom-left"
+        elif angle >= 157.5 or angle < -157.5:
+            direction = "left"
+        elif -157.5 <= angle < -112.5:
+            direction = "top-left"
+        elif -112.5 <= angle < -67.5:
+            direction = "top"
+        else:
+            direction = "top-right"
+    else:
+        direction = "ambient"
+        angle = 0
+    
+    edges = cv2.Canny(l_channel.astype(np.uint8), 50, 150)
+    dist_transform = cv2.distanceTransform(255 - edges, cv2.DIST_L2, 5)
+    blur_samples = dist_transform[dist_transform > 0]
+    if len(blur_samples) > 0:
+        blur_radius = round(float(np.median(blur_samples)), 1)
+    else:
+        blur_radius = 0
+    
+    blur_radius = min(blur_radius, 24)
+    
+    hist = cv2.calcHist([l_channel.astype(np.uint8)], [0], None, [256], [0, 256])
+    hist = hist.flatten() / hist.sum()
+    
+    dark_ratio = np.sum(hist[:85])
+    mid_ratio = np.sum(hist[85:170])
+    light_ratio = np.sum(hist[170:])
+    
+    contrast = np.std(l_channel)
+    
+    if dark_ratio > 0.4 and light_ratio > 0.2:
+        depth_style = "high-contrast"
+    elif dark_ratio > 0.5:
+        depth_style = "dark-dominant"
+    elif light_ratio > 0.5:
+        depth_style = "light-dominant"
+    elif mid_ratio > 0.6:
+        depth_style = "flat"
+    else:
+        depth_style = "balanced"
+    
+    dark_mask = l_channel < 50
+    if np.sum(dark_mask) > 100:
+        dark_pixels = img[dark_mask]
+        if len(dark_pixels) > 0:
+            avg_dark = np.mean(dark_pixels, axis=0)
+            shadow_color = Color(f"rgb({int(avg_dark[2])},{int(avg_dark[1])},{int(avg_dark[0])})").convert("oklch")
+            shadow_color_data = {
+                "space": "oklch",
+                "l": round(shadow_color['l'], 3),
+                "c": round(shadow_color['c'], 3),
+                "h": round(shadow_color['h'] if shadow_color['h'] and not np.isnan(shadow_color['h']) else 0, 1)
+            }
+        else:
+            shadow_color_data = None
+    else:
+        shadow_color_data = None
 
     return {
         "elevation": level,
-        "shadowStrength": round(float(strength), 2)
+        "shadowStrength": round(float(strength), 2),
+        "direction": direction,
+        "directionAngle": round(float(angle), 1),
+        "blurRadius": blur_radius,
+        "contrast": round(float(contrast), 1),
+        "depthStyle": depth_style,
+        "distribution": {
+            "dark": round(float(dark_ratio), 2),
+            "mid": round(float(mid_ratio), 2),
+            "light": round(float(light_ratio), 2)
+        },
+        "shadowColor": shadow_color_data
     }
 
 
