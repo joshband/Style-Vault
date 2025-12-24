@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { ImageIcon, Trash2, AlertCircle, Palette } from "lucide-react";
+import { Trash2, AlertCircle, Palette } from "lucide-react";
 import { Link } from "wouter";
 import { useEffect, useState } from "react";
 import { trackStyleView } from "@/lib/suggestions";
@@ -13,11 +13,7 @@ interface StyleSummary {
   metadataTags?: any;
   moodBoardStatus?: string;
   uiConceptsStatus?: string;
-  previews?: {
-    stillLife: string;
-    landscape: string;
-    portrait: string;
-  };
+  thumbnailPreview?: string | null;
   tokens?: any;
 }
 
@@ -90,42 +86,20 @@ export function StyleCard({ style, className, onDelete }: StyleCardProps) {
         </motion.div>
       
       <div className={cn("group relative flex flex-col bg-card border border-border rounded-lg overflow-hidden transition-all hover:shadow-md hover:border-primary/20", isDragging && "cursor-grabbing")}>
-        {/* Preview Area - 3 Column Composite or Placeholder - Clickable */}
+        {/* Preview Area - Single thumbnail or Placeholder - Clickable */}
         <Link href={`/style/${style.id}`} className="block">
-          <div className="relative aspect-[12/4] bg-muted overflow-hidden flex cursor-pointer">
-            {style.previews ? (
-              <>
-                {/* Portrait Column */}
-                <div className="flex-1 relative overflow-hidden border-r border-border/50">
-                  <img 
-                    src={style.previews.portrait} 
-                    alt={`${style.name} - portrait`}
-                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    draggable={false}
-                  />
-                </div>
-                {/* Landscape Column */}
-                <div className="flex-1 relative overflow-hidden border-r border-border/50">
-                  <img 
-                    src={style.previews.landscape} 
-                    alt={`${style.name} - landscape`}
-                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    draggable={false}
-                  />
-                </div>
-                {/* Still Life Column */}
-                <div className="flex-1 relative overflow-hidden">
-                  <img 
-                    src={style.previews.stillLife} 
-                    alt={`${style.name} - still life`}
-                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    draggable={false}
-                  />
-                </div>
-              </>
+          <div className="relative aspect-[16/9] bg-muted overflow-hidden cursor-pointer">
+            {style.thumbnailPreview ? (
+              <img 
+                src={style.thumbnailPreview} 
+                alt={`${style.name} preview`}
+                className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                draggable={false}
+                loading="lazy"
+              />
             ) : (
-              /* Placeholder when previews not loaded */
-              <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-muted to-muted/50">
+              /* Placeholder when preview not loaded */
+              <div className="flex-1 h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted/50">
                 <Palette className="w-12 h-12 text-muted-foreground/30" />
               </div>
             )}

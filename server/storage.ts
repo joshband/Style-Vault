@@ -10,6 +10,7 @@ export interface StyleSummary {
   metadataTags: any;
   moodBoardStatus: string;
   uiConceptsStatus: string;
+  thumbnailPreview: string | null;
 }
 
 export interface IStorage {
@@ -64,6 +65,7 @@ export class DatabaseStorage implements IStorage {
         metadataTags: styles.metadataTags,
         moodBoard: styles.moodBoard,
         uiConcepts: styles.uiConcepts,
+        previews: styles.previews,
       })
       .from(styles)
       .orderBy(desc(styles.createdAt));
@@ -76,6 +78,7 @@ export class DatabaseStorage implements IStorage {
       metadataTags: s.metadataTags,
       moodBoardStatus: (s.moodBoard as any)?.status || "pending",
       uiConceptsStatus: (s.uiConcepts as any)?.status || "pending",
+      thumbnailPreview: (s.previews as any)?.landscape || (s.previews as any)?.portrait || null,
     }));
   }
 
