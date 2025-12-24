@@ -2,18 +2,16 @@ import { useRoute, useLocation } from "wouter";
 import { fetchStyleById, type Style } from "@/lib/store";
 import { Layout } from "@/components/layout";
 import { TokenViewer } from "@/components/token-viewer";
-import { ArrowLeft, ImageIcon, Layers, Download, Loader2, Wand2, Palette, Component, Layout as LayoutIcon } from "lucide-react";
+import { ArrowLeft, ImageIcon, Layers, Download, Loader2, Wand2, Palette, Layout as LayoutIcon } from "lucide-react";
 import { Link } from "wouter";
 import { useState, useEffect, lazy, Suspense } from "react";
 import { cn } from "@/lib/utils";
 import { useStyleTheme } from "@/hooks/useStyleTheme";
 import { AiMoodBoard } from "@/components/ai-mood-board";
 
-const MoodBoard = lazy(() => import("@/components/mood-board"));
-const StylePlayground = lazy(() => import("@/components/style-playground"));
 const AppConcepts = lazy(() => import("@/components/app-concepts"));
 
-type MainView = 'previews' | 'moodboard' | 'components' | 'concepts';
+type MainView = 'previews' | 'moodboard' | 'concepts';
 type DetailTab = 'tokens' | 'scaffolding';
 
 export default function StyleDetail() {
@@ -131,8 +129,7 @@ export default function StyleDetail() {
         <div className="flex gap-1 p-1 bg-muted rounded-sm w-fit">
           {[
             { key: 'previews' as MainView, label: 'Previews', icon: ImageIcon },
-            { key: 'moodboard' as MainView, label: 'Mood Board', icon: Palette },
-            { key: 'components' as MainView, label: 'Components', icon: Component },
+            { key: 'moodboard' as MainView, label: 'Style Assets', icon: Palette },
             { key: 'concepts' as MainView, label: 'App Concepts', icon: LayoutIcon },
           ].map((tab) => (
             <button
@@ -226,19 +223,6 @@ export default function StyleDetail() {
               </div>
             )}
 
-            {mainView === 'components' && (
-              <Suspense fallback={<div className="flex items-center justify-center h-64"><Loader2 className="animate-spin" /></div>}>
-                {theme ? (
-                  <div className="animate-in fade-in duration-300 rounded-lg overflow-hidden border border-border">
-                    <StylePlayground theme={theme} />
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center h-64 text-muted-foreground">
-                    Theme data unavailable
-                  </div>
-                )}
-              </Suspense>
-            )}
 
             {mainView === 'concepts' && (
               <Suspense fallback={<div className="flex items-center justify-center h-64"><Loader2 className="animate-spin" /></div>}>
