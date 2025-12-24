@@ -129,17 +129,34 @@ export class DatabaseStorage implements IStorage {
 
   async updateStyleMetadata(id: string, metadataTags: MetadataTags, status: MetadataEnrichmentStatus): Promise<Style | undefined> {
     const normalizedTags: MetadataTags = {
+      // Core visual characteristics
       mood: metadataTags.mood || [],
       colorFamily: metadataTags.colorFamily || [],
       lighting: metadataTags.lighting || [],
       texture: metadataTags.texture || [],
+      // Art historical context
       era: metadataTags.era || [],
       artPeriod: metadataTags.artPeriod || [],
       historicalInfluences: metadataTags.historicalInfluences || [],
       similarArtists: metadataTags.similarArtists || [],
+      // Technical aspects
       medium: metadataTags.medium || [],
       subjects: metadataTags.subjects || [],
+      // Application guidance
       usageExamples: metadataTags.usageExamples || [],
+      // Subjective Visual DNA - Emotional Resonance
+      narrativeTone: metadataTags.narrativeTone || [],
+      sensoryPalette: metadataTags.sensoryPalette || [],
+      movementRhythm: metadataTags.movementRhythm || [],
+      // Subjective Visual DNA - Design Voice
+      stylisticPrinciples: metadataTags.stylisticPrinciples || [],
+      signatureMotifs: metadataTags.signatureMotifs || [],
+      contrastDynamics: metadataTags.contrastDynamics || [],
+      // Subjective Visual DNA - Experiential Impact
+      psychologicalEffect: metadataTags.psychologicalEffect || [],
+      culturalResonance: metadataTags.culturalResonance || [],
+      audiencePerception: metadataTags.audiencePerception || [],
+      // Search keywords
       keywords: metadataTags.keywords || [],
       version: metadataTags.version,
       lastAnalyzedAt: metadataTags.lastAnalyzedAt,
