@@ -38,6 +38,21 @@ export interface MetadataTags {
   // Application guidance
   usageExamples: string[];
   
+  // Subjective Visual DNA - Emotional Resonance
+  narrativeTone: string[];
+  sensoryPalette: string[];
+  movementRhythm: string[];
+  
+  // Subjective Visual DNA - Design Voice
+  stylisticPrinciples: string[];
+  signatureMotifs: string[];
+  contrastDynamics: string[];
+  
+  // Subjective Visual DNA - Experiential Impact
+  psychologicalEffect: string[];
+  culturalResonance: string[];
+  audiencePerception: string[];
+  
   // Search keywords
   keywords: string[];
   
@@ -108,6 +123,15 @@ export const styles = pgTable("styles", {
     medium: [],
     subjects: [],
     usageExamples: [],
+    narrativeTone: [],
+    sensoryPalette: [],
+    movementRhythm: [],
+    stylisticPrinciples: [],
+    signatureMotifs: [],
+    contrastDynamics: [],
+    psychologicalEffect: [],
+    culturalResonance: [],
+    audiencePerception: [],
     keywords: [],
   }),
   metadataEnrichmentStatus: text("metadata_enrichment_status").$type<MetadataEnrichmentStatus>().default("pending"),

@@ -30,6 +30,21 @@ interface EnrichmentResult {
   // Application guidance
   usageExamples: string[];
   
+  // Subjective Visual DNA - Emotional Resonance
+  narrativeTone: string[];
+  sensoryPalette: string[];
+  movementRhythm: string[];
+  
+  // Subjective Visual DNA - Design Voice
+  stylisticPrinciples: string[];
+  signatureMotifs: string[];
+  contrastDynamics: string[];
+  
+  // Subjective Visual DNA - Experiential Impact
+  psychologicalEffect: string[];
+  culturalResonance: string[];
+  audiencePerception: string[];
+  
   // Search keywords
   keywords: string[];
 }
@@ -37,7 +52,7 @@ interface EnrichmentResult {
 function buildEnrichmentPrompt(style: Style): string {
   const tokensPreview = JSON.stringify(style.tokens, null, 2).slice(0, 2000);
   
-  return `You are an art historian and design expert. Analyze this visual style and generate rich descriptive metadata for discovery and classification.
+  return `You are an art historian, design critic, and visual culture expert. Analyze this visual style deeply and extract its "Visual DNA" - both objective characteristics and subjective interpretive qualities.
 
 Style Name: ${style.name}
 Description: ${style.description}
@@ -45,11 +60,11 @@ Description: ${style.description}
 Design Tokens (excerpt):
 ${tokensPreview}
 
-Generate tags in these categories. Use lowercase, hyphenated keywords where appropriate.
+Generate tags capturing both technical attributes and subjective essence. Use lowercase, hyphenated keywords.
 
 Respond with ONLY valid JSON in this exact format:
 {
-  "mood": ["tag1", "tag2", "tag3"],
+  "mood": ["tag1", "tag2"],
   "colorFamily": ["tag1", "tag2"],
   "lighting": ["tag1", "tag2"],
   "texture": ["tag1", "tag2"],
@@ -59,25 +74,52 @@ Respond with ONLY valid JSON in this exact format:
   "similarArtists": ["artist1", "artist2"],
   "medium": ["tag1", "tag2"],
   "subjects": ["tag1", "tag2"],
-  "usageExamples": ["example1", "example2", "example3"],
+  "usageExamples": ["example1", "example2"],
+  "narrativeTone": ["tag1", "tag2"],
+  "sensoryPalette": ["tag1", "tag2"],
+  "movementRhythm": ["tag1", "tag2"],
+  "stylisticPrinciples": ["tag1", "tag2"],
+  "signatureMotifs": ["tag1", "tag2"],
+  "contrastDynamics": ["tag1", "tag2"],
+  "psychologicalEffect": ["tag1", "tag2"],
+  "culturalResonance": ["tag1", "tag2"],
+  "audiencePerception": ["tag1", "tag2"],
   "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"]
 }
 
-Guidelines:
-- mood: emotional qualities (e.g., "serene", "melancholic", "energetic", "nostalgic", "whimsical", "dramatic")
-- colorFamily: color palettes (e.g., "earth-tones", "pastels", "monochrome", "jewel-tones", "muted", "high-contrast")
-- lighting: lighting characteristics (e.g., "soft-diffused", "dramatic-chiaroscuro", "golden-hour", "flat", "rim-lit")
-- texture: surface qualities (e.g., "smooth", "grainy", "impasto", "organic", "geometric")
-- era: time period (e.g., "1920s", "1970s", "contemporary", "ancient", "medieval", "renaissance")
-- artPeriod: art movement or period (e.g., "art-deco", "art-nouveau", "impressionism", "bauhaus", "pop-art", "minimalism")
-- historicalInfluences: art movements, cultural movements, or design schools that influenced this style (e.g., "japanese-woodblock", "bauhaus-school", "memphis-design", "swiss-style")
-- similarArtists: artists or designers with comparable aesthetics (e.g., "monet", "warhol", "mucha", "saul-bass", "yayoi-kusama")
-- medium: artistic medium feel (e.g., "oil-painting", "watercolor", "photography", "digital-illustration", "collage")
-- subjects: common subject matter (e.g., "landscapes", "portraits", "still-life", "abstract", "architectural")
-- usageExamples: practical applications (e.g., "album-covers", "book-illustrations", "brand-identity", "editorial", "packaging", "web-design", "fashion-photography")
-- keywords: 5-10 general search terms combining all aspects
+== OBJECTIVE CHARACTERISTICS ==
+- mood: emotional qualities (e.g., "serene", "melancholic", "energetic", "nostalgic", "whimsical")
+- colorFamily: color palettes (e.g., "earth-tones", "pastels", "monochrome", "jewel-tones")
+- lighting: lighting characteristics (e.g., "soft-diffused", "dramatic-chiaroscuro", "golden-hour")
+- texture: surface qualities (e.g., "smooth", "grainy", "impasto", "organic")
+- era: time period (e.g., "1920s", "1970s", "contemporary", "renaissance")
+- artPeriod: art movements (e.g., "art-deco", "impressionism", "bauhaus", "minimalism")
+- historicalInfluences: design schools/movements (e.g., "japanese-woodblock", "swiss-style", "memphis-design")
+- similarArtists: artists with comparable aesthetics (e.g., "monet", "warhol", "saul-bass")
+- medium: artistic medium (e.g., "oil-painting", "watercolor", "photography", "digital-illustration")
+- subjects: subject matter (e.g., "landscapes", "portraits", "abstract", "architectural")
+- usageExamples: applications (e.g., "album-covers", "brand-identity", "web-design", "editorial")
 
-Be specific, knowledgeable, and descriptive. Generate 2-5 tags per category.`;
+== SUBJECTIVE VISUAL DNA ==
+
+Emotional Resonance:
+- narrativeTone: storytelling voice (e.g., "poetic-dreamlike", "documentary-raw", "mythological", "intimate-confessional", "epic-sweeping")
+- sensoryPalette: cross-sensory associations (e.g., "velvet-touch", "citrus-bright", "autumn-smoke", "ocean-depths", "sun-warmed")
+- movementRhythm: visual tempo/flow (e.g., "flowing-organic", "staccato-sharp", "meditative-slow", "dynamic-explosive", "undulating")
+
+Design Voice:
+- stylisticPrinciples: core design philosophy (e.g., "form-follows-function", "maximalist-abundance", "wabi-sabi-imperfection", "geometric-precision")
+- signatureMotifs: recurring visual elements (e.g., "curved-lines", "negative-space", "layered-transparency", "bold-typography", "natural-forms")
+- contrastDynamics: tension/harmony (e.g., "high-drama", "subtle-gradients", "harsh-juxtaposition", "harmonious-blend", "push-pull")
+
+Experiential Impact:
+- psychologicalEffect: viewer response (e.g., "calming-meditative", "energizing-stimulating", "thought-provoking", "comfort-nostalgia", "awe-inspiring")
+- culturalResonance: cultural connections (e.g., "japanese-zen", "scandinavian-hygge", "american-midcentury", "mediterranean-warmth", "african-diaspora")
+- audiencePerception: who responds (e.g., "design-professionals", "mass-market-appeal", "avant-garde-collectors", "youthful-trendy", "sophisticated-mature")
+
+- keywords: 5-10 general search terms
+
+Be interpretive, evocative, and specific. Generate 2-4 tags per category.`;
 }
 
 function normalizeTag(tag: string): string {
@@ -120,6 +162,21 @@ function parseEnrichmentResponse(text: string): EnrichmentResult | null {
       
       // Application guidance
       usageExamples: normalizeArray(parsed.usageExamples || []),
+      
+      // Subjective Visual DNA - Emotional Resonance
+      narrativeTone: normalizeArray(parsed.narrativeTone || []),
+      sensoryPalette: normalizeArray(parsed.sensoryPalette || []),
+      movementRhythm: normalizeArray(parsed.movementRhythm || []),
+      
+      // Subjective Visual DNA - Design Voice
+      stylisticPrinciples: normalizeArray(parsed.stylisticPrinciples || []),
+      signatureMotifs: normalizeArray(parsed.signatureMotifs || []),
+      contrastDynamics: normalizeArray(parsed.contrastDynamics || []),
+      
+      // Subjective Visual DNA - Experiential Impact
+      psychologicalEffect: normalizeArray(parsed.psychologicalEffect || []),
+      culturalResonance: normalizeArray(parsed.culturalResonance || []),
+      audiencePerception: normalizeArray(parsed.audiencePerception || []),
       
       // Search keywords
       keywords: normalizeArray(parsed.keywords || []),
@@ -234,6 +291,21 @@ export async function getTagsSummary(): Promise<Record<string, Record<string, nu
     
     // Application guidance
     usageExamples: {},
+    
+    // Subjective Visual DNA - Emotional Resonance
+    narrativeTone: {},
+    sensoryPalette: {},
+    movementRhythm: {},
+    
+    // Subjective Visual DNA - Design Voice
+    stylisticPrinciples: {},
+    signatureMotifs: {},
+    contrastDynamics: {},
+    
+    // Subjective Visual DNA - Experiential Impact
+    psychologicalEffect: {},
+    culturalResonance: {},
+    audiencePerception: {},
     
     // Search keywords
     keywords: {},
