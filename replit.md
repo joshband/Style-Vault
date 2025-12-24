@@ -79,6 +79,26 @@ Preferred communication style: Simple, everyday language.
 - **Structure**: Hierarchical JSON with `$type`, `$value`, and `$description` properties
 - **Usage**: Tokens define color palettes, typography, spacing, and visual characteristics that are applied consistently across generated images
 
+### Async Job Orchestration
+- **Location**: `server/job-runner.ts` - Core job execution engine
+- **Database Table**: `jobs` - Tracks all async operations
+- **Configuration**:
+  - Timeout: 120 seconds per attempt
+  - Max Retries: 3 attempts
+  - Backoff: Exponential (2s × 2^attempt)
+  - Polling: 1-2 second intervals
+- **Job Types**: token_extraction, preview_generation, image_generation, mood_board, metadata_enrichment
+- **Job States**: queued → running → succeeded/failed/canceled
+- **API Endpoints**:
+  - `GET /api/jobs/:id` - Get job status with progress
+  - `GET /api/jobs?styleId=xxx` - Get jobs for a style
+  - `POST /api/jobs/:id/cancel` - Cancel running job
+  - `POST /api/jobs/:id/retry` - Retry failed job
+- **Frontend Integration**:
+  - `useJob` hook for status polling (`client/src/hooks/use-job.ts`)
+  - `JobProgress` component for UI (`client/src/components/job-progress.tsx`)
+  - `ErrorBoundary` for graceful error recovery (`client/src/components/error-boundary.tsx`)
+
 ### Key Design Decisions
 
 **Tokens as Source of Truth**: The application enforces that no style can exist without a complete token definition. This ensures styles are portable, comparable, and can be applied consistently.
@@ -86,6 +106,8 @@ Preferred communication style: Simple, everyday language.
 **Canonical Preview System**: Each style generates three standardized preview images (portrait, landscape, still-life) using fixed subjects. This enables meaningful cross-style comparison.
 
 **Prompt Scaffolding**: Styles include structured prompt templates (base, modifiers, negative) derived from tokens, ensuring consistent application of style characteristics during image generation.
+
+**Job-Based Async Operations**: All long-running operations use a persistent job system with automatic retry, exponential backoff, and progress tracking. This prevents stuck states and enables recovery from transient failures.
 
 **Background Metadata Enrichment**: After style creation and mood board generation, an AI-powered background worker enriches styles with comprehensive metadata for discovery and classification. The system extracts both objective characteristics and subjective "Visual DNA" descriptors:
 
