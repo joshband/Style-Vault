@@ -22,15 +22,29 @@ export default function Authoring() {
   const [prompt, setPrompt] = useState("");
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
   const [generatedPreviews, setGeneratedPreviews] = useState<{ stillLife: string; landscape: string; portrait: string } | null>(null);
-  const [metadataTags, setMetadataTags] = useState<{
+  const [metadataTags, setMetadataTags] = useState<Partial<{
     mood: string[];
     colorFamily: string[];
-    era: string[];
-    medium: string[];
-    subjects: string[];
     lighting: string[];
     texture: string[];
-  }>({
+    era: string[];
+    artPeriod: string[];
+    historicalInfluences: string[];
+    similarArtists: string[];
+    medium: string[];
+    subjects: string[];
+    usageExamples: string[];
+    narrativeTone: string[];
+    sensoryPalette: string[];
+    movementRhythm: string[];
+    stylisticPrinciples: string[];
+    signatureMotifs: string[];
+    contrastDynamics: string[];
+    psychologicalEffect: string[];
+    culturalResonance: string[];
+    audiencePerception: string[];
+    keywords: string[];
+  }>>({
     mood: [],
     colorFamily: [],
     era: [],
@@ -188,7 +202,7 @@ export default function Authoring() {
           modifiers: ["extracted-from-reference", "auto-analyzed"],
           negative: "blurry, low quality, distorted"
         },
-        metadataTags: metadataTags
+        metadataTags: metadataTags as any
       });
       
       toast({
