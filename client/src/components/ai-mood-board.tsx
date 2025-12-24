@@ -1,7 +1,6 @@
 import { useEffect } from "react";
-import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, RefreshCw, Image as ImageIcon, Layout, Palette } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { MoodBoardAssets, UiConceptAssets } from "@/lib/store";
@@ -33,12 +32,10 @@ export function AiMoodBoard({
   className,
 }: AiMoodBoardProps) {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<"collage" | "audio" | "dashboard">("collage");
 
   const isGenerating = moodBoard?.status === "generating" || uiConcepts?.status === "generating";
   const isPending = moodBoard?.status === "pending" || uiConcepts?.status === "pending";
 
-  // Poll for updates when generating
   useQuery({
     queryKey: ["/api/styles", styleId, "poll"],
     queryFn: async () => {
@@ -49,7 +46,6 @@ export function AiMoodBoard({
     enabled: isGenerating || isPending,
   });
 
-  // Invalidate main query when poll detects completion
   useEffect(() => {
     if (!isGenerating && !isPending) {
       queryClient.invalidateQueries({ queryKey: ["/api/styles", styleId] });
@@ -68,7 +64,6 @@ export function AiMoodBoard({
   const hasDashboard = uiConcepts?.status === "complete" && uiConcepts.dashboard;
   const hasAnyAssets = hasCollage || hasAudioPlugin || hasDashboard;
 
-  // Show loading state when generating
   if (isGenerating || isPending) {
     return (
       <div className={cn("flex flex-col items-center justify-center p-12 space-y-6", className)} data-testid="mood-board-generating">
@@ -80,21 +75,20 @@ export function AiMoodBoard({
         <div className="text-center space-y-2">
           <h3 className="text-lg font-semibold">Generating Style Assets...</h3>
           <p className="text-sm text-muted-foreground">
-            Creating mood board collage and UI concept mockups. This may take a minute.
+            Creating mood board and UI mockups. This may take a minute.
           </p>
         </div>
       </div>
     );
   }
 
-  // Show failure state if generation failed
   if (moodBoard?.status === "failed" && uiConcepts?.status === "failed" && !hasAnyAssets) {
     return (
       <div className={cn("flex flex-col items-center justify-center p-12 space-y-6", className)} data-testid="mood-board-failed">
         <div className="text-center space-y-2">
           <h3 className="text-lg font-semibold">Generation Failed</h3>
           <p className="text-sm text-muted-foreground">
-            Unable to generate mood board assets. You can try regenerating.
+            Unable to generate assets. You can try regenerating.
           </p>
         </div>
         <Button
@@ -109,15 +103,7 @@ export function AiMoodBoard({
     );
   }
 
-  // Show content when assets are available
-  const tabs = [
-    { id: "collage" as const, label: "AI Mood Board", icon: Palette, available: hasCollage },
-    { id: "audio" as const, label: "AI Audio Plugin", icon: Layout, available: hasAudioPlugin },
-    { id: "dashboard" as const, label: "AI Dashboard", icon: ImageIcon, available: hasDashboard },
-  ].filter((tab) => tab.available);
-
-  // If no tabs available but not generating, default to first available or show empty
-  if (tabs.length === 0) {
+  if (!hasAnyAssets) {
     return (
       <div className={cn("flex flex-col items-center justify-center p-12 space-y-6", className)} data-testid="mood-board-empty">
         <div className="text-center space-y-2">
@@ -138,45 +124,10 @@ export function AiMoodBoard({
     );
   }
 
-  // Ensure active tab is valid
-  const validActiveTab = tabs.find(t => t.id === activeTab) ? activeTab : tabs[0]?.id || "collage";
-
-  const getCurrentImage = () => {
-    switch (validActiveTab) {
-      case "collage":
-        return moodBoard?.collage;
-      case "audio":
-        return uiConcepts?.audioPlugin;
-      case "dashboard":
-        return uiConcepts?.dashboard;
-      default:
-        return null;
-    }
-  };
-
-  const currentImage = getCurrentImage();
-
   return (
-    <div className={cn("space-y-4", className)}>
+    <div className={cn("space-y-6", className)}>
       <div className="flex items-center justify-between">
-        <div className="flex gap-1 p-1 bg-muted rounded-lg">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              data-testid={`tab-${tab.id}`}
-              className={cn(
-                "flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
-                validActiveTab === tab.id
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <tab.icon className="w-4 h-4" />
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Generated Assets</h2>
         <Button
           variant="outline"
           size="sm"
@@ -189,26 +140,53 @@ export function AiMoodBoard({
         </Button>
       </div>
 
-      <div className="relative rounded-lg overflow-hidden border border-border bg-muted/30" data-testid="mood-board-image-container">
-        {currentImage ? (
-          <img
-            src={currentImage}
-            alt={`${styleName} ${validActiveTab}`}
-            className="w-full h-auto"
-            data-testid={`img-${validActiveTab}`}
-          />
-        ) : (
-          <div className="aspect-[3/4] flex items-center justify-center">
-            <p className="text-muted-foreground">No image available</p>
+      {hasCollage && (
+        <div className="space-y-2">
+          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Mood Board</h3>
+          <div className="rounded-lg overflow-hidden border border-border" data-testid="img-container-collage">
+            <img
+              src={moodBoard?.collage}
+              alt={`${styleName} mood board`}
+              className="w-full h-auto"
+              data-testid="img-collage"
+            />
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      <div className="text-center text-xs text-muted-foreground">
-        {validActiveTab === "collage" && "AI-generated mood board collage showing color palette, textures, typography, and visual references"}
-        {validActiveTab === "audio" && "AI-generated audio plugin interface styled with extracted design tokens"}
-        {validActiveTab === "dashboard" && "AI-generated dashboard interface styled with extracted design tokens"}
-      </div>
+      {(hasAudioPlugin || hasDashboard) && (
+        <div className="space-y-2">
+          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">UI Concepts</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {hasAudioPlugin && (
+              <div className="rounded-lg overflow-hidden border border-border" data-testid="img-container-audio">
+                <img
+                  src={uiConcepts?.audioPlugin}
+                  alt={`${styleName} audio plugin`}
+                  className="w-full h-auto"
+                  data-testid="img-audio"
+                />
+                <div className="p-2 bg-muted/50 text-center">
+                  <span className="text-xs text-muted-foreground">Audio Plugin</span>
+                </div>
+              </div>
+            )}
+            {hasDashboard && (
+              <div className="rounded-lg overflow-hidden border border-border" data-testid="img-container-dashboard">
+                <img
+                  src={uiConcepts?.dashboard}
+                  alt={`${styleName} dashboard`}
+                  className="w-full h-auto"
+                  data-testid="img-dashboard"
+                />
+                <div className="p-2 bg-muted/50 text-center">
+                  <span className="text-xs text-muted-foreground">Dashboard</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

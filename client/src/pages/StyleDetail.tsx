@@ -19,7 +19,7 @@ export default function StyleDetail() {
   const [style, setStyle] = useState<Style | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<DetailTab>('tokens');
-  const [mainView, setMainView] = useState<MainView>('ai-assets');
+  const [mainView, setMainView] = useState<MainView>('previews');
   
   const theme = useStyleTheme(style?.tokens as any);
 
@@ -126,8 +126,8 @@ export default function StyleDetail() {
         {/* Main View Tabs */}
         <div className="flex gap-1 p-1 bg-muted rounded-sm w-fit">
           {[
-            { key: 'ai-assets' as MainView, label: 'AI Generated', icon: Palette },
             { key: 'previews' as MainView, label: 'Previews', icon: ImageIcon },
+            { key: 'ai-assets' as MainView, label: 'Generated', icon: Palette },
           ].map((tab) => (
             <button
               key={tab.key}
