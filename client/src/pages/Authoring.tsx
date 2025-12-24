@@ -290,17 +290,14 @@ export default function Authoring() {
                       {/* Portrait Column */}
                       <div className="flex-1 relative overflow-hidden border-r border-border/50">
                         <img src={generatedPreviews.portrait} className="w-full h-full object-cover" alt="Portrait" />
-                        <span className="absolute bottom-2 left-2 text-[10px] bg-black/70 text-white px-1.5 py-0.5 rounded-sm backdrop-blur-sm">PORTRAIT 3:4</span>
                       </div>
                       {/* Landscape Column */}
                       <div className="flex-1 relative overflow-hidden border-r border-border/50">
                         <img src={generatedPreviews.landscape} className="w-full h-full object-cover" alt="Landscape" />
-                        <span className="absolute bottom-2 left-2 text-[10px] bg-black/70 text-white px-1.5 py-0.5 rounded-sm backdrop-blur-sm">LANDSCAPE 16:9</span>
                       </div>
                       {/* Still Life Column */}
                       <div className="flex-1 relative overflow-hidden">
                         <img src={generatedPreviews.stillLife} className="w-full h-full object-cover" alt="Still Life" />
-                        <span className="absolute bottom-2 left-2 text-[10px] bg-black/70 text-white px-1.5 py-0.5 rounded-sm backdrop-blur-sm">STILL 1:1</span>
                       </div>
                     </div>
                   </div>

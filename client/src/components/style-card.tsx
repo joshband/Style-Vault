@@ -1,7 +1,6 @@
 import { Style } from "@/lib/store";
 import { cn } from "@/lib/utils";
-import { Eye, Code, ImageIcon } from "lucide-react";
-import { useState } from "react";
+import { Code, ImageIcon } from "lucide-react";
 import { Link } from "wouter";
 
 interface StyleCardProps {
