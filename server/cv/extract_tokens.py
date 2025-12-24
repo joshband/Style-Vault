@@ -25,10 +25,13 @@ This file intentionally avoids:
 import sys
 import json
 import base64
+import time
 import cv2
 import numpy as np
 from scipy.spatial.distance import cdist
 from coloraide import Color
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from functools import partial
 
 
 # ------------------------------------------------------------
@@ -376,12 +379,36 @@ def extract_strokes(img):
 
 
 # ------------------------------------------------------------
+# Parallel extraction wrappers
+# ------------------------------------------------------------
+
+def _run_extractor(extractor_name, img_bytes, img_shape):
+    """
+    Worker function for parallel extraction.
+    Reconstructs image from bytes and runs the specified extractor.
+    """
+    img = np.frombuffer(img_bytes, dtype=np.uint8).reshape(img_shape)
+    
+    extractors = {
+        "color": extract_colors,
+        "spacing": extract_spacing,
+        "borderRadius": extract_border_radius,
+        "grid": extract_grid,
+        "elevation": extract_shadows,
+        "strokeWidth": extract_strokes,
+    }
+    
+    extractor_fn = extractors[extractor_name]
+    return extractor_name, extractor_fn(img)
+
+
+# ------------------------------------------------------------
 # Master extractor
 # ------------------------------------------------------------
 
-def extract_design_tokens(img):
+def extract_design_tokens_sequential(img):
     """
-    Full lightweight extraction pass.
+    Sequential extraction pass (fallback).
     """
     img_resized = resize_for_speed(img, 512)
 
@@ -395,9 +422,55 @@ def extract_design_tokens(img):
         "meta": {
             "method": "heuristic-cv",
             "confidence": "medium-high",
-            "realtimeSafe": True
+            "realtimeSafe": True,
+            "parallel": False
         }
     }
+
+
+def extract_design_tokens_parallel(img):
+    """
+    Parallel extraction using multiprocessing.
+    Runs all extractors concurrently for faster execution.
+    """
+    img_resized = resize_for_speed(img, 512)
+    
+    img_bytes = img_resized.tobytes()
+    img_shape = img_resized.shape
+    
+    extractor_names = ["color", "spacing", "borderRadius", "grid", "elevation", "strokeWidth"]
+    
+    results = {}
+    
+    with ProcessPoolExecutor(max_workers=len(extractor_names)) as executor:
+        futures = {
+            executor.submit(_run_extractor, name, img_bytes, img_shape): name
+            for name in extractor_names
+        }
+        
+        for future in as_completed(futures):
+            name, result = future.result()
+            results[name] = result
+    
+    results["meta"] = {
+        "method": "heuristic-cv",
+        "confidence": "medium-high",
+        "realtimeSafe": True,
+        "parallel": True
+    }
+    
+    return results
+
+
+def extract_design_tokens(img):
+    """
+    Full lightweight extraction pass.
+    Uses parallel processing when available, falls back to sequential.
+    """
+    try:
+        return extract_design_tokens_parallel(img)
+    except Exception as e:
+        return extract_design_tokens_sequential(img)
 
 
 def load_image_from_base64(data_url):
