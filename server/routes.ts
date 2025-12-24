@@ -12,6 +12,7 @@ import { db } from "./db";
 import { sql } from "drizzle-orm";
 import { cache, CACHE_KEYS } from "./cache";
 import type { MetadataTags } from "@shared/schema";
+import { getJobProgress } from "./job-runner";
 
 function getDefaultMetadataTags(): MetadataTags {
   return {
@@ -549,6 +550,126 @@ export async function registerRoutes(
       console.error("Error processing enrichments:", error);
       res.status(500).json({
         error: "Failed to process enrichments",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // ============================================
+  // Job Management API - Async operation tracking
+  // ============================================
+
+  // Get job status by ID
+  app.get("/api/jobs/:id", async (req, res) => {
+    try {
+      const job = await storage.getJobById(req.params.id);
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      
+      res.json({
+        ...job,
+        ...getJobProgress(job),
+      });
+    } catch (error) {
+      console.error("Error fetching job:", error);
+      res.status(500).json({
+        error: "Failed to fetch job",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // Get all active jobs (queued or running)
+  app.get("/api/jobs", async (req, res) => {
+    try {
+      const styleId = req.query.styleId as string | undefined;
+      
+      let jobsList;
+      if (styleId) {
+        jobsList = await storage.getJobsByStyleId(styleId);
+      } else {
+        jobsList = await storage.getActiveJobs();
+      }
+      
+      res.json(jobsList.map(job => ({
+        ...job,
+        ...getJobProgress(job),
+      })));
+    } catch (error) {
+      console.error("Error fetching jobs:", error);
+      res.status(500).json({
+        error: "Failed to fetch jobs",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // Cancel a job
+  app.post("/api/jobs/:id/cancel", async (req, res) => {
+    try {
+      const job = await storage.getJobById(req.params.id);
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      
+      if (job.status === "succeeded" || job.status === "failed" || job.status === "canceled") {
+        return res.status(400).json({ 
+          error: "Cannot cancel job", 
+          reason: `Job is already ${job.status}` 
+        });
+      }
+      
+      const updated = await storage.updateJobStatus(job.id, "canceled", {
+        progressMessage: "Canceled by user",
+      });
+      
+      res.json({
+        ...updated,
+        ...getJobProgress(updated!),
+      });
+    } catch (error) {
+      console.error("Error canceling job:", error);
+      res.status(500).json({
+        error: "Failed to cancel job",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // Retry a failed job
+  app.post("/api/jobs/:id/retry", async (req, res) => {
+    try {
+      const job = await storage.getJobById(req.params.id);
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      
+      if (job.status !== "failed" && job.status !== "canceled") {
+        return res.status(400).json({ 
+          error: "Cannot retry job", 
+          reason: `Job status is ${job.status}, only failed or canceled jobs can be retried` 
+        });
+      }
+      
+      if (job.retryCount >= job.maxRetries) {
+        return res.status(400).json({ 
+          error: "Cannot retry job", 
+          reason: "Maximum retries exceeded" 
+        });
+      }
+      
+      const updated = await storage.incrementJobRetry(job.id);
+      
+      res.json({
+        ...updated,
+        ...getJobProgress(updated!),
+        message: "Job queued for retry",
+      });
+    } catch (error) {
+      console.error("Error retrying job:", error);
+      res.status(500).json({
+        error: "Failed to retry job",
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
