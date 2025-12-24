@@ -1,6 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { storage } from "./storage";
 import type { Style, MetadataTags, MetadataEnrichmentStatus } from "@shared/schema";
+import pLimit from "p-limit";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
@@ -251,20 +252,25 @@ export async function enrichPendingStyles(): Promise<EnrichmentProcessResult[]> 
   
   const stylesToProcess = [...pendingStyles, ...queuedStyles, ...failedStyles].slice(0, 5);
   
-  const results: EnrichmentProcessResult[] = [];
-  for (const style of stylesToProcess) {
-    try {
-      const success = await enrichStyleMetadata(style.id);
-      results.push({ styleId: style.id, success });
-    } catch (error) {
-      results.push({ 
-        styleId: style.id, 
-        success: false, 
-        error: error instanceof Error ? error.message : "Unknown error" 
-      });
-    }
-    await new Promise(resolve => setTimeout(resolve, 1000));
-  }
+  // Process up to 3 styles in parallel for faster batch enrichment
+  const limit = pLimit(3);
+  
+  const results = await Promise.all(
+    stylesToProcess.map(style =>
+      limit(async (): Promise<EnrichmentProcessResult> => {
+        try {
+          const success = await enrichStyleMetadata(style.id);
+          return { styleId: style.id, success };
+        } catch (error) {
+          return { 
+            styleId: style.id, 
+            success: false, 
+            error: error instanceof Error ? error.message : "Unknown error" 
+          };
+        }
+      })
+    )
+  );
   
   return results;
 }
