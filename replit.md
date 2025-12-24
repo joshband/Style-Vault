@@ -1,0 +1,87 @@
+# Style Explorer
+
+## Overview
+
+Style Explorer is a style intelligence application for managing visual styles as first-class, standards-based artifacts. Unlike typical image generators, this application treats styles as reusable, inspectable, and comparable objects composed of reference images, canonical preview images, W3C DTCG design tokens, and AI prompt scaffolding derived from those tokens.
+
+The core philosophy is that **tokens are the source of truth** - every style must have a comprehensive W3C DTCG 2025.10 design-token JSON, and image generation is merely a consumer of styles, not their definition.
+
+The application operates in three modes:
+1. **Style Explorer** - Browse, compare, and discover saved styles
+2. **Style Authoring** - Create new styles from reference images or prompts
+3. **Image Generation** - Apply saved styles to generate new images
+
+## User Preferences
+
+Preferred communication style: Simple, everyday language.
+
+## System Architecture
+
+### Frontend Architecture
+- **Framework**: React 18 with TypeScript
+- **Routing**: Wouter (lightweight React router)
+- **State Management**: TanStack React Query for server state
+- **Styling**: Tailwind CSS v4 with shadcn/ui component library (New York style)
+- **Animations**: Framer Motion for UI transitions and gestures
+- **Build Tool**: Vite with custom plugins for Replit integration
+
+### Backend Architecture
+- **Runtime**: Node.js with Express
+- **Language**: TypeScript (ESM modules)
+- **API Pattern**: RESTful JSON endpoints under `/api/` prefix
+- **Build Process**: esbuild for server bundling, Vite for client
+
+### Data Storage
+- **Database**: PostgreSQL via Drizzle ORM
+- **Schema Location**: `shared/schema.ts` (shared between client and server)
+- **Migrations**: Drizzle Kit with `db:push` command
+- **Key Tables**:
+  - `users` - Basic user accounts
+  - `styles` - Visual style definitions with tokens, previews, and metadata
+  - `generatedImages` - Images generated using styles
+  - `conversations`/`messages` - Chat history for AI interactions
+
+### AI Integration
+- **Provider**: Google Gemini via Replit AI Integrations
+- **Models Used**:
+  - `gemini-2.5-flash` - Fast text generation and image analysis
+  - `gemini-2.5-pro` - Advanced reasoning tasks
+  - `gemini-2.5-flash-image` - Image generation
+- **Features**:
+  - Image analysis for style extraction (`server/analysis.ts`)
+  - Canonical preview generation (`server/preview-generation.ts`)
+  - Styled image generation (`server/image-generation.ts`)
+
+### Design Token System
+- **Standard**: W3C DTCG (Design Token Community Group) 2025.10 format
+- **Structure**: Hierarchical JSON with `$type`, `$value`, and `$description` properties
+- **Usage**: Tokens define color palettes, typography, spacing, and visual characteristics that are applied consistently across generated images
+
+### Key Design Decisions
+
+**Tokens as Source of Truth**: The application enforces that no style can exist without a complete token definition. This ensures styles are portable, comparable, and can be applied consistently.
+
+**Canonical Preview System**: Each style generates three standardized preview images (portrait, landscape, still-life) using fixed subjects. This enables meaningful cross-style comparison.
+
+**Prompt Scaffolding**: Styles include structured prompt templates (base, modifiers, negative) derived from tokens, ensuring consistent application of style characteristics during image generation.
+
+## External Dependencies
+
+### AI Services
+- **Replit AI Integrations**: Provides Gemini API access without requiring a separate API key
+  - Environment variables: `AI_INTEGRATIONS_GEMINI_API_KEY`, `AI_INTEGRATIONS_GEMINI_BASE_URL`
+
+### Database
+- **PostgreSQL**: Primary data store
+  - Environment variable: `DATABASE_URL`
+  - Connection: `pg` driver with Drizzle ORM
+
+### UI Components
+- **shadcn/ui**: Comprehensive component library built on Radix UI primitives
+- **Radix UI**: Accessible, unstyled UI primitives
+- **Lucide React**: Icon library
+
+### Development Tools
+- **Vite**: Frontend build and dev server
+- **Drizzle Kit**: Database schema management and migrations
+- **esbuild**: Server bundling for production

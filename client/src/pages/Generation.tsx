@@ -13,6 +13,7 @@ export default function Generation() {
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState<string | null>(null);
+  const [generatedImageId, setGeneratedImageId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -46,6 +47,7 @@ export default function Generation() {
       }
       
       const data = await response.json();
+      setGeneratedImageId(data.id);
       setResult(`data:image/png;base64,${data.imageBase64}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Generation failed");
