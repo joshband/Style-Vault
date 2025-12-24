@@ -1,6 +1,6 @@
 import { Layout } from "@/components/layout";
-import { useState } from "react";
-import { Upload, Wand2, ArrowRight, Loader2, Code, Image as ImageIcon } from "lucide-react";
+import { useState, useRef } from "react";
+import { Upload, Wand2, ArrowRight, Loader2, Code, Image as ImageIcon, X } from "lucide-react";
 import { useLocation } from "wouter";
 import { addStyle, SAMPLE_TOKENS } from "@/lib/store";
 import { TokenViewer } from "@/components/token-viewer";
@@ -10,41 +10,80 @@ export default function Authoring() {
   const [, setLocation] = useLocation();
   const [step, setStep] = useState<1 | 2>(1);
   const [isGenerating, setIsGenerating] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Form State
   const [name, setName] = useState("");
   const [prompt, setPrompt] = useState("");
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
+  const [generatedPreviews, setGeneratedPreviews] = useState<{ stillLife: string; landscape: string; portrait: string } | null>(null);
 
-  const handleGenerate = () => {
-    if (!name || !prompt) return;
+  const handleFileSelect = (file: File) => {
+    if (!file.type.startsWith('image/')) return;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      setReferenceImage(dataUrl);
+      // Auto-fill prompt with file name suggestion
+      if (!prompt) {
+        setPrompt(`Style inspired by: ${file.name.replace(/\.[^/.]+$/, '')}`);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      handleFileSelect(files[0]);
+    }
+  };
+
+  const generateVariations = async () => {
+    if (!referenceImage && !prompt) return;
     
     setIsGenerating(true);
     
-    // Simulate generation delay
-    setTimeout(() => {
-      setIsGenerating(false);
-      setStep(2);
-    }, 2000);
+    // Simulate token extraction and image generation
+    // In a real app, this would call an API to:
+    // 1. Extract design tokens from the reference image
+    // 2. Generate 3 canonical preview images using those tokens
+    await new Promise(resolve => setTimeout(resolve, 2500));
+    
+    // Mock generated previews - in reality these would be generated based on tokens
+    setGeneratedPreviews({
+      stillLife: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=600&auto=format&fit=crop",
+      landscape: "https://images.unsplash.com/photo-1614850523060-8da1d56e37def?q=80&w=600&auto=format&fit=crop",
+      portrait: "https://images.unsplash.com/photo-1614851099511-e51a8781977d?q=80&w=600&auto=format&fit=crop"
+    });
+    
+    setIsGenerating(false);
+    setStep(2);
   };
 
   const handleSave = () => {
+    if (!generatedPreviews) return;
+
     addStyle({
       id: `style-${Date.now()}`,
       name: name,
       description: prompt,
       createdAt: new Date().toISOString(),
       referenceImages: referenceImage ? [referenceImage] : [],
-      previews: {
-        stillLife: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=600&auto=format&fit=crop", // Placeholder
-        landscape: "https://images.unsplash.com/photo-1614850523060-8da1d56e37def?q=80&w=600&auto=format&fit=crop", // Placeholder
-        portrait: "https://images.unsplash.com/photo-1614851099511-e51a8781977d?q=80&w=600&auto=format&fit=crop", // Placeholder
-      },
-      tokens: SAMPLE_TOKENS, // In a real app, this would be generated
+      previews: generatedPreviews,
+      tokens: SAMPLE_TOKENS, // In a real app, tokens would be extracted from the reference image
       promptScaffolding: {
         base: prompt,
-        modifiers: ["generated", "auto-extracted"],
-        negative: "blurry, low quality"
+        modifiers: ["extracted-from-reference", "auto-analyzed"],
+        negative: "blurry, low quality, distorted"
       }
     });
     
@@ -90,86 +129,130 @@ export default function Authoring() {
                </div>
 
                <div className="space-y-2">
-                 <label className="text-sm font-medium">Generative Prompt / Description</label>
+                 <label className="text-sm font-medium">Style Description</label>
                  <textarea 
                    value={prompt}
                    onChange={(e) => setPrompt(e.target.value)}
                    className="w-full bg-background border border-border rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary min-h-[120px]"
-                   placeholder="Describe the visual characteristics, lighting, texture, and mood..."
+                   placeholder="Describe the visual characteristics, color palette, lighting, texture, and mood..."
                  />
                </div>
 
                <div className="pt-4">
                   <button 
-                    onClick={handleGenerate}
-                    disabled={!name || !prompt || isGenerating}
+                    onClick={generateVariations}
+                    disabled={!referenceImage || !name || isGenerating}
                     className="w-full bg-primary text-primary-foreground h-10 rounded-sm flex items-center justify-center gap-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors"
                   >
                     {isGenerating ? <Loader2 className="animate-spin" size={16} /> : <Wand2 size={16} />}
-                    {isGenerating ? "Analyzing & Tokenizing..." : "Generate Artifacts"}
+                    {isGenerating ? "Extracting Tokens & Generating Previews..." : "Analyze & Generate Previews"}
                   </button>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Upload an image first. System will extract design tokens and generate 3 canonical preview images.
+                  </p>
                </div>
              </div>
 
              {/* Right: Reference */}
-             <div className="space-y-4">
-                <label className="text-sm font-medium">Reference Image (Optional)</label>
-                <div className="aspect-square border-2 border-dashed border-border rounded-sm flex flex-col items-center justify-center text-muted-foreground hover:bg-muted/50 transition-colors cursor-pointer bg-muted/10">
-                   <Upload size={32} className="mb-2 opacity-50" />
-                   <span className="text-xs">Drag & drop or click to upload</span>
-                </div>
+             <div className="space-y-4 flex flex-col">
+                <label className="text-sm font-medium">Reference Image</label>
+                {referenceImage ? (
+                  <div className="relative aspect-square border border-border rounded-sm overflow-hidden bg-muted">
+                    <img src={referenceImage} alt="Reference" className="w-full h-full object-cover" />
+                    <button 
+                      onClick={() => {
+                        setReferenceImage(null);
+                        setGeneratedPreviews(null);
+                        if (fileInputRef.current) fileInputRef.current.value = '';
+                      }}
+                      className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-1.5 rounded-sm transition-colors"
+                    >
+                      <X size={14} />
+                    </button>
+                    <div className="absolute bottom-2 left-2 bg-green-500/90 text-white text-[10px] px-2 py-1 rounded-sm">
+                      REFERENCE LOADED
+                    </div>
+                  </div>
+                ) : (
+                  <div 
+                    onDragOver={handleDragOver}
+                    onDrop={handleDrop}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="aspect-square border-2 border-dashed border-border rounded-sm flex flex-col items-center justify-center text-muted-foreground hover:bg-muted/50 hover:border-primary/50 transition-all cursor-pointer bg-muted/10"
+                  >
+                    <Upload size={32} className="mb-2 opacity-50" />
+                    <span className="text-xs font-medium">Drag & drop or click to upload</span>
+                    <span className="text-[10px] mt-1 opacity-60">JPG, PNG, WebP • Max 10MB</span>
+                  </div>
+                )}
+                <input 
+                  ref={fileInputRef}
+                  type="file" 
+                  accept="image/*"
+                  onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+                  className="hidden"
+                />
                 <p className="text-xs text-muted-foreground">
-                  Providing a reference image helps the tokenizer extract more accurate palette and texture data.
+                  Upload a reference image to extract visual style. The system will analyze color palette, texture, lighting, and compositional patterns to generate design tokens.
                 </p>
              </div>
           </div>
         )}
 
-        {step === 2 && (
+        {step === 2 && generatedPreviews && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
              
              <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-sm text-green-700 dark:text-green-400 text-sm flex items-center gap-3">
                <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center text-white text-xs">✓</div>
-               <span>Analysis complete. Tokens extracted and previews generated.</span>
+               <span>Analysis complete. Design tokens extracted and 3 canonical previews generated in a single immutable artifact.</span>
              </div>
 
              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Generated Previews */}
+                {/* Generated Previews - Composite Grid */}
                 <div className="space-y-4">
                   <h3 className="text-sm font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                    <ImageIcon size={14} /> Generated Previews
+                    <ImageIcon size={14} /> Canonical Preview Set (Gallery Thumbnail)
                   </h3>
-                  <div className="grid grid-cols-2 gap-3">
-                     <div className="col-span-2 aspect-video bg-muted rounded-sm border border-border relative overflow-hidden">
-                        <img src="https://images.unsplash.com/photo-1614850523060-8da1d56e37def?q=80&w=600&auto=format&fit=crop" className="w-full h-full object-cover" alt="Landscape" />
-                        <span className="absolute bottom-2 left-2 text-[10px] bg-black/60 text-white px-1.5 py-0.5 rounded-sm">Landscape</span>
+                  <div className="grid grid-cols-2 gap-3 p-3 border border-border rounded-sm bg-muted/20">
+                     <div className="col-span-2 aspect-video bg-muted rounded-sm border border-border/50 relative overflow-hidden shadow-sm">
+                        <img src={generatedPreviews.landscape} className="w-full h-full object-cover" alt="Landscape" />
+                        <span className="absolute bottom-2 left-2 text-[10px] bg-black/70 text-white px-1.5 py-0.5 rounded-sm backdrop-blur-sm">LANDSCAPE 16:9</span>
                      </div>
-                     <div className="aspect-square bg-muted rounded-sm border border-border relative overflow-hidden">
-                        <img src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=600&auto=format&fit=crop" className="w-full h-full object-cover" alt="Still Life" />
-                        <span className="absolute bottom-2 left-2 text-[10px] bg-black/60 text-white px-1.5 py-0.5 rounded-sm">Still Life</span>
+                     <div className="aspect-square bg-muted rounded-sm border border-border/50 relative overflow-hidden shadow-sm">
+                        <img src={generatedPreviews.stillLife} className="w-full h-full object-cover" alt="Still Life" />
+                        <span className="absolute bottom-2 left-2 text-[10px] bg-black/70 text-white px-1.5 py-0.5 rounded-sm backdrop-blur-sm">STILL 1:1</span>
                      </div>
-                     <div className="aspect-[3/4] bg-muted rounded-sm border border-border relative overflow-hidden">
-                        <img src="https://images.unsplash.com/photo-1614851099511-e51a8781977d?q=80&w=600&auto=format&fit=crop" className="w-full h-full object-cover" alt="Portrait" />
-                        <span className="absolute bottom-2 left-2 text-[10px] bg-black/60 text-white px-1.5 py-0.5 rounded-sm">Portrait</span>
+                     <div className="aspect-[3/4] bg-muted rounded-sm border border-border/50 relative overflow-hidden shadow-sm">
+                        <img src={generatedPreviews.portrait} className="w-full h-full object-cover" alt="Portrait" />
+                        <span className="absolute bottom-2 left-2 text-[10px] bg-black/70 text-white px-1.5 py-0.5 rounded-sm backdrop-blur-sm">PORTRAIT 3:4</span>
                      </div>
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    These 3 previews are generated from the extracted tokens and serve as the style's visual signature across different aspect ratios.
+                  </p>
                 </div>
 
                 {/* Generated Tokens */}
                 <div className="space-y-4">
                   <h3 className="text-sm font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                    <Code size={14} /> Extracted Tokens
+                    <Code size={14} /> W3C DTCG Design Tokens
                   </h3>
                   <TokenViewer tokens={SAMPLE_TOKENS} className="h-[400px]" />
+                  <p className="text-xs text-muted-foreground">
+                    Extracted from the reference image using vision analysis and standardized in W3C Design Token Community Group format.
+                  </p>
                 </div>
              </div>
 
              <div className="flex justify-end gap-4 pt-6 border-t border-border">
                 <button 
-                   onClick={() => setStep(1)}
+                   onClick={() => {
+                     setStep(1);
+                     setGeneratedPreviews(null);
+                   }}
                    className="px-4 py-2 text-sm font-medium hover:bg-secondary rounded-sm transition-colors"
                 >
-                  Discard & Restart
+                  Back & Upload Different Image
                 </button>
                 <button 
                    onClick={handleSave}
