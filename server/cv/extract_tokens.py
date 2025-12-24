@@ -202,6 +202,369 @@ def create_depth_visualization(depth_map, colormap=cv2.COLORMAP_PLASMA):
 
 
 # ------------------------------------------------------------
+# Color Analysis Utilities (using coloraide)
+# ------------------------------------------------------------
+
+def analyze_color_harmony(colors):
+    """
+    Analyze color palette for harmony relationships.
+    
+    Detects: complementary, analogous, triadic, split-complementary,
+    tetradic, monochromatic based on hue angle relationships.
+    
+    Args:
+        colors: List of coloraide Color objects in OKLCH
+    
+    Returns:
+        dict with harmony type, strength score, and relationships
+    """
+    if len(colors) < 2:
+        return {"type": "monochromatic", "strength": 1.0, "relationships": []}
+    
+    chromatic = [c for c in colors if c['c'] > 0.02]
+    if len(chromatic) < 2:
+        return {"type": "achromatic", "strength": 1.0, "relationships": []}
+    
+    hues = []
+    for c in chromatic:
+        h = c['h']
+        if h is not None and not np.isnan(h):
+            hues.append(h % 360)
+    
+    if len(hues) < 2:
+        return {"type": "monochromatic", "strength": 1.0, "relationships": []}
+    
+    hues = sorted(hues)
+    hue_range = max(hues) - min(hues)
+    if hue_range > 180:
+        hue_range = 360 - hue_range
+    
+    relationships = []
+    harmony_scores = {
+        "monochromatic": 0,
+        "analogous": 0,
+        "complementary": 0,
+        "split-complementary": 0,
+        "triadic": 0,
+        "tetradic": 0
+    }
+    
+    for i, h1 in enumerate(hues):
+        for h2 in hues[i+1:]:
+            diff = abs(h1 - h2)
+            if diff > 180:
+                diff = 360 - diff
+            
+            if diff < 30:
+                relationships.append({"type": "analogous", "hues": [h1, h2], "angle": diff})
+                harmony_scores["analogous"] += 1
+            elif 150 < diff < 210:
+                relationships.append({"type": "complementary", "hues": [h1, h2], "angle": diff})
+                harmony_scores["complementary"] += 1
+            elif 110 < diff < 130:
+                relationships.append({"type": "triadic", "hues": [h1, h2], "angle": diff})
+                harmony_scores["triadic"] += 1
+            elif 80 < diff < 100:
+                relationships.append({"type": "tetradic", "hues": [h1, h2], "angle": diff})
+                harmony_scores["tetradic"] += 1
+    
+    if hue_range < 15:
+        harmony_type = "monochromatic"
+        strength = 1.0 - (hue_range / 15)
+    elif harmony_scores["complementary"] > 0 and harmony_scores["analogous"] > 0:
+        harmony_type = "split-complementary"
+        strength = 0.8
+    elif harmony_scores["complementary"] >= harmony_scores["analogous"]:
+        if harmony_scores["complementary"] > 0:
+            harmony_type = "complementary"
+            strength = min(1.0, harmony_scores["complementary"] / len(hues))
+        else:
+            harmony_type = "analogous"
+            strength = 0.5
+    elif harmony_scores["triadic"] >= 2:
+        harmony_type = "triadic"
+        strength = min(1.0, harmony_scores["triadic"] / 3)
+    elif harmony_scores["tetradic"] >= 3:
+        harmony_type = "tetradic"
+        strength = min(1.0, harmony_scores["tetradic"] / 4)
+    else:
+        harmony_type = "analogous"
+        strength = min(1.0, harmony_scores["analogous"] / max(1, len(hues) - 1))
+    
+    return {
+        "type": harmony_type,
+        "strength": round(strength, 2),
+        "hueRange": round(hue_range, 1),
+        "relationships": relationships[:5]
+    }
+
+
+def calculate_contrast_ratio(color1, color2):
+    """
+    Calculate WCAG 2.1 contrast ratio between two colors.
+    
+    Args:
+        color1, color2: coloraide Color objects
+    
+    Returns:
+        float contrast ratio (1:1 to 21:1)
+    """
+    def relative_luminance(c):
+        rgb = c.convert("srgb")
+        r, g, b = rgb['red'], rgb['green'], rgb['blue']
+        
+        def linearize(v):
+            if v <= 0.03928:
+                return v / 12.92
+            return ((v + 0.055) / 1.055) ** 2.4
+        
+        r = linearize(max(0, min(1, r)))
+        g = linearize(max(0, min(1, g)))
+        b = linearize(max(0, min(1, b)))
+        
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
+    
+    l1 = relative_luminance(color1)
+    l2 = relative_luminance(color2)
+    
+    lighter = max(l1, l2)
+    darker = min(l1, l2)
+    
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+def analyze_contrast_pairs(colors):
+    """
+    Analyze WCAG contrast ratios between all color pairs.
+    
+    Returns matrix of contrast ratios and accessibility flags.
+    """
+    if len(colors) < 2:
+        return {"pairs": [], "accessibilityScore": 1.0}
+    
+    pairs = []
+    aa_pass = 0
+    aaa_pass = 0
+    total_pairs = 0
+    
+    for i, c1 in enumerate(colors):
+        for j, c2 in enumerate(colors[i+1:], i+1):
+            ratio = calculate_contrast_ratio(c1, c2)
+            
+            aa_normal = ratio >= 4.5
+            aa_large = ratio >= 3.0
+            aaa_normal = ratio >= 7.0
+            aaa_large = ratio >= 4.5
+            
+            pairs.append({
+                "color1Index": i,
+                "color2Index": j,
+                "ratio": round(ratio, 2),
+                "wcag": {
+                    "AA_normal": aa_normal,
+                    "AA_large": aa_large,
+                    "AAA_normal": aaa_normal,
+                    "AAA_large": aaa_large
+                }
+            })
+            
+            total_pairs += 1
+            if aa_normal:
+                aa_pass += 1
+            if aaa_normal:
+                aaa_pass += 1
+    
+    accessibility_score = aa_pass / total_pairs if total_pairs > 0 else 0
+    
+    return {
+        "pairs": pairs,
+        "summary": {
+            "totalPairs": total_pairs,
+            "aaPassCount": aa_pass,
+            "aaaPassCount": aaa_pass,
+            "accessibilityScore": round(accessibility_score, 2)
+        }
+    }
+
+
+def analyze_color_temperature(colors):
+    """
+    Classify color palette temperature as warm, cool, or neutral.
+    
+    Uses hue angle: 0-60 and 300-360 = warm, 120-240 = cool
+    """
+    if len(colors) == 0:
+        return {"temperature": "neutral", "warmRatio": 0.5, "dominantTone": "neutral"}
+    
+    warm_weight = 0
+    cool_weight = 0
+    neutral_weight = 0
+    total_weight = 0
+    
+    for c in colors:
+        chroma = c['c']
+        if chroma < 0.02:
+            neutral_weight += 1
+            total_weight += 1
+            continue
+        
+        hue = c['h']
+        if hue is None or np.isnan(hue):
+            neutral_weight += 1
+            total_weight += 1
+            continue
+        
+        hue = hue % 360
+        weight = chroma
+        
+        if hue <= 60 or hue >= 300:
+            warm_weight += weight
+        elif 120 <= hue <= 240:
+            cool_weight += weight
+        else:
+            warm_dist = min(abs(hue - 60), abs(hue - 300))
+            cool_dist = min(abs(hue - 120), abs(hue - 240))
+            if warm_dist < cool_dist:
+                warm_weight += weight * 0.5
+            else:
+                cool_weight += weight * 0.5
+        
+        total_weight += weight
+    
+    if total_weight == 0:
+        return {"temperature": "neutral", "warmRatio": 0.5, "dominantTone": "neutral"}
+    
+    warm_ratio = warm_weight / total_weight
+    cool_ratio = cool_weight / total_weight
+    
+    if warm_ratio > 0.6:
+        temperature = "warm"
+        dominant = "warm"
+    elif cool_ratio > 0.6:
+        temperature = "cool"
+        dominant = "cool"
+    elif abs(warm_ratio - cool_ratio) < 0.2:
+        temperature = "neutral"
+        dominant = "balanced"
+    elif warm_ratio > cool_ratio:
+        temperature = "warm-neutral"
+        dominant = "warm"
+    else:
+        temperature = "cool-neutral"
+        dominant = "cool"
+    
+    return {
+        "temperature": temperature,
+        "warmRatio": round(warm_ratio, 2),
+        "coolRatio": round(cool_ratio, 2),
+        "dominantTone": dominant
+    }
+
+
+def create_harmony_wheel_visual(colors, size=256):
+    """
+    Create a color wheel visualization showing palette positions and harmony lines.
+    """
+    img = np.ones((size, size, 3), dtype=np.uint8) * 40
+    center = size // 2
+    radius = size // 2 - 20
+    
+    for angle in range(0, 360, 1):
+        rad = np.radians(angle)
+        for r in range(radius - 30, radius):
+            x = int(center + r * np.cos(rad))
+            y = int(center - r * np.sin(rad))
+            if 0 <= x < size and 0 <= y < size:
+                hue_color = Color(f"oklch(0.7 0.15 {angle})").convert("srgb")
+                img[y, x] = [
+                    max(0, min(255, int(hue_color['blue'] * 255))),
+                    max(0, min(255, int(hue_color['green'] * 255))),
+                    max(0, min(255, int(hue_color['red'] * 255)))
+                ]
+    
+    color_positions = []
+    for c in colors:
+        if c['c'] < 0.02:
+            continue
+        hue = c['h']
+        if hue is None or np.isnan(hue):
+            continue
+        
+        rad = np.radians(hue)
+        marker_r = radius - 15
+        x = int(center + marker_r * np.cos(rad))
+        y = int(center - marker_r * np.sin(rad))
+        color_positions.append((x, y, hue))
+        
+        rgb = c.convert("srgb")
+        color_bgr = (
+            max(0, min(255, int(rgb['blue'] * 255))),
+            max(0, min(255, int(rgb['green'] * 255))),
+            max(0, min(255, int(rgb['red'] * 255)))
+        )
+        cv2.circle(img, (x, y), 8, color_bgr, -1)
+        cv2.circle(img, (x, y), 8, (255, 255, 255), 2)
+    
+    if len(color_positions) >= 2:
+        for i in range(len(color_positions)):
+            x1, y1, h1 = color_positions[i]
+            x2, y2, h2 = color_positions[(i + 1) % len(color_positions)]
+            
+            diff = abs(h1 - h2)
+            if diff > 180:
+                diff = 360 - diff
+            
+            if 150 < diff < 210:
+                cv2.line(img, (x1, y1), (x2, y2), (100, 100, 255), 1)
+    
+    return img
+
+
+def create_contrast_matrix_visual(colors, contrasts):
+    """
+    Create a visual matrix showing contrast ratios between colors.
+    """
+    n = len(colors)
+    if n < 2:
+        return np.ones((100, 100, 3), dtype=np.uint8) * 40
+    
+    cell_size = min(40, 256 // n)
+    size = n * cell_size
+    img = np.ones((size, size, 3), dtype=np.uint8) * 40
+    
+    for i, c in enumerate(colors):
+        rgb = c.convert("srgb")
+        color_bgr = (
+            max(0, min(255, int(rgb['blue'] * 255))),
+            max(0, min(255, int(rgb['green'] * 255))),
+            max(0, min(255, int(rgb['red'] * 255)))
+        )
+        cv2.rectangle(img, (i * cell_size, 0), ((i + 1) * cell_size, cell_size // 3), color_bgr, -1)
+        cv2.rectangle(img, (0, i * cell_size), (cell_size // 3, (i + 1) * cell_size), color_bgr, -1)
+    
+    for pair in contrasts.get("pairs", []):
+        i, j = pair["color1Index"], pair["color2Index"]
+        ratio = pair["ratio"]
+        
+        if ratio >= 7:
+            cell_color = (80, 180, 80)
+        elif ratio >= 4.5:
+            cell_color = (80, 180, 180)
+        elif ratio >= 3:
+            cell_color = (80, 140, 200)
+        else:
+            cell_color = (80, 80, 120)
+        
+        x1 = j * cell_size + cell_size // 3
+        y1 = i * cell_size + cell_size // 3
+        x2 = (j + 1) * cell_size
+        y2 = (i + 1) * cell_size
+        cv2.rectangle(img, (x1, y1), (x2, y2), cell_color, -1)
+    
+    return img
+
+
+# ------------------------------------------------------------
 # Color Tokens
 # ------------------------------------------------------------
 
@@ -617,6 +980,7 @@ def extract_design_tokens(img):
 def extract_colors_with_debug(img, k=12):
     """
     Extract colors with intermediate visualizations for walkthrough.
+    Includes harmony analysis, WCAG contrast ratios, and temperature classification.
     """
     img_small = resize_for_speed(img)
     pixels = img_small.reshape(-1, 3).astype(np.float32)
@@ -650,9 +1014,18 @@ def extract_colors_with_debug(img, k=12):
     for c in colors:
         if not any(c.delta_e(u) < 3 for u in unique):
             unique.append(c)
+    
+    unique_8 = unique[:8]
+    
+    harmony = analyze_color_harmony(unique_8)
+    contrasts = analyze_contrast_pairs(unique_8)
+    temperature = analyze_color_temperature(unique_8)
+    
+    harmony_wheel = create_harmony_wheel_visual(unique_8)
+    contrast_matrix = create_contrast_matrix_visual(unique_8, contrasts)
 
     result = []
-    for c in unique[:8]:
+    for c in unique_8:
         hue = c['h']
         if hue is None or (isinstance(hue, float) and np.isnan(hue)):
             hue = 0
@@ -665,10 +1038,17 @@ def extract_colors_with_debug(img, k=12):
     
     return {
         "tokens": result,
+        "analysis": {
+            "harmony": harmony,
+            "contrast": contrasts,
+            "temperature": temperature
+        },
         "debug": {
             "visuals": [
                 {"label": "Color Clusters", "description": "Image recolored using only the detected color clusters", "image": encode_image_base64(cluster_vis)},
                 {"label": "Extracted Palette", "description": "The final color palette after deduplication", "image": encode_image_base64(palette_bar)},
+                {"label": "Harmony Wheel", "description": f"Color positions on the wheel - {harmony['type']} harmony detected", "image": encode_image_base64(harmony_wheel)},
+                {"label": "Contrast Matrix", "description": f"WCAG contrast ratios - {contrasts['summary']['aaPassCount']}/{contrasts['summary']['totalPairs']} pairs pass AA", "image": encode_image_base64(contrast_matrix)},
             ],
             "steps": [
                 "We shrink the image to speed up processing",
@@ -676,7 +1056,10 @@ def extract_colors_with_debug(img, k=12):
                 "We count how often each color appears and rank by popularity",
                 "Colors are converted to OKLCH (a perceptual color space)",
                 "Very similar colors (Delta-E < 3) are merged to avoid duplicates",
-                "The top 8 unique colors become your palette"
+                "The top 8 unique colors become your palette",
+                f"HARMONY: Hue angles are analyzed - detected '{harmony['type']}' with {harmony['strength']*100:.0f}% strength",
+                f"CONTRAST: All {contrasts['summary']['totalPairs']} color pairs checked for WCAG compliance",
+                f"TEMPERATURE: Palette is '{temperature['temperature']}' (warm ratio: {temperature['warmRatio']*100:.0f}%)"
             ]
         }
     }
