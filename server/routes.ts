@@ -5,7 +5,7 @@ import { generateCanonicalPreviews } from "./preview-generation";
 import { generateStyledImage } from "./image-generation";
 import { generateAllMoodBoardAssets } from "./mood-board-generation";
 import { queueStyleForEnrichment, enrichPendingStyles, getTagsSummary } from "./metadata-enrichment";
-import { extractTokensWithCV, convertToDTCG, isCVExtractionEnabled } from "./cv-bridge";
+import { extractTokensWithCV, extractTokensWithWalkthrough, convertToDTCG, isCVExtractionEnabled, CVDebugInfo } from "./cv-bridge";
 import { storage } from "./storage";
 import { insertStyleSchema, insertGeneratedImageSchema } from "@shared/schema";
 import { db } from "./db";
@@ -237,28 +237,48 @@ export async function registerRoutes(
         });
       }
 
-      const { imageBase64 } = req.body;
+      const { imageBase64, includeWalkthrough } = req.body;
 
       if (!imageBase64) {
         return res.status(400).json({ error: "Image data required" });
       }
 
-      const result = await extractTokensWithCV(imageBase64);
+      if (includeWalkthrough) {
+        const walkthroughResult = await extractTokensWithWalkthrough(imageBase64);
 
-      if (!result.success) {
-        return res.status(500).json({
-          error: "CV extraction failed",
-          message: result.error,
+        if (!walkthroughResult.success) {
+          return res.status(500).json({
+            error: "CV walkthrough extraction failed",
+            message: walkthroughResult.error,
+          });
+        }
+
+        const dtcgTokens = walkthroughResult.tokens ? convertToDTCG(walkthroughResult.tokens) : null;
+
+        res.json({
+          rawTokens: walkthroughResult.tokens,
+          dtcgTokens,
+          debug: walkthroughResult.debug,
+          processingTimeMs: walkthroughResult.processingTimeMs,
+        });
+      } else {
+        const result = await extractTokensWithCV(imageBase64);
+
+        if (!result.success) {
+          return res.status(500).json({
+            error: "CV extraction failed",
+            message: result.error,
+          });
+        }
+
+        const dtcgTokens = result.tokens ? convertToDTCG(result.tokens) : null;
+
+        res.json({
+          rawTokens: result.tokens,
+          dtcgTokens,
+          processingTimeMs: result.processingTimeMs,
         });
       }
-
-      const dtcgTokens = result.tokens ? convertToDTCG(result.tokens) : null;
-
-      res.json({
-        rawTokens: result.tokens,
-        dtcgTokens,
-        processingTimeMs: result.processingTimeMs,
-      });
     } catch (error) {
       console.error("Error in CV analysis:", error);
       res.status(500).json({

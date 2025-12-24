@@ -66,6 +66,25 @@ export interface CVExtractionResult {
   processingTimeMs?: number;
 }
 
+export interface CVDebugVisual {
+  label: string;
+  description: string;
+  image: string;
+}
+
+export interface CVDebugInfo {
+  visuals: CVDebugVisual[];
+  steps: string[];
+}
+
+export interface CVWalkthroughResult {
+  success: boolean;
+  tokens?: CVExtractedTokens;
+  debug?: Record<string, CVDebugInfo>;
+  error?: string;
+  processingTimeMs?: number;
+}
+
 /**
  * Check if CV extraction is enabled via environment variable
  */
@@ -133,6 +152,79 @@ export async function extractTokensWithCV(imageBase64: string): Promise<CVExtrac
 
     pythonProcess.on('error', (err) => {
       console.error('[CV Bridge] Process error:', err);
+      resolve({
+        success: false,
+        error: `Process error: ${err.message}`,
+        processingTimeMs: Date.now() - startTime,
+      });
+    });
+
+    pythonProcess.stdin.write(imageBase64);
+    pythonProcess.stdin.end();
+  });
+}
+
+/**
+ * Extract design tokens with walkthrough mode (includes debug visualizations and explanations)
+ * 
+ * @param imageBase64 - Base64 encoded image data
+ * @returns Extracted tokens with debug info or error
+ */
+export async function extractTokensWithWalkthrough(imageBase64: string): Promise<CVWalkthroughResult> {
+  const startTime = Date.now();
+  
+  return new Promise((resolve) => {
+    const scriptPath = path.join(__dirname, 'cv', 'extract_tokens.py');
+    
+    const pythonProcess = spawn('python3', [scriptPath, '--with-visuals'], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: 60000,
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    pythonProcess.stdout.on('data', (data: Buffer) => {
+      stdout += data.toString();
+    });
+
+    pythonProcess.stderr.on('data', (data: Buffer) => {
+      stderr += data.toString();
+    });
+
+    pythonProcess.on('close', (code: number | null) => {
+      const processingTimeMs = Date.now() - startTime;
+
+      if (code !== 0) {
+        console.error('[CV Bridge] Walkthrough process failed:', stderr);
+        resolve({
+          success: false,
+          error: stderr || 'CV walkthrough extraction failed',
+          processingTimeMs,
+        });
+        return;
+      }
+
+      try {
+        const result = JSON.parse(stdout);
+        resolve({
+          success: true,
+          tokens: result.tokens as CVExtractedTokens,
+          debug: result.debug as Record<string, CVDebugInfo>,
+          processingTimeMs,
+        });
+      } catch (parseError) {
+        console.error('[CV Bridge] Failed to parse walkthrough output:', stdout.substring(0, 500));
+        resolve({
+          success: false,
+          error: 'Failed to parse CV walkthrough output',
+          processingTimeMs,
+        });
+      }
+    });
+
+    pythonProcess.on('error', (err: Error) => {
+      console.error('[CV Bridge] Walkthrough process error:', err);
       resolve({
         success: false,
         error: `Process error: ${err.message}`,
