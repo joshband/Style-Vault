@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { Wand2, ArrowRight, Loader2, Download, ArrowLeft } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link, useParams } from "wouter";
+import { InfoTooltip, FEATURE_EXPLANATIONS } from "@/components/info-tooltip";
 
 export default function Generation() {
   const { styleId } = useParams<{ styleId: string }>();
@@ -164,7 +165,10 @@ export default function Generation() {
 
         {/* Prompt Input */}
         <div className="space-y-4">
-          <h3 className="text-sm font-medium">Describe Your Concept</h3>
+          <h3 className="text-sm font-medium flex items-center gap-2">
+            Describe Your Concept
+            <InfoTooltip testId="tooltip-generation">{FEATURE_EXPLANATIONS.generation}</InfoTooltip>
+          </h3>
           <textarea 
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}

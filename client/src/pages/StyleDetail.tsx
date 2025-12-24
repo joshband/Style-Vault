@@ -8,6 +8,7 @@ import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useStyleTheme } from "@/hooks/useStyleTheme";
 import { AiMoodBoard } from "@/components/ai-mood-board";
+import { InfoTooltip, FEATURE_EXPLANATIONS } from "@/components/info-tooltip";
 
 type DetailTab = 'tokens' | 'scaffolding';
 
@@ -130,7 +131,10 @@ export default function StyleDetail() {
           <div className="col-span-1 lg:col-span-7 space-y-6 md:space-y-8">
             {/* Canonical Previews */}
             <div className="space-y-3 md:space-y-4 animate-in fade-in duration-300">
-              <h2 className="text-xs md:text-sm font-medium uppercase tracking-wider text-muted-foreground">Canonical Previews</h2>
+              <h2 className="text-xs md:text-sm font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                Canonical Previews
+                <InfoTooltip testId="tooltip-canonical-previews">{FEATURE_EXPLANATIONS.canonicalPreviews}</InfoTooltip>
+              </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-4">
                 <div className="col-span-1 sm:col-span-2 aspect-video bg-muted rounded-sm overflow-hidden border border-border relative group">
                   {style.previews.landscape && (
@@ -219,7 +223,10 @@ export default function StyleDetail() {
             {/* Reference Images */}
             {style.referenceImages && style.referenceImages.length > 0 && (
               <div className="space-y-3 md:space-y-4">
-                <h2 className="text-xs md:text-sm font-medium uppercase tracking-wider text-muted-foreground">Reference Sources</h2>
+                <h2 className="text-xs md:text-sm font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                  Reference Sources
+                  <InfoTooltip testId="tooltip-reference-sources">{FEATURE_EXPLANATIONS.referenceImage}</InfoTooltip>
+                </h2>
                 <div className="flex gap-2 flex-wrap">
                   {style.referenceImages.map((img, i) => (
                     <div key={i} className="w-16 h-16 md:w-20 md:h-20 rounded-sm overflow-hidden border border-border">
@@ -242,25 +249,33 @@ export default function StyleDetail() {
           {/* Right Column: Technical Data */}
           <div className="col-span-1 lg:col-span-5 space-y-4 md:space-y-6">
             {/* Tab Switcher */}
-            <div className="flex gap-1 p-1 bg-muted rounded-sm">
-              <button 
-                onClick={() => setActiveTab('tokens')}
-                className={cn(
-                  "flex-1 py-2 text-xs font-medium rounded-sm transition-colors",
-                  activeTab === 'tokens' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                DESIGN TOKENS
-              </button>
-              <button 
-                onClick={() => setActiveTab('scaffolding')}
-                className={cn(
-                  "flex-1 py-2 text-xs font-medium rounded-sm transition-colors",
-                  activeTab === 'scaffolding' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                PROMPT SCAFFOLDING
-              </button>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span>Technical Data</span>
+                <InfoTooltip side="right" testId="tooltip-technical-data">
+                  {activeTab === 'tokens' ? FEATURE_EXPLANATIONS.designTokens : FEATURE_EXPLANATIONS.promptScaffolding}
+                </InfoTooltip>
+              </div>
+              <div className="flex gap-1 p-1 bg-muted rounded-sm">
+                <button 
+                  onClick={() => setActiveTab('tokens')}
+                  className={cn(
+                    "flex-1 py-2 text-xs font-medium rounded-sm transition-colors",
+                    activeTab === 'tokens' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  DESIGN TOKENS
+                </button>
+                <button 
+                  onClick={() => setActiveTab('scaffolding')}
+                  className={cn(
+                    "flex-1 py-2 text-xs font-medium rounded-sm transition-colors",
+                    activeTab === 'scaffolding' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  PROMPT SCAFFOLDING
+                </button>
+              </div>
             </div>
 
             {activeTab === 'tokens' && (

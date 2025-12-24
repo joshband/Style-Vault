@@ -4,6 +4,7 @@ import { Loader2, RefreshCw, Clock, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { MoodBoardAssets, UiConceptAssets, MoodBoardEntry, UiConceptEntry } from "@/lib/store";
+import { InfoTooltip, FEATURE_EXPLANATIONS } from "@/components/info-tooltip";
 
 function downloadImage(dataUrl: string, filename: string) {
   const link = document.createElement("a");
@@ -167,7 +168,10 @@ export function AiMoodBoard({
 
       {hasCollage && (
         <div className="space-y-2">
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Mood Board</h3>
+          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+            Mood Board
+            <InfoTooltip testId="tooltip-mood-board">{FEATURE_EXPLANATIONS.moodBoard}</InfoTooltip>
+          </h3>
           <div className="relative group rounded-lg overflow-hidden border border-border" data-testid="img-container-collage">
             <img
               src={moodBoard?.collage}
@@ -182,7 +186,10 @@ export function AiMoodBoard({
 
       {(hasAudioPlugin || hasDashboard) && (
         <div className="space-y-2">
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">UI Concepts</h3>
+          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+            UI Concepts
+            <InfoTooltip testId="tooltip-ui-concepts">{FEATURE_EXPLANATIONS.uiConcepts}</InfoTooltip>
+          </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {hasAudioPlugin && (
               <div className="relative group rounded-lg overflow-hidden border border-border" data-testid="img-container-audio">
