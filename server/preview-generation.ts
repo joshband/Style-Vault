@@ -20,16 +20,12 @@ interface PreviewImage {
   stillLife: string;
 }
 
-/**
- * Generate style-inspired placeholder images
- */
 function generateStyledPlaceholder(
   width: number,
   height: number,
   styleName: string,
   type: "portrait" | "landscape" | "stillLife"
 ): string {
-  // Generate colors from style name
   let hash = 0;
   for (let i = 0; i < styleName.length; i++) {
     hash = ((hash << 5) - hash) + styleName.charCodeAt(i);
@@ -66,80 +62,10 @@ function generateStyledPlaceholder(
   return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
 }
 
-/**
- * Determine the subject from the image using Gemini's vision capabilities
- */
-async function determineSubject(referenceImageBase64?: string, styleDescription?: string): Promise<string> {
-  try {
-    // If we have a reference image, analyze it to determine the subject
-    if (referenceImageBase64) {
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: [
-          {
-            role: "user",
-            parts: [
-              {
-                inlineData: {
-                  mimeType: "image/jpeg",
-                  data: referenceImageBase64.split(",")[1] || referenceImageBase64,
-                },
-              },
-              {
-                text: "What is the main subject or object in this image? Respond with just 2-3 words describing the subject.",
-              },
-            ],
-          },
-        ],
-      });
-
-      const candidate = response.candidates?.[0];
-      if (candidate?.content?.parts?.[0]?.text) {
-        const subject = candidate.content.parts[0].text.trim();
-        if (subject.length > 0 && subject.length < 50) {
-          return subject;
-        }
-      }
-    }
-
-    // Fallback: try to extract subject from description
-    if (styleDescription) {
-      // Look for common subjects mentioned in descriptions
-      const subjectPatterns = [
-        /a (portrait|photo|image) of ([a-z\s]+)/i,
-        /featuring ([a-z\s]+)/i,
-        /showing ([a-z\s]+)/i,
-      ];
-
-      for (const pattern of subjectPatterns) {
-        const match = styleDescription.match(pattern);
-        if (match) {
-          return match[2] || match[1];
-        }
-      }
-
-      // Extract the most descriptive noun phrase from the first sentence
-      const firstSentence = styleDescription.split(/[.!?]/)[0];
-      const words = firstSentence.split(" ").slice(0, 5).join(" ");
-      if (words.length > 3) {
-        return words;
-      }
-    }
-
-    return "subject in a specific style";
-  } catch (error) {
-    console.warn("Failed to determine subject:", error instanceof Error ? error.message : String(error));
-    return "subject in a specific style";
-  }
-}
-
-/**
- * Generate 3 canonical preview images with consistent subject but varying compositions
- */
 export async function generateCanonicalPreviews(
   request: PreviewGenerationRequest
 ): Promise<PreviewImage> {
-  const { styleName, styleDescription, referenceImageBase64 } = request;
+  const { styleName, styleDescription } = request;
 
   const result: PreviewImage = {
     portrait: generateStyledPlaceholder(384, 512, styleName, "portrait"),
@@ -148,23 +74,27 @@ export async function generateCanonicalPreviews(
   };
 
   try {
-    // Determine the subject from the reference image
-    const subject = await determineSubject(referenceImageBase64, styleDescription);
-
-    // Generate portrait with same subject
+    // Generate portrait (3:4) - a person/figure showcasing the style
     try {
       const portraitResponse = await ai.models.generateContent({
-        model: "gemini-2.5-flash-image",
+        model: "gemini-2.5-flash-preview-05-20",
         contents: [
           {
             role: "user",
             parts: [
               {
-                text: `Create a portrait-oriented photograph of ${subject} in the "${styleName}" style. Style details: ${styleDescription}. Keep the composition focused on the subject in portrait orientation (vertical).`,
+                text: `Generate a portrait image (3:4 aspect ratio, vertical orientation) showcasing the "${styleName}" visual style. 
+
+Style characteristics: ${styleDescription}
+
+The portrait should feature a person or figure that demonstrates this aesthetic. Focus on composition, lighting, color palette, and mood that embody this style.`,
               },
             ],
           },
         ],
+        config: {
+          responseModalities: ["image", "text"],
+        },
       });
 
       const portraitImage = extractImageFromResponse(portraitResponse);
@@ -175,20 +105,27 @@ export async function generateCanonicalPreviews(
       console.warn("Portrait generation failed:", error instanceof Error ? error.message : String(error));
     }
 
-    // Generate landscape with same subject
+    // Generate landscape (16:9) - a scenic view showcasing the style
     try {
       const landscapeResponse = await ai.models.generateContent({
-        model: "gemini-2.5-flash-image",
+        model: "gemini-2.5-flash-preview-05-20",
         contents: [
           {
             role: "user",
             parts: [
               {
-                text: `Create a landscape-oriented photograph of ${subject} in the "${styleName}" style. Style details: ${styleDescription}. Keep the composition focused on the subject in landscape orientation (horizontal).`,
+                text: `Generate a landscape image (16:9 aspect ratio, horizontal orientation) showcasing the "${styleName}" visual style.
+
+Style characteristics: ${styleDescription}
+
+The landscape should feature a scenic environment or vista that demonstrates this aesthetic. Focus on composition, lighting, color palette, and atmosphere that embody this style.`,
               },
             ],
           },
         ],
+        config: {
+          responseModalities: ["image", "text"],
+        },
       });
 
       const landscapeImage = extractImageFromResponse(landscapeResponse);
@@ -199,20 +136,27 @@ export async function generateCanonicalPreviews(
       console.warn("Landscape generation failed:", error instanceof Error ? error.message : String(error));
     }
 
-    // Generate still life with same subject
+    // Generate still life (1:1) - an arrangement of objects showcasing the style
     try {
       const stillLifeResponse = await ai.models.generateContent({
-        model: "gemini-2.5-flash-image",
+        model: "gemini-2.5-flash-preview-05-20",
         contents: [
           {
             role: "user",
             parts: [
               {
-                text: `Create a still life photograph of ${subject} in the "${styleName}" style. Style details: ${styleDescription}. Keep the composition focused on the subject in square format.`,
+                text: `Generate a still life image (1:1 square aspect ratio) showcasing the "${styleName}" visual style.
+
+Style characteristics: ${styleDescription}
+
+The still life should feature an arrangement of objects that demonstrates this aesthetic. Focus on composition, lighting, color palette, and textures that embody this style.`,
               },
             ],
           },
         ],
+        config: {
+          responseModalities: ["image", "text"],
+        },
       });
 
       const stillLifeImage = extractImageFromResponse(stillLifeResponse);
@@ -229,9 +173,6 @@ export async function generateCanonicalPreviews(
   return result;
 }
 
-/**
- * Extract image from Gemini API response
- */
 function extractImageFromResponse(response: any): string | null {
   try {
     if (!response || !response.candidates || response.candidates.length === 0) {
