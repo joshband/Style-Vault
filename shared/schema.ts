@@ -17,6 +17,17 @@ export const insertUserSchema = createInsertSchema(users).pick({
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
+// Metadata tags for visual descriptors
+export interface MetadataTags {
+  mood: string[];
+  colorFamily: string[];
+  era: string[];
+  medium: string[];
+  subjects: string[];
+  lighting: string[];
+  texture: string[];
+}
+
 // Styles table for persisting visual styles
 export const styles = pgTable("styles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -35,6 +46,15 @@ export const styles = pgTable("styles", {
     modifiers: string[];
     negative: string;
   }>().notNull(),
+  metadataTags: jsonb("metadata_tags").$type<MetadataTags>().default({
+    mood: [],
+    colorFamily: [],
+    era: [],
+    medium: [],
+    subjects: [],
+    lighting: [],
+    texture: [],
+  }),
 });
 
 export const insertStyleSchema = createInsertSchema(styles).omit({
@@ -44,3 +64,21 @@ export const insertStyleSchema = createInsertSchema(styles).omit({
 
 export type InsertStyle = z.infer<typeof insertStyleSchema>;
 export type Style = typeof styles.$inferSelect;
+
+// Generated images table - stores images created using styles (admin only)
+export const generatedImages = pgTable("generated_images", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  styleId: varchar("style_id").notNull(),
+  prompt: text("prompt").notNull(),
+  imageData: text("image_data").notNull(),
+  thumbnailData: text("thumbnail_data").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertGeneratedImageSchema = createInsertSchema(generatedImages).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertGeneratedImage = z.infer<typeof insertGeneratedImageSchema>;
+export type GeneratedImage = typeof generatedImages.$inferSelect;

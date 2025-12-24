@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Grid, Plus, Wand2, Layers, Search, Settings, Menu, X } from "lucide-react";
+import { Grid, Plus, Layers, Search, Settings, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 
@@ -10,7 +10,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const navItems = [
     { href: "/", label: "Explorer", icon: Grid },
     { href: "/create", label: "Authoring", icon: Plus },
-    { href: "/generate", label: "Application", icon: Wand2 },
   ];
 
   return (
