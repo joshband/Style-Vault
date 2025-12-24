@@ -9,12 +9,10 @@ import { useState, useEffect } from "react";
 export default function Explorer() {
   const [styles, setStyles] = useState<Style[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchStyles()
       .then(setStyles)
-      .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
 
@@ -42,16 +40,6 @@ export default function Explorer() {
     );
   }
 
-  if (error) {
-    return (
-      <Layout>
-        <div className="py-20 text-center text-red-500 border border-dashed border-red-300 rounded-lg bg-red-50/10">
-          <p>Error loading styles: {error}</p>
-        </div>
-      </Layout>
-    );
-  }
-
   return (
     <Layout>
       <div className="flex flex-col gap-6 md:gap-8">
@@ -67,6 +55,16 @@ export default function Explorer() {
             <span>{styles.length} STYLES INDEXED</span>
           </div>
         </div>
+
+        {/* Empty State */}
+        {styles.length === 0 && (
+          <div className="py-20 text-center border border-dashed border-border rounded-lg bg-muted/5">
+            <p className="text-muted-foreground mb-2">No styles yet</p>
+            <p className="text-sm text-muted-foreground/70">
+              Create your first style by navigating to the Create page
+            </p>
+          </div>
+        )}
 
         {/* Recommendations Section */}
         {hasHistory && recommendations.length > 0 && (
