@@ -56,27 +56,33 @@ export default function Generation() {
     }
   };
 
-  const handleDownload = async () => {
+  const handleDownload = () => {
     if (!result) return;
     
+    // For base64 data URLs, we need to convert to blob first
+    const base64Data = result.split(",")[1];
+    if (!base64Data) {
+      window.open(result, "_blank");
+      return;
+    }
+    
     try {
-      // Convert base64 to blob for more reliable downloads
-      const response = await fetch(result);
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
+      const byteCharacters = atob(base64Data);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: "image/png" });
       
+      const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `${style?.name || "generated"}-${Date.now()}.png`;
-      link.style.display = "none";
+      link.download = `${style?.name?.toLowerCase().replace(/\s+/g, "-") || "generated"}-${Date.now()}.png`;
       document.body.appendChild(link);
       link.click();
-      
-      // Cleanup
-      setTimeout(() => {
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      }, 100);
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     } catch (err) {
       // Fallback: open in new tab for manual save
       window.open(result, "_blank");
