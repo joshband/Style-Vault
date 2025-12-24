@@ -219,13 +219,14 @@ export async function generateMoodBoardCollage(
       return {
         collage: image,
         status: "complete",
+        history: [],
       };
     }
 
-    return { collage: "", status: "failed" };
+    return { collage: "", status: "failed", history: [] };
   } catch (error) {
     console.error("Mood board generation failed:", error);
-    return { collage: "", status: "failed" };
+    return { collage: "", status: "failed", history: [] };
   }
 }
 
@@ -233,7 +234,7 @@ export async function generateUiConcepts(
   request: MoodBoardRequest
 ): Promise<UiConceptAssets> {
   const summary = extractTokenSummary(request.tokens);
-  const result: UiConceptAssets = { status: "generating" };
+  const result: UiConceptAssets = { status: "generating", history: [] };
 
   const conceptTypes: Array<"audioPlugin" | "dashboard"> = [
     "audioPlugin",

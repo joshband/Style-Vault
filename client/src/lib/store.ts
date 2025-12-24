@@ -24,16 +24,30 @@ export interface MetadataTags {
   texture: string[];
 }
 
-export interface MoodBoardAssets {
+export interface MoodBoardEntry {
   collage: string;
-  status: "pending" | "generating" | "complete" | "failed";
+  generatedAt: string;
 }
 
-export interface UiConceptAssets {
+export interface UiConceptEntry {
   audioPlugin?: string;
   dashboard?: string;
   componentLibrary?: string;
+  generatedAt: string;
+}
+
+export interface MoodBoardAssets {
   status: "pending" | "generating" | "complete" | "failed";
+  collage?: string;
+  history: MoodBoardEntry[];
+}
+
+export interface UiConceptAssets {
+  status: "pending" | "generating" | "complete" | "failed";
+  audioPlugin?: string;
+  dashboard?: string;
+  componentLibrary?: string;
+  history: UiConceptEntry[];
 }
 
 export interface Style {

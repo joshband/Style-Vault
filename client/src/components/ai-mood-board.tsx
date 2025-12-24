@@ -1,9 +1,9 @@
 import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { MoodBoardAssets, UiConceptAssets } from "@/lib/store";
+import type { MoodBoardAssets, UiConceptAssets, MoodBoardEntry, UiConceptEntry } from "@/lib/store";
 
 interface AiMoodBoardProps {
   styleId: string;
@@ -185,6 +185,77 @@ export function AiMoodBoard({
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Generation History */}
+      {((moodBoard?.history && moodBoard.history.length > 0) || 
+        (uiConcepts?.history && uiConcepts.history.length > 0)) && (
+        <div className="space-y-4 pt-6 border-t border-border">
+          <div className="flex items-center gap-2">
+            <Clock size={14} className="text-muted-foreground" />
+            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Previous Generations</h3>
+          </div>
+          
+          {moodBoard?.history?.map((entry: MoodBoardEntry, index: number) => (
+            <div key={`mood-${index}`} className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">
+                  Mood Board - {new Date(entry.generatedAt).toLocaleDateString(undefined, { 
+                    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+                  })}
+                </span>
+              </div>
+              <div className="rounded-lg overflow-hidden border border-border/50 opacity-75 hover:opacity-100 transition-opacity">
+                <img
+                  src={entry.collage}
+                  alt={`${styleName} previous mood board`}
+                  className="w-full h-auto"
+                  loading="lazy"
+                />
+              </div>
+            </div>
+          ))}
+
+          {uiConcepts?.history?.map((entry: UiConceptEntry, index: number) => (
+            <div key={`ui-${index}`} className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">
+                  UI Concepts - {new Date(entry.generatedAt).toLocaleDateString(undefined, { 
+                    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+                  })}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {entry.audioPlugin && (
+                  <div className="rounded-lg overflow-hidden border border-border/50 opacity-75 hover:opacity-100 transition-opacity">
+                    <img
+                      src={entry.audioPlugin}
+                      alt={`${styleName} previous audio plugin`}
+                      className="w-full h-auto"
+                      loading="lazy"
+                    />
+                    <div className="p-2 bg-muted/30 text-center">
+                      <span className="text-xs text-muted-foreground">Audio Plugin</span>
+                    </div>
+                  </div>
+                )}
+                {entry.dashboard && (
+                  <div className="rounded-lg overflow-hidden border border-border/50 opacity-75 hover:opacity-100 transition-opacity">
+                    <img
+                      src={entry.dashboard}
+                      alt={`${styleName} previous dashboard`}
+                      className="w-full h-auto"
+                      loading="lazy"
+                    />
+                    <div className="p-2 bg-muted/30 text-center">
+                      <span className="text-xs text-muted-foreground">Dashboard</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
