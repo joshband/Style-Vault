@@ -299,15 +299,41 @@ export const MOCK_STYLES: Style[] = [
   }
 ];
 
-// Simple in-memory store for the prototype
-let styles = [...MOCK_STYLES];
+// API functions for persistent storage
+export async function fetchStyles(): Promise<Style[]> {
+  const response = await fetch("/api/styles");
+  if (!response.ok) {
+    throw new Error("Failed to fetch styles");
+  }
+  return response.json();
+}
 
-export const getStyles = () => styles;
-export const getStyleById = (id: string) => styles.find(s => s.id === id);
-export const addStyle = (style: Style) => {
-  styles = [style, ...styles];
-  return style;
-};
-export const deleteStyle = (id: string) => {
-  styles = styles.filter(s => s.id !== id);
-};
+export async function fetchStyleById(id: string): Promise<Style | null> {
+  const response = await fetch(`/api/styles/${id}`);
+  if (!response.ok) {
+    if (response.status === 404) return null;
+    throw new Error("Failed to fetch style");
+  }
+  return response.json();
+}
+
+export async function createStyle(style: Omit<Style, "id" | "createdAt">): Promise<Style> {
+  const response = await fetch("/api/styles", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(style),
+  });
+  if (!response.ok) {
+    throw new Error("Failed to create style");
+  }
+  return response.json();
+}
+
+export async function deleteStyleApi(id: string): Promise<void> {
+  const response = await fetch(`/api/styles/${id}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    throw new Error("Failed to delete style");
+  }
+}

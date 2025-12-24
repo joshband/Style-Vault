@@ -1,16 +1,23 @@
 import { Layout } from "@/components/layout";
-import { getStyles, Style } from "@/lib/store";
-import { useState } from "react";
+import { fetchStyles, type Style } from "@/lib/store";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { Search, Wand2, ArrowRight } from "lucide-react";
+import { Search, Wand2, ArrowRight, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function Generation() {
-  const styles = getStyles();
+  const [styles, setStyles] = useState<Style[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedStyleId, setSelectedStyleId] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchStyles()
+      .then(setStyles)
+      .finally(() => setLoading(false));
+  }, []);
 
   const selectedStyle = styles.find(s => s.id === selectedStyleId);
 
@@ -21,10 +28,19 @@ export default function Generation() {
     
     setTimeout(() => {
       setIsGenerating(false);
-      // Mock result
       setResult("https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?q=80&w=1000&auto=format&fit=crop");
     }, 2500);
   };
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="animate-spin text-muted-foreground" size={32} />
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -46,6 +62,7 @@ export default function Generation() {
                  type="text" 
                  placeholder="Filter styles..." 
                  className="bg-transparent border-none outline-none text-xs w-full"
+                 data-testid="input-filter-styles"
                />
              </div>
              
@@ -54,6 +71,7 @@ export default function Generation() {
                  <div 
                    key={style.id}
                    onClick={() => setSelectedStyleId(style.id)}
+                   data-testid={`card-style-${style.id}`}
                    className={cn(
                      "flex gap-3 p-2 rounded-md border cursor-pointer transition-all hover:shadow-sm",
                      selectedStyleId === style.id 
@@ -70,86 +88,81 @@ export default function Generation() {
                     </div>
                  </div>
                ))}
+               
+               {styles.length === 0 && (
+                 <div className="text-center text-muted-foreground text-sm py-8">
+                   No styles available. Create one first.
+                 </div>
+               )}
              </div>
           </div>
 
-          {/* Middle/Right: Composition & Result */}
-          <div className="col-span-1 lg:col-span-8 flex flex-col gap-4 md:gap-6 overflow-y-auto">
+          {/* Middle: Prompt Input */}
+          <div className="col-span-1 lg:col-span-4 flex flex-col border-b lg:border-b-0 lg:border-r border-border pb-4 md:pb-6 lg:pb-0 lg:px-6">
+             <h3 className="text-sm font-medium mb-4">Describe Your Concept</h3>
              
-             {/* Prompt Input */}
-             <div className="space-y-4 flex-shrink-0">
-               <div className="flex items-center justify-between">
-                 <label className="text-sm font-medium">Prompt</label>
-                 {selectedStyle && (
-                   <span className="text-[10px] font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                     Active Style: {selectedStyle.name}
-                   </span>
-                 )}
+             {selectedStyle && (
+               <div className="mb-4 p-3 bg-muted/50 rounded-sm border border-border/50">
+                 <p className="text-xs text-muted-foreground">Applying style:</p>
+                 <p className="text-sm font-medium">{selectedStyle.name}</p>
                </div>
-               <div className="relative">
-                 <textarea 
-                   value={prompt}
-                   onChange={(e) => setPrompt(e.target.value)}
-                   className="w-full bg-background border border-border rounded-md p-4 text-sm focus:outline-none focus:ring-1 focus:ring-primary shadow-sm min-h-[100px] resize-none"
-                   placeholder={selectedStyle ? `Describe what you want to generate in the style of "${selectedStyle.name}"...` : "Select a style to begin..."}
-                   disabled={!selectedStyle}
-                 />
-                 <button
-                   onClick={handleGenerate}
-                   disabled={!selectedStyle || !prompt || isGenerating}
-                   className="absolute bottom-4 right-4 bg-primary text-primary-foreground h-8 px-4 rounded-sm text-xs font-medium flex items-center gap-2 hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                 >
-                   {isGenerating ? <span className="animate-spin">⏳</span> : <Wand2 size={12} />}
-                   Generate
-                 </button>
-               </div>
-             </div>
-
-             {/* Result Area */}
-             <div className="flex-1 bg-muted/10 border-2 border-dashed border-border rounded-lg flex items-center justify-center relative overflow-hidden min-h-[400px]">
-                {result ? (
-                  <motion.div 
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="relative w-full h-full p-4"
-                  >
-                    <img src={result} className="w-full h-full object-contain rounded-md shadow-lg" />
-                    <div className="absolute top-6 right-6 flex gap-2">
-                       <button className="bg-black/70 text-white px-3 py-1.5 rounded-sm text-xs backdrop-blur-md hover:bg-black/90">
-                         Upscale
-                       </button>
-                       <button className="bg-black/70 text-white px-3 py-1.5 rounded-sm text-xs backdrop-blur-md hover:bg-black/90">
-                         Save to Library
-                       </button>
-                    </div>
-                  </motion.div>
-                ) : (
-                   <div className="text-center text-muted-foreground">
-                      {isGenerating ? (
-                        <div className="flex flex-col items-center gap-4">
-                           <div className="w-12 h-12 rounded-full border-2 border-primary border-t-transparent animate-spin"></div>
-                           <p className="text-sm font-mono animate-pulse">Synthesizing style tokens...</p>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center gap-2 opacity-50">
-                           <Wand2 size={32} />
-                           <p className="text-sm">Select a style and enter a prompt to generate</p>
-                        </div>
-                      )}
-                   </div>
-                )}
-             </div>
-
-             {selectedStyle && !result && !isGenerating && (
-                <div className="p-4 bg-muted/30 rounded-md border border-border/50 text-xs font-mono text-muted-foreground space-y-2">
-                   <p className="uppercase font-bold text-[10px] opacity-70">Injecting Token Scaffolding:</p>
-                   <div className="grid grid-cols-2 gap-2">
-                     <div>BASE: <span className="text-foreground">{selectedStyle.promptScaffolding.base}</span></div>
-                     <div>MODS: <span className="text-foreground">{selectedStyle.promptScaffolding.modifiers.join(", ")}</span></div>
-                   </div>
-                </div>
              )}
+             
+             <textarea 
+               value={prompt}
+               onChange={(e) => setPrompt(e.target.value)}
+               placeholder="e.g., A cozy reading nook with warm lighting and vintage books..."
+               className="flex-1 resize-none p-3 text-sm bg-background border border-border rounded-sm focus:ring-1 focus:ring-primary/30 outline-none min-h-[120px]"
+               data-testid="input-concept-prompt"
+             />
+             
+             <button 
+               onClick={handleGenerate}
+               disabled={!selectedStyleId || !prompt || isGenerating}
+               data-testid="button-generate"
+               className={cn(
+                 "mt-4 h-10 flex items-center justify-center gap-2 rounded-sm text-sm font-medium transition-all",
+                 selectedStyleId && prompt && !isGenerating
+                   ? "bg-primary text-primary-foreground hover:opacity-90"
+                   : "bg-muted text-muted-foreground cursor-not-allowed"
+               )}
+             >
+               {isGenerating ? (
+                 <>
+                   <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                   Generating...
+                 </>
+               ) : (
+                 <>
+                   <Wand2 size={14} />
+                   Generate
+                   <ArrowRight size={14} />
+                 </>
+               )}
+             </button>
+          </div>
 
+          {/* Right: Result Preview */}
+          <div className="col-span-1 lg:col-span-4 flex flex-col lg:pl-6">
+             <h3 className="text-sm font-medium mb-4">Result</h3>
+             
+             <div className="flex-1 bg-muted rounded-sm border border-border overflow-hidden relative min-h-[200px]">
+               {result ? (
+                 <motion.img 
+                   initial={{ opacity: 0, scale: 0.95 }}
+                   animate={{ opacity: 1, scale: 1 }}
+                   src={result} 
+                   alt="Generated result" 
+                   className="w-full h-full object-cover"
+                 />
+               ) : (
+                 <div className="absolute inset-0 flex items-center justify-center">
+                   <p className="text-xs text-muted-foreground font-mono text-center px-4">
+                     {isGenerating ? "Processing..." : "Select a style and describe your concept"}
+                   </p>
+                 </div>
+               )}
+             </div>
           </div>
         </div>
       </div>

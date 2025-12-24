@@ -1,4 +1,4 @@
-import { Style, deleteStyle } from "@/lib/store";
+import { Style } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { Code, ImageIcon, Trash2, AlertCircle } from "lucide-react";
 import { Link } from "wouter";
@@ -33,7 +33,6 @@ export function StyleCard({ style, className, onDelete }: StyleCardProps) {
   };
 
   const handleConfirmDelete = () => {
-    deleteStyle(style.id);
     onDelete?.(style.id);
     setShowConfirmDialog(false);
   };

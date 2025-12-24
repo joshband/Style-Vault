@@ -50,19 +50,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
               const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href));
               
               return (
-                <Link key={item.href} href={item.href}>
-                  <a 
-                    onClick={() => setSidebarOpen(false)}
-                    className={cn(
-                      "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors",
-                      isActive 
-                        ? "bg-sidebar-primary text-sidebar-primary-foreground" 
-                        : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                    )}
-                  >
-                    <Icon size={18} />
-                    <span className="hidden sm:inline">{item.label}</span>
-                  </a>
+                <Link 
+                  key={item.href} 
+                  href={item.href}
+                  onClick={() => setSidebarOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                    isActive 
+                      ? "bg-sidebar-primary text-sidebar-primary-foreground" 
+                      : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  )}
+                >
+                  <Icon size={18} />
+                  <span className="hidden sm:inline">{item.label}</span>
                 </Link>
               );
             })}

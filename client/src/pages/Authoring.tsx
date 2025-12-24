@@ -2,7 +2,7 @@ import { Layout } from "@/components/layout";
 import { useState, useRef } from "react";
 import { Upload, Wand2, ArrowRight, Loader2, Code, Image as ImageIcon, X } from "lucide-react";
 import { useLocation } from "wouter";
-import { addStyle, SAMPLE_TOKENS } from "@/lib/store";
+import { createStyle, SAMPLE_TOKENS } from "@/lib/store";
 import { TokenViewer } from "@/components/token-viewer";
 import { cn } from "@/lib/utils";
 
@@ -134,25 +134,32 @@ export default function Authoring() {
     }
   };
 
-  const handleSave = () => {
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async () => {
     if (!generatedPreviews) return;
 
-    addStyle({
-      id: `style-${Date.now()}`,
-      name: name,
-      description: prompt,
-      createdAt: new Date().toISOString(),
-      referenceImages: referenceImage ? [referenceImage] : [],
-      previews: generatedPreviews,
-      tokens: SAMPLE_TOKENS, // In a real app, tokens would be extracted from the reference image
-      promptScaffolding: {
-        base: prompt,
-        modifiers: ["extracted-from-reference", "auto-analyzed"],
-        negative: "blurry, low quality, distorted"
-      }
-    });
-    
-    setLocation("/");
+    setIsSaving(true);
+    try {
+      await createStyle({
+        name: name,
+        description: prompt,
+        referenceImages: referenceImage ? [referenceImage] : [],
+        previews: generatedPreviews,
+        tokens: SAMPLE_TOKENS,
+        promptScaffolding: {
+          base: prompt,
+          modifiers: ["extracted-from-reference", "auto-analyzed"],
+          negative: "blurry, low quality, distorted"
+        }
+      });
+      
+      setLocation("/");
+    } catch (error) {
+      console.error("Failed to save style:", error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
