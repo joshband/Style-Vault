@@ -4,6 +4,7 @@ import { analyzeImageForStyle } from "./analysis";
 import { generateCanonicalPreviews } from "./preview-generation";
 import { generateStyledImage } from "./image-generation";
 import { generateAllMoodBoardAssets } from "./mood-board-generation";
+import { queueStyleForEnrichment, enrichPendingStyles, getTagsSummary } from "./metadata-enrichment";
 import { storage } from "./storage";
 import { insertStyleSchema, insertGeneratedImageSchema } from "@shared/schema";
 import { db } from "./db";
@@ -141,6 +142,9 @@ export async function registerRoutes(
           cache.delete(CACHE_KEYS.STYLE_DETAIL(style.id));
           cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
           console.log(`Mood board generation complete for style: ${style.id}`);
+          
+          // Queue metadata enrichment after mood board generation
+          queueStyleForEnrichment(style.id);
         } catch (error) {
           console.error(`Background mood board generation failed for ${style.id}:`, error);
           await storage.updateStyleMoodBoard(
@@ -401,6 +405,67 @@ export async function registerRoutes(
       console.error("Error fetching mood board:", error);
       res.status(500).json({
         error: "Failed to fetch mood board",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // Get aggregated tags summary for filtering UI
+  app.get("/api/tags", async (req, res) => {
+    try {
+      const tagsSummary = await getTagsSummary();
+      res.json(tagsSummary);
+    } catch (error) {
+      console.error("Error fetching tags summary:", error);
+      res.status(500).json({
+        error: "Failed to fetch tags",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // Trigger metadata enrichment for a specific style
+  app.post("/api/styles/:id/enrich", async (req, res) => {
+    try {
+      const styleId = req.params.id;
+      const style = await storage.getStyleById(styleId);
+      
+      if (!style) {
+        return res.status(404).json({ error: "Style not found" });
+      }
+      
+      // Queue for immediate enrichment
+      queueStyleForEnrichment(styleId);
+      
+      res.json({ message: "Enrichment queued", styleId });
+    } catch (error) {
+      console.error("Error queuing enrichment:", error);
+      res.status(500).json({
+        error: "Failed to queue enrichment",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // Process all pending enrichments (admin/cron endpoint)
+  app.post("/api/enrich/process", async (req, res) => {
+    try {
+      const results = await enrichPendingStyles();
+      
+      // Invalidate caches for all processed styles
+      for (const result of results) {
+        cache.delete(CACHE_KEYS.STYLE_DETAIL(result.styleId));
+      }
+      cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
+      
+      res.json({ 
+        processed: results.length, 
+        results 
+      });
+    } catch (error) {
+      console.error("Error processing enrichments:", error);
+      res.status(500).json({
+        error: "Failed to process enrichments",
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }

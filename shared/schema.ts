@@ -17,7 +17,7 @@ export const insertUserSchema = createInsertSchema(users).pick({
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
-// Metadata tags for visual descriptors
+// Metadata tags for visual descriptors and AI-generated keywords
 export interface MetadataTags {
   mood: string[];
   colorFamily: string[];
@@ -26,7 +26,12 @@ export interface MetadataTags {
   subjects: string[];
   lighting: string[];
   texture: string[];
+  keywords: string[];
+  version?: number;
+  lastAnalyzedAt?: string;
 }
+
+export type MetadataEnrichmentStatus = "pending" | "queued" | "processing" | "complete" | "failed";
 
 // Single mood board generation entry
 export interface MoodBoardEntry {
@@ -84,7 +89,9 @@ export const styles = pgTable("styles", {
     subjects: [],
     lighting: [],
     texture: [],
+    keywords: [],
   }),
+  metadataEnrichmentStatus: text("metadata_enrichment_status").$type<MetadataEnrichmentStatus>().default("pending"),
   moodBoard: jsonb("mood_board").$type<MoodBoardAssets>().default({
     status: "pending",
     history: [],

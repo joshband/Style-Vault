@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Style, type InsertStyle, type GeneratedImage, type InsertGeneratedImage, type MoodBoardAssets, type UiConceptAssets, users, styles, generatedImages } from "@shared/schema";
+import { type User, type InsertUser, type Style, type InsertStyle, type GeneratedImage, type InsertGeneratedImage, type MoodBoardAssets, type UiConceptAssets, type MetadataTags, type MetadataEnrichmentStatus, users, styles, generatedImages } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
 
@@ -117,6 +117,31 @@ export class DatabaseStorage implements IStorage {
   async createGeneratedImage(insertImage: InsertGeneratedImage): Promise<GeneratedImage> {
     const [image] = await db.insert(generatedImages).values(insertImage).returning();
     return image;
+  }
+
+  // Metadata enrichment operations
+  async updateStyleEnrichmentStatus(id: string, status: MetadataEnrichmentStatus): Promise<void> {
+    await db
+      .update(styles)
+      .set({ metadataEnrichmentStatus: status })
+      .where(eq(styles.id, id));
+  }
+
+  async updateStyleMetadata(id: string, metadataTags: MetadataTags, status: MetadataEnrichmentStatus): Promise<Style | undefined> {
+    const [updated] = await db
+      .update(styles)
+      .set({ metadataTags, metadataEnrichmentStatus: status })
+      .where(eq(styles.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getStylesByEnrichmentStatus(status: MetadataEnrichmentStatus): Promise<Style[]> {
+    return db
+      .select()
+      .from(styles)
+      .where(eq(styles.metadataEnrichmentStatus, status))
+      .orderBy(desc(styles.createdAt));
   }
 }
 
