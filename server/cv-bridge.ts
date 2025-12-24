@@ -27,6 +27,22 @@ export interface CVGridToken {
 export interface CVElevationToken {
   elevation: number;
   shadowStrength: number;
+  direction: string;
+  directionAngle: number;
+  blurRadius: number;
+  contrast: number;
+  depthStyle: string;
+  distribution: {
+    dark: number;
+    mid: number;
+    light: number;
+  };
+  shadowColor: {
+    space: string;
+    l: number;
+    c: number;
+    h: number;
+  } | null;
 }
 
 export interface CVExtractedTokens {

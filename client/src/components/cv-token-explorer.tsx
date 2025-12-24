@@ -17,6 +17,22 @@ interface CVGridToken {
 interface CVElevationToken {
   elevation: number;
   shadowStrength: number;
+  direction: string;
+  directionAngle: number;
+  blurRadius: number;
+  contrast: number;
+  depthStyle: string;
+  distribution: {
+    dark: number;
+    mid: number;
+    light: number;
+  };
+  shadowColor: {
+    space: string;
+    l: number;
+    c: number;
+    h: number;
+  } | null;
 }
 
 interface CVExtractedTokens {
@@ -138,38 +154,174 @@ function BorderRadiusSection({ radii }: { radii: number[] }) {
   );
 }
 
+function DirectionIndicator({ direction, angle }: { direction: string; angle: number }) {
+  const directionAngles: Record<string, number> = {
+    'right': 0,
+    'bottom-right': 45,
+    'bottom': 90,
+    'bottom-left': 135,
+    'left': 180,
+    'top-left': -135,
+    'top': -90,
+    'top-right': -45,
+    'ambient': 0,
+  };
+
+  const displayAngle = directionAngles[direction] ?? angle;
+
+  return (
+    <div className="relative w-16 h-16 rounded-full border border-border bg-muted flex items-center justify-center">
+      {direction === 'ambient' ? (
+        <div className="w-8 h-8 rounded-full bg-gradient-radial from-foreground/20 to-transparent" />
+      ) : (
+        <div 
+          className="absolute w-6 h-1 bg-primary rounded-full origin-left"
+          style={{ 
+            transform: `rotate(${displayAngle}deg)`,
+            left: '50%',
+            top: '50%',
+            marginTop: '-2px'
+          }}
+        />
+      )}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="w-2 h-2 rounded-full bg-foreground/60" />
+      </div>
+    </div>
+  );
+}
+
+function DepthDistributionBar({ distribution }: { distribution: { dark: number; mid: number; light: number } }) {
+  return (
+    <div className="w-full h-4 rounded-sm overflow-hidden flex">
+      <div 
+        className="h-full bg-zinc-800" 
+        style={{ width: `${distribution.dark * 100}%` }}
+        title={`Dark: ${(distribution.dark * 100).toFixed(0)}%`}
+      />
+      <div 
+        className="h-full bg-zinc-500" 
+        style={{ width: `${distribution.mid * 100}%` }}
+        title={`Mid: ${(distribution.mid * 100).toFixed(0)}%`}
+      />
+      <div 
+        className="h-full bg-zinc-200" 
+        style={{ width: `${distribution.light * 100}%` }}
+        title={`Light: ${(distribution.light * 100).toFixed(0)}%`}
+      />
+    </div>
+  );
+}
+
 function ElevationSection({ elevation }: { elevation: CVElevationToken }) {
-  const levels = ['Flat', 'Subtle', 'Elevated'];
+  const levels = ['Flat', 'Subtle', 'Medium', 'Deep'];
   const shadows = [
     'none',
     '0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08)',
-    '0 4px 6px rgba(0,0,0,0.12), 0 2px 4px rgba(0,0,0,0.08)'
+    '0 4px 6px rgba(0,0,0,0.12), 0 2px 4px rgba(0,0,0,0.08)',
+    '0 10px 20px rgba(0,0,0,0.15), 0 6px 6px rgba(0,0,0,0.10)'
   ];
 
+  const depthStyleLabels: Record<string, string> = {
+    'high-contrast': 'High Contrast',
+    'dark-dominant': 'Dark Dominant',
+    'light-dominant': 'Light Dominant',
+    'flat': 'Flat',
+    'balanced': 'Balanced',
+  };
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
         <Layers size={14} />
-        <span>Elevation</span>
+        <span>Shadow & Depth Analysis</span>
       </div>
-      <div className="flex gap-3">
-        {[0, 1, 2].map((level) => (
-          <div
-            key={level}
-            className={cn(
-              "w-16 h-16 rounded-md bg-card border border-border flex items-center justify-center text-xs font-mono transition-all",
-              elevation.elevation === level && "ring-2 ring-primary"
-            )}
-            style={{ boxShadow: shadows[level] }}
-            data-testid={`elevation-level-${level}`}
-          >
-            {levels[level]}
+      
+      {/* Elevation Levels */}
+      <div className="space-y-2">
+        <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Elevation Level</div>
+        <div className="flex gap-2">
+          {[0, 1, 2, 3].map((level) => (
+            <div
+              key={level}
+              className={cn(
+                "flex-1 h-12 rounded-md bg-card border border-border flex items-center justify-center text-[10px] font-mono transition-all",
+                elevation.elevation === level && "ring-2 ring-primary bg-primary/5"
+              )}
+              style={{ boxShadow: shadows[level] }}
+              data-testid={`elevation-level-${level}`}
+            >
+              {levels[level]}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Shadow Direction & Properties */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Light Direction</div>
+          <div className="flex items-center gap-3">
+            <DirectionIndicator direction={elevation.direction} angle={elevation.directionAngle} />
+            <div className="space-y-1">
+              <div className="text-sm font-medium capitalize">{elevation.direction.replace('-', ' ')}</div>
+              <div className="text-[10px] text-muted-foreground font-mono">{elevation.directionAngle.toFixed(0)}°</div>
+            </div>
           </div>
-        ))}
+        </div>
+
+        <div className="space-y-2">
+          <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Shadow Properties</div>
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Blur Radius</span>
+              <span className="font-mono">{elevation.blurRadius}px</span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Strength</span>
+              <span className="font-mono">{elevation.shadowStrength.toFixed(1)}</span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Contrast</span>
+              <span className="font-mono">{elevation.contrast.toFixed(0)}</span>
+            </div>
+          </div>
+        </div>
       </div>
-      <div className="text-[10px] text-muted-foreground font-mono">
-        Detected: {levels[elevation.elevation]} (strength: {elevation.shadowStrength.toFixed(1)})
+
+      {/* Depth Distribution */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Luminance Distribution</div>
+          <div className="text-[10px] font-mono text-primary capitalize">
+            {depthStyleLabels[elevation.depthStyle] || elevation.depthStyle}
+          </div>
+        </div>
+        <DepthDistributionBar distribution={elevation.distribution} />
+        <div className="flex justify-between text-[9px] text-muted-foreground font-mono">
+          <span>Dark {(elevation.distribution.dark * 100).toFixed(0)}%</span>
+          <span>Mid {(elevation.distribution.mid * 100).toFixed(0)}%</span>
+          <span>Light {(elevation.distribution.light * 100).toFixed(0)}%</span>
+        </div>
       </div>
+
+      {/* Shadow Color */}
+      {elevation.shadowColor && (
+        <div className="space-y-2">
+          <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Shadow Color</div>
+          <div className="flex items-center gap-3">
+            <div 
+              className="w-10 h-10 rounded-md border border-border"
+              style={{ backgroundColor: `oklch(${elevation.shadowColor.l} ${elevation.shadowColor.c} ${elevation.shadowColor.h})` }}
+            />
+            <div className="text-[10px] font-mono text-muted-foreground">
+              <div>L: {elevation.shadowColor.l.toFixed(2)}</div>
+              <div>C: {elevation.shadowColor.c.toFixed(3)}</div>
+              <div>H: {elevation.shadowColor.h.toFixed(0)}°</div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
