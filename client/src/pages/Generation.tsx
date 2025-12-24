@@ -56,14 +56,31 @@ export default function Generation() {
     }
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!result) return;
-    const link = document.createElement("a");
-    link.href = result;
-    link.download = `${style?.name || "generated"}-${Date.now()}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    
+    try {
+      // Convert base64 to blob for more reliable downloads
+      const response = await fetch(result);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${style?.name || "generated"}-${Date.now()}.png`;
+      link.style.display = "none";
+      document.body.appendChild(link);
+      link.click();
+      
+      // Cleanup
+      setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }, 100);
+    } catch (err) {
+      // Fallback: open in new tab for manual save
+      window.open(result, "_blank");
+    }
   };
 
   if (loading) {
