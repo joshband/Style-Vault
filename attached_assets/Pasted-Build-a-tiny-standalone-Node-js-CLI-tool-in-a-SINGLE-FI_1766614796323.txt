@@ -1,0 +1,104 @@
+Build a tiny, standalone Node.js CLI tool in a SINGLE FILE named:
+
+dtcg-effects-cli.mjs
+
+Purpose:
+Normalize and validate W3C Design Tokens Community Group 2025.10-style
+gradient, shadow, and border tokens.
+
+Constraints:
+- One file only
+- Node 18+ compatible
+- No build step
+- No external files
+- Only dependency allowed: ajv
+- Must run with: node dtcg-effects-cli.mjs input.json
+- Must also support stdin piping
+
+Required behavior:
+
+1) INPUT
+- Accept JSON either from:
+  - First positional argument (file path), OR
+  - stdin when --stdin flag is provided
+
+2) OUTPUT
+- Print normalized JSON to stdout
+- Support:
+  --out <file>
+  --pretty (2-space indent)
+  --quiet
+
+3) SUPPORTED TOKEN TYPES
+Each top-level key is a token name. Each value must include:
+- $type: "gradient" | "shadow" | "border"
+- $value: type-specific payload
+
+4) NORMALIZATION RULES
+
+GRADIENT:
+- $value.kind ∈ ["linear","radial","conic"]
+- Clamp angle to [0..360)
+- Each stop:
+  - position clamped to [0..100]
+  - color normalized
+- Accept colors in:
+  { space: "oklch" | "srgb", value: string, optional hex }
+
+SHADOW:
+- $value MUST become an array
+- Each shadow defaults:
+  x: "0px"
+  y: "0px"
+  blur: "0px"
+  spread: "0px"
+  inset: false
+- Normalize color
+
+BORDER:
+- Required:
+  width, style, color
+- Default:
+  alignment = "center"
+- Optional:
+  radius per corner
+- Normalize color
+
+COLOR NORMALIZATION:
+- If space === "oklch":
+  Clamp:
+    L ∈ [0..1]
+    C ≥ 0
+    H ∈ [0..360)
+    A ∈ [0..1] (default 1)
+- Do NOT perform color space conversion
+- If srgb hex is provided, keep it as fallback
+
+5) VALIDATION
+- Inline a minimal JSON Schema (do NOT load from disk)
+- Validate AFTER normalization
+- On validation error:
+  - Print readable errors
+  - Exit with non-zero status
+
+6) CLI USAGE EXAMPLES (must work):
+node dtcg-effects-cli.mjs tokens.json
+cat tokens.json | node dtcg-effects-cli.mjs --stdin
+node dtcg-effects-cli.mjs tokens.json --pretty --out normalized.json
+
+7) QUALITY BAR
+- Clear function separation:
+  normalizeGradient
+  normalizeShadow
+  normalizeBorder
+  normalizeColor
+- Defensive parsing
+- No frameworks
+- No TypeScript
+- No comments explaining obvious JS syntax
+
+Deliverable:
+Return ONLY the full contents of dtcg-effects-cli.mjs.
+Do not explain it.
+Do not summarize it.
+Do not add README text.

@@ -63,12 +63,31 @@ Preferred communication style: Simple, everyday language.
   - Deterministic and explainable (no deep learning)
   - Extracts: colors (OKLCH), spacing, border radius, grid, elevation, stroke width
   - Produces W3C DTCG 2025.10 compatible output
+- **Color Analysis** (powered by coloraide):
+  - **Harmony Detection**: Classifies palettes as complementary, analogous, triadic, split-complementary, tetradic, or monochromatic with strength scores (0-1)
+  - **WCAG Contrast Ratios**: All color pairs analyzed for AA (4.5:1), AAA (7:1), and large-text (3:1) compliance
+  - **Temperature Classification**: Palette classified as warm, cool, or neutral based on hue distribution weighted by chroma
+  - Returns `colorAnalysis` object with `harmony`, `contrast`, and `temperature` sub-objects
+- **Elevation/Depth Estimation**:
+  - Multi-cue heuristic depth estimation (no deep learning)
+  - Three complementary cues weighted and fused:
+    - **Sharpness (45%)**: Laplacian edge detection finds in-focus areas (closer)
+    - **Shadow near edges (35%)**: Dark regions adjacent to edges suggest elevation
+    - **Perspective prior (20%)**: Bottom of image assumed closer (common in photos/UI)
+  - Elevation level determined by depth variance: <0.02=flat(0), <0.05=low(1), <0.12=medium(2), ≥0.12=high(3)
+  - Additional depth metrics: averageDepth, depthVariance, hasDepthLayers
 - **API Endpoints**:
   - `GET /api/cv-status` - Check if CV extraction is enabled
   - `POST /api/analyze-image-cv` - Extract tokens from image using CV (supports `includeWalkthrough: true` for debug visualizations)
 - **Algorithm Walkthrough Feature**:
   - Opt-in educational mode showing intermediate CV processing steps
   - Generates debug visualizations: edge maps, color cluster mosaics, histograms, distance transforms, gradient maps
+  - **Depth cue visualizations** (8 total for elevation):
+    - Combined Depth Map (Plasma colormap: purple=far, yellow=near)
+    - Sharpness Cue (Hot colormap)
+    - Shadow Cue (Bone colormap)
+    - Perspective Prior (Cool colormap)
+    - Edge Detection, Gradient Magnitude, Shadow Direction, Luminance Histogram
   - Plain-language step-by-step explanations for each token extraction algorithm
   - UI: Collapsible "Algorithm Walkthrough" panel with subsections per token type (color, spacing, border radius, grid, elevation, stroke width)
   - Uses `--with-visuals` flag internally; adds ~5-15 seconds to extraction time
