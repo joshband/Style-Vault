@@ -7,18 +7,27 @@ import type { MoodBoardAssets, UiConceptAssets, MoodBoardEntry, UiConceptEntry }
 import { InfoTooltip, FEATURE_EXPLANATIONS } from "@/components/info-tooltip";
 
 function downloadImage(dataUrl: string, filename: string) {
-  const link = document.createElement("a");
-  link.href = dataUrl;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  if (!dataUrl) return;
+  
+  try {
+    const link = document.createElement("a");
+    link.href = dataUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  } catch (err) {
+    console.error("Failed to download image:", err);
+  }
 }
 
 function DownloadButton({ src, filename }: { src: string; filename: string }) {
+  if (!src) return null;
+  
   return (
     <button
       onClick={(e) => {
+        e.preventDefault();
         e.stopPropagation();
         downloadImage(src, filename);
       }}

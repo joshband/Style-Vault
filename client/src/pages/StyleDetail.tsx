@@ -146,11 +146,20 @@ export default function StyleDetail() {
                         loading="lazy"
                       />
                       <button
-                        onClick={() => {
-                          const link = document.createElement("a");
-                          link.href = style.previews.landscape!;
-                          link.download = `${style.name}-landscape.png`;
-                          link.click();
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (!style.previews.landscape) return;
+                          try {
+                            const link = document.createElement("a");
+                            link.href = style.previews.landscape;
+                            link.download = `${style.name}-landscape.png`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                          } catch (err) {
+                            console.error("Failed to download:", err);
+                          }
                         }}
                         className="absolute top-2 right-2 p-1.5 rounded-md bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 z-10"
                         title="Download image"
@@ -173,11 +182,20 @@ export default function StyleDetail() {
                         loading="lazy"
                       />
                       <button
-                        onClick={() => {
-                          const link = document.createElement("a");
-                          link.href = style.previews.portrait!;
-                          link.download = `${style.name}-portrait.png`;
-                          link.click();
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (!style.previews.portrait) return;
+                          try {
+                            const link = document.createElement("a");
+                            link.href = style.previews.portrait;
+                            link.download = `${style.name}-portrait.png`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                          } catch (err) {
+                            console.error("Failed to download:", err);
+                          }
                         }}
                         className="absolute top-2 right-2 p-1.5 rounded-md bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 z-10"
                         title="Download image"
@@ -200,11 +218,20 @@ export default function StyleDetail() {
                         loading="lazy"
                       />
                       <button
-                        onClick={() => {
-                          const link = document.createElement("a");
-                          link.href = style.previews.stillLife!;
-                          link.download = `${style.name}-still-life.png`;
-                          link.click();
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (!style.previews.stillLife) return;
+                          try {
+                            const link = document.createElement("a");
+                            link.href = style.previews.stillLife;
+                            link.download = `${style.name}-still-life.png`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                          } catch (err) {
+                            console.error("Failed to download:", err);
+                          }
                         }}
                         className="absolute top-2 right-2 p-1.5 rounded-md bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 z-10"
                         title="Download image"

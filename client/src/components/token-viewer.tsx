@@ -13,9 +13,14 @@ interface TokenViewerProps {
 export function TokenViewer({ tokens, className, expandable = false, showExport = false }: TokenViewerProps) {
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = async () => {
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!tokens) return;
+    
     try {
-      await navigator.clipboard.writeText(JSON.stringify(tokens, null, 2));
+      const jsonString = JSON.stringify(tokens, null, 2);
+      await navigator.clipboard.writeText(jsonString);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
@@ -23,16 +28,25 @@ export function TokenViewer({ tokens, className, expandable = false, showExport 
     }
   };
 
-  const handleDownload = () => {
-    const blob = new Blob([JSON.stringify(tokens, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'design-tokens.json';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  const handleDownload = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!tokens) return;
+    
+    try {
+      const jsonString = JSON.stringify(tokens, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'design-tokens.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to download:', err);
+    }
   };
 
   return (
