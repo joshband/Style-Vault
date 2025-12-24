@@ -53,6 +53,20 @@ Preferred communication style: Simple, everyday language.
   - Styled image generation (`server/image-generation.ts`)
   - Metadata enrichment for searchable tags (`server/metadata-enrichment.ts`)
 
+### CV-Based Token Extraction (Optional)
+- **Location**: `server/cv/extract_tokens.py` - Python script
+- **Bridge**: `server/cv-bridge.ts` - Node.js child_process interface
+- **Toggle**: `CV_EXTRACTION_ENABLED` environment variable (set to "true" to enable)
+- **Dependencies**: opencv-python-headless, numpy, scipy, coloraide
+- **Features**:
+  - CPU-only, near-realtime extraction (~100ms)
+  - Deterministic and explainable (no deep learning)
+  - Extracts: colors (OKLCH), spacing, border radius, grid, elevation, stroke width
+  - Produces W3C DTCG 2025.10 compatible output
+- **API Endpoints**:
+  - `GET /api/cv-status` - Check if CV extraction is enabled
+  - `POST /api/analyze-image-cv` - Extract tokens from image using CV
+
 ### Design Token System
 - **Standard**: W3C DTCG (Design Token Community Group) 2025.10 format
 - **Structure**: Hierarchical JSON with `$type`, `$value`, and `$description` properties
