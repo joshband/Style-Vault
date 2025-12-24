@@ -9,7 +9,7 @@ import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
-export default function Explorer() {
+export default function Explore() {
   const queryClient = useQueryClient();
   
   const { data: styles = [], isLoading, isError, refetch } = useQuery<Style[]>({
@@ -52,7 +52,7 @@ export default function Explorer() {
             <div className="space-y-1">
               <h1 className="text-2xl md:text-3xl font-serif font-medium text-foreground">Style Vault</h1>
               <p className="text-muted-foreground text-xs sm:text-sm max-w-2xl">
-                A curated library of visual intelligence artifacts. Inspect tokens, compare aesthetics, and analyze prompt scaffolding.
+                Discover and compare visual styles. Click any style to explore its details.
               </p>
             </div>
           </div>
@@ -73,7 +73,7 @@ export default function Explorer() {
           <div className="space-y-1">
             <h1 className="text-2xl md:text-3xl font-serif font-medium text-foreground">Style Vault</h1>
             <p className="text-muted-foreground text-xs sm:text-sm max-w-2xl">
-              A curated library of visual intelligence artifacts. Inspect tokens, compare aesthetics, and analyze prompt scaffolding.
+              Discover and compare visual styles. Click any style to explore its details.
             </p>
           </div>
           
