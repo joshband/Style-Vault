@@ -1,9 +1,10 @@
 import { cn } from "@/lib/utils";
 import { Trash2, AlertCircle, Palette } from "lucide-react";
 import { Link } from "wouter";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { trackStyleView } from "@/lib/suggestions";
 import { motion, AnimatePresence } from "framer-motion";
+import { queryClient } from "@/lib/queryClient";
 
 interface StyleSummary {
   id: string;
@@ -31,6 +32,18 @@ export function StyleCard({ style, className, onDelete }: StyleCardProps) {
   // Track view on mount
   useEffect(() => {
     trackStyleView(style.id);
+  }, [style.id]);
+
+  // Prefetch style details on hover for faster navigation
+  const handlePrefetch = useCallback(() => {
+    queryClient.prefetchQuery({
+      queryKey: ["/api/styles", style.id],
+      queryFn: async () => {
+        const res = await fetch(`/api/styles/${style.id}`);
+        return res.json();
+      },
+      staleTime: 60000, // Cache for 1 minute
+    });
   }, [style.id]);
 
   const handleDragEnd = (info: any) => {
@@ -85,7 +98,10 @@ export function StyleCard({ style, className, onDelete }: StyleCardProps) {
           </motion.div>
         </motion.div>
       
-      <div className={cn("group relative flex flex-col bg-card border border-border rounded-lg overflow-hidden transition-all hover:shadow-md hover:border-primary/20", isDragging && "cursor-grabbing")}>
+      <div 
+        className={cn("group relative flex flex-col bg-card border border-border rounded-lg overflow-hidden transition-all hover:shadow-md hover:border-primary/20", isDragging && "cursor-grabbing")}
+        onMouseEnter={handlePrefetch}
+      >
         {/* Preview Area - Single thumbnail or Placeholder - Clickable */}
         <Link href={`/style/${style.id}`} className="block">
           <div className="relative aspect-[16/9] bg-muted overflow-hidden cursor-pointer">

@@ -85,28 +85,16 @@ export function AiMoodBoard({
     },
   });
 
-  const hasCollage = moodBoard?.status === "complete" && moodBoard.collage;
-  const hasAudioPlugin = uiConcepts?.status === "complete" && uiConcepts.audioPlugin;
-  const hasDashboard = uiConcepts?.status === "complete" && uiConcepts.dashboard;
+  // Show images immediately when available, even if still generating
+  const hasCollage = !!moodBoard?.collage;
+  const hasAudioPlugin = !!uiConcepts?.audioPlugin;
+  const hasDashboard = !!uiConcepts?.dashboard;
   const hasAnyAssets = hasCollage || hasAudioPlugin || hasDashboard;
-
-  if (isGenerating || isPending) {
-    return (
-      <div className={cn("flex flex-col items-center justify-center p-12 space-y-6", className)} data-testid="mood-board-generating">
-        <div className="relative">
-          <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center">
-            <Loader2 className="w-10 h-10 text-primary animate-spin" />
-          </div>
-        </div>
-        <div className="text-center space-y-2">
-          <h3 className="text-lg font-semibold">Generating Style Assets...</h3>
-          <p className="text-sm text-muted-foreground">
-            Creating mood board and UI mockups. This may take a minute.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  
+  // Track what's still loading
+  const collageLoading = (isGenerating || isPending) && !hasCollage;
+  const audioPluginLoading = (isGenerating || isPending) && !hasAudioPlugin;
+  const dashboardLoading = (isGenerating || isPending) && !hasDashboard;
 
   if (moodBoard?.status === "failed" && uiConcepts?.status === "failed" && !hasAnyAssets) {
     return (
@@ -129,7 +117,8 @@ export function AiMoodBoard({
     );
   }
 
-  if (!hasAnyAssets) {
+  // Only show empty state if not generating and no assets
+  if (!hasAnyAssets && !isGenerating && !isPending) {
     return (
       <div className={cn("flex flex-col items-center justify-center p-12 space-y-6", className)} data-testid="mood-board-empty">
         <div className="text-center space-y-2">
@@ -150,6 +139,16 @@ export function AiMoodBoard({
     );
   }
 
+  // Loading placeholder component for images still being generated
+  const LoadingPlaceholder = ({ label }: { label: string }) => (
+    <div className="relative rounded-lg overflow-hidden border border-border bg-muted/50 aspect-video flex items-center justify-center">
+      <div className="text-center space-y-2">
+        <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto" />
+        <span className="text-xs text-muted-foreground">{label}</span>
+      </div>
+    </div>
+  );
+
   return (
     <div className={cn("space-y-6", className)}>
       <div className="flex items-center justify-between">
@@ -166,32 +165,39 @@ export function AiMoodBoard({
         </Button>
       </div>
 
-      {hasCollage && (
+      {/* Mood Board Section - show loading or image */}
+      {(hasCollage || collageLoading) && (
         <div className="space-y-2">
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
             Mood Board
             <InfoTooltip testId="tooltip-mood-board">{FEATURE_EXPLANATIONS.moodBoard}</InfoTooltip>
           </h3>
-          <div className="relative group rounded-lg overflow-hidden border border-border" data-testid="img-container-collage">
-            <img
-              src={moodBoard?.collage}
-              alt={`${styleName} mood board`}
-              className="w-full h-auto"
-              data-testid="img-collage"
-            />
-            <DownloadButton src={moodBoard?.collage || ""} filename={`${styleName}-mood-board.png`} />
-          </div>
+          {hasCollage ? (
+            <div className="relative group rounded-lg overflow-hidden border border-border" data-testid="img-container-collage">
+              <img
+                src={moodBoard?.collage}
+                alt={`${styleName} mood board`}
+                className="w-full h-auto"
+                data-testid="img-collage"
+              />
+              <DownloadButton src={moodBoard?.collage || ""} filename={`${styleName}-mood-board.png`} />
+            </div>
+          ) : (
+            <LoadingPlaceholder label="Generating mood board..." />
+          )}
         </div>
       )}
 
-      {(hasAudioPlugin || hasDashboard) && (
+      {/* UI Concepts Section - show loading or images progressively */}
+      {(hasAudioPlugin || hasDashboard || audioPluginLoading || dashboardLoading) && (
         <div className="space-y-2">
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
             UI Concepts
             <InfoTooltip testId="tooltip-ui-concepts">{FEATURE_EXPLANATIONS.uiConcepts}</InfoTooltip>
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {hasAudioPlugin && (
+            {/* Audio Plugin - show image or loading */}
+            {hasAudioPlugin ? (
               <div className="relative group rounded-lg overflow-hidden border border-border" data-testid="img-container-audio">
                 <img
                   src={uiConcepts?.audioPlugin}
@@ -204,8 +210,12 @@ export function AiMoodBoard({
                   <span className="text-xs text-muted-foreground">Audio Plugin</span>
                 </div>
               </div>
-            )}
-            {hasDashboard && (
+            ) : audioPluginLoading ? (
+              <LoadingPlaceholder label="Generating audio plugin..." />
+            ) : null}
+            
+            {/* Dashboard - show image or loading */}
+            {hasDashboard ? (
               <div className="relative group rounded-lg overflow-hidden border border-border" data-testid="img-container-dashboard">
                 <img
                   src={uiConcepts?.dashboard}
@@ -218,7 +228,9 @@ export function AiMoodBoard({
                   <span className="text-xs text-muted-foreground">Dashboard</span>
                 </div>
               </div>
-            )}
+            ) : dashboardLoading ? (
+              <LoadingPlaceholder label="Generating dashboard..." />
+            ) : null}
           </div>
         </div>
       )}

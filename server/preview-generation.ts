@@ -69,6 +69,54 @@ function generateStyledPlaceholder(
   return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
 }
 
+async function generateSinglePreview(
+  styleName: string,
+  styleDescription: string,
+  type: "portrait" | "landscape" | "stillLife"
+): Promise<string | null> {
+  const aspectRatios = {
+    portrait: "3:4 vertical",
+    landscape: "16:9 horizontal",
+    stillLife: "1:1 square",
+  };
+  
+  const characteristics = {
+    portrait: "color palette, lighting approach, texture treatment, and overall mood",
+    landscape: "color palette, atmospheric treatment, spatial depth, and overall mood",
+    stillLife: "color palette, material textures, lighting approach, and overall mood",
+  };
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash-image",
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              text: `Generate a ${type} image (${aspectRatios[type]} aspect ratio) rendered in the "${styleName}" visual style.
+
+Subject: ${CANONICAL_SUBJECTS[type]}
+
+Apply these style characteristics to the rendering: ${styleDescription}
+
+The image should clearly demonstrate this style's ${characteristics[type]}. Keep the image compact and optimized.`,
+            },
+          ],
+        },
+      ],
+      config: {
+        responseModalities: ["image", "text"],
+      },
+    });
+
+    return extractImageFromResponse(response);
+  } catch (error) {
+    console.warn(`${type} generation failed:`, error instanceof Error ? error.message : String(error));
+    return null;
+  }
+}
+
 export async function generateCanonicalPreviews(
   request: PreviewGenerationRequest
 ): Promise<PreviewImage> {
@@ -81,104 +129,16 @@ export async function generateCanonicalPreviews(
   };
 
   try {
-    // Generate portrait (3:4) - fixed subject: artist in atelier
-    try {
-      const portraitResponse = await ai.models.generateContent({
-        model: "gemini-2.5-flash-image",
-        contents: [
-          {
-            role: "user",
-            parts: [
-              {
-                text: `Generate a portrait image (3:4 vertical aspect ratio) rendered in the "${styleName}" visual style.
+    // Generate all 3 previews in parallel for ~3x speedup
+    const [portraitImage, landscapeImage, stillLifeImage] = await Promise.all([
+      generateSinglePreview(styleName, styleDescription, "portrait"),
+      generateSinglePreview(styleName, styleDescription, "landscape"),
+      generateSinglePreview(styleName, styleDescription, "stillLife"),
+    ]);
 
-Subject: ${CANONICAL_SUBJECTS.portrait}
-
-Apply these style characteristics to the rendering: ${styleDescription}
-
-The image should clearly demonstrate this style's color palette, lighting approach, texture treatment, and overall mood.`,
-              },
-            ],
-          },
-        ],
-        config: {
-          responseModalities: ["image", "text"],
-        },
-      });
-
-      const portraitImage = extractImageFromResponse(portraitResponse);
-      if (portraitImage) {
-        result.portrait = portraitImage;
-      }
-    } catch (error) {
-      console.warn("Portrait generation failed:", error instanceof Error ? error.message : String(error));
-    }
-
-    // Generate landscape (16:9) - fixed subject: elevated promenade overlooking cityscape
-    try {
-      const landscapeResponse = await ai.models.generateContent({
-        model: "gemini-2.5-flash-image",
-        contents: [
-          {
-            role: "user",
-            parts: [
-              {
-                text: `Generate a landscape image (16:9 horizontal aspect ratio) rendered in the "${styleName}" visual style.
-
-Subject: ${CANONICAL_SUBJECTS.landscape}
-
-Apply these style characteristics to the rendering: ${styleDescription}
-
-The image should clearly demonstrate this style's color palette, atmospheric treatment, spatial depth, and overall mood.`,
-              },
-            ],
-          },
-        ],
-        config: {
-          responseModalities: ["image", "text"],
-        },
-      });
-
-      const landscapeImage = extractImageFromResponse(landscapeResponse);
-      if (landscapeImage) {
-        result.landscape = landscapeImage;
-      }
-    } catch (error) {
-      console.warn("Landscape generation failed:", error instanceof Error ? error.message : String(error));
-    }
-
-    // Generate still life (1:1) - fixed subject: curated desk arrangement
-    try {
-      const stillLifeResponse = await ai.models.generateContent({
-        model: "gemini-2.5-flash-image",
-        contents: [
-          {
-            role: "user",
-            parts: [
-              {
-                text: `Generate a still life image (1:1 square aspect ratio) rendered in the "${styleName}" visual style.
-
-Subject: ${CANONICAL_SUBJECTS.stillLife}
-
-Apply these style characteristics to the rendering: ${styleDescription}
-
-The image should clearly demonstrate this style's color palette, material textures, lighting approach, and overall mood.`,
-              },
-            ],
-          },
-        ],
-        config: {
-          responseModalities: ["image", "text"],
-        },
-      });
-
-      const stillLifeImage = extractImageFromResponse(stillLifeResponse);
-      if (stillLifeImage) {
-        result.stillLife = stillLifeImage;
-      }
-    } catch (error) {
-      console.warn("Still life generation failed:", error instanceof Error ? error.message : String(error));
-    }
+    if (portraitImage) result.portrait = portraitImage;
+    if (landscapeImage) result.landscape = landscapeImage;
+    if (stillLifeImage) result.stillLife = stillLifeImage;
   } catch (error) {
     console.error("Error in preview generation:", error instanceof Error ? error.message : String(error));
   }
