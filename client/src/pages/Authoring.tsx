@@ -7,6 +7,7 @@ import { TokenViewer } from "@/components/token-viewer";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { compressImage, getImageSizeKB } from "@/lib/image-utils";
+import { InfoTooltip, FEATURE_EXPLANATIONS } from "@/components/info-tooltip";
 
 export default function Authoring() {
   const [, setLocation] = useLocation();
@@ -212,7 +213,10 @@ export default function Authoring() {
     <Layout>
       <div className="max-w-4xl mx-auto space-y-6 md:space-y-8">
         <div className="border-b border-border pb-4 md:pb-6">
-          <h1 className="text-2xl md:text-3xl font-serif font-medium text-foreground">Style Authoring</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl md:text-3xl font-serif font-medium text-foreground">Style Authoring</h1>
+            <InfoTooltip side="right" testId="tooltip-style-creation">{FEATURE_EXPLANATIONS.styleCreation}</InfoTooltip>
+          </div>
           <p className="text-muted-foreground text-xs md:text-sm mt-2">
             Create a new immutable style artifact. System will automatically generate canonical previews and W3C tokens.
           </p>
@@ -235,7 +239,10 @@ export default function Authoring() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
              {/* Left: Upload */}
              <div className="space-y-4 flex flex-col">
-                <label className="text-sm font-medium">Step 1: Upload Reference Image</label>
+                <label className="text-sm font-medium flex items-center gap-2">
+                  Step 1: Upload Reference Image
+                  <InfoTooltip testId="tooltip-reference-image">{FEATURE_EXPLANATIONS.referenceImage}</InfoTooltip>
+                </label>
                 {referenceImage ? (
                   <div className="relative aspect-square border border-border rounded-sm overflow-hidden bg-muted">
                     <img src={referenceImage} alt="Reference" className="w-full h-full object-cover" />
