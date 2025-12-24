@@ -1,9 +1,34 @@
 import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, RefreshCw, Clock } from "lucide-react";
+import { Loader2, RefreshCw, Clock, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { MoodBoardAssets, UiConceptAssets, MoodBoardEntry, UiConceptEntry } from "@/lib/store";
+
+function downloadImage(dataUrl: string, filename: string) {
+  const link = document.createElement("a");
+  link.href = dataUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+function DownloadButton({ src, filename }: { src: string; filename: string }) {
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        downloadImage(src, filename);
+      }}
+      className="absolute top-2 right-2 p-1.5 rounded-md bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"
+      title="Download image"
+      data-testid={`button-download-${filename.replace(/\s+/g, "-").toLowerCase()}`}
+    >
+      <Download size={14} />
+    </button>
+  );
+}
 
 interface AiMoodBoardProps {
   styleId: string;
@@ -143,13 +168,14 @@ export function AiMoodBoard({
       {hasCollage && (
         <div className="space-y-2">
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Mood Board</h3>
-          <div className="rounded-lg overflow-hidden border border-border" data-testid="img-container-collage">
+          <div className="relative group rounded-lg overflow-hidden border border-border" data-testid="img-container-collage">
             <img
               src={moodBoard?.collage}
               alt={`${styleName} mood board`}
               className="w-full h-auto"
               data-testid="img-collage"
             />
+            <DownloadButton src={moodBoard?.collage || ""} filename={`${styleName}-mood-board.png`} />
           </div>
         </div>
       )}
@@ -159,26 +185,28 @@ export function AiMoodBoard({
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">UI Concepts</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {hasAudioPlugin && (
-              <div className="rounded-lg overflow-hidden border border-border" data-testid="img-container-audio">
+              <div className="relative group rounded-lg overflow-hidden border border-border" data-testid="img-container-audio">
                 <img
                   src={uiConcepts?.audioPlugin}
                   alt={`${styleName} audio plugin`}
                   className="w-full h-auto"
                   data-testid="img-audio"
                 />
+                <DownloadButton src={uiConcepts?.audioPlugin || ""} filename={`${styleName}-audio-plugin.png`} />
                 <div className="p-2 bg-muted/50 text-center">
                   <span className="text-xs text-muted-foreground">Audio Plugin</span>
                 </div>
               </div>
             )}
             {hasDashboard && (
-              <div className="rounded-lg overflow-hidden border border-border" data-testid="img-container-dashboard">
+              <div className="relative group rounded-lg overflow-hidden border border-border" data-testid="img-container-dashboard">
                 <img
                   src={uiConcepts?.dashboard}
                   alt={`${styleName} dashboard`}
                   className="w-full h-auto"
                   data-testid="img-dashboard"
                 />
+                <DownloadButton src={uiConcepts?.dashboard || ""} filename={`${styleName}-dashboard.png`} />
                 <div className="p-2 bg-muted/50 text-center">
                   <span className="text-xs text-muted-foreground">Dashboard</span>
                 </div>
@@ -206,13 +234,14 @@ export function AiMoodBoard({
                   })}
                 </span>
               </div>
-              <div className="rounded-lg overflow-hidden border border-border/50 opacity-75 hover:opacity-100 transition-opacity">
+              <div className="relative group rounded-lg overflow-hidden border border-border/50 opacity-75 hover:opacity-100 transition-opacity">
                 <img
                   src={entry.collage}
                   alt={`${styleName} previous mood board`}
                   className="w-full h-auto"
                   loading="lazy"
                 />
+                <DownloadButton src={entry.collage} filename={`${styleName}-mood-board-${index + 1}.png`} />
               </div>
             </div>
           ))}
@@ -228,26 +257,28 @@ export function AiMoodBoard({
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {entry.audioPlugin && (
-                  <div className="rounded-lg overflow-hidden border border-border/50 opacity-75 hover:opacity-100 transition-opacity">
+                  <div className="relative group rounded-lg overflow-hidden border border-border/50 opacity-75 hover:opacity-100 transition-opacity">
                     <img
                       src={entry.audioPlugin}
                       alt={`${styleName} previous audio plugin`}
                       className="w-full h-auto"
                       loading="lazy"
                     />
+                    <DownloadButton src={entry.audioPlugin} filename={`${styleName}-audio-plugin-${index + 1}.png`} />
                     <div className="p-2 bg-muted/30 text-center">
                       <span className="text-xs text-muted-foreground">Audio Plugin</span>
                     </div>
                   </div>
                 )}
                 {entry.dashboard && (
-                  <div className="rounded-lg overflow-hidden border border-border/50 opacity-75 hover:opacity-100 transition-opacity">
+                  <div className="relative group rounded-lg overflow-hidden border border-border/50 opacity-75 hover:opacity-100 transition-opacity">
                     <img
                       src={entry.dashboard}
                       alt={`${styleName} previous dashboard`}
                       className="w-full h-auto"
                       loading="lazy"
                     />
+                    <DownloadButton src={entry.dashboard} filename={`${styleName}-dashboard-${index + 1}.png`} />
                     <div className="p-2 bg-muted/30 text-center">
                       <span className="text-xs text-muted-foreground">Dashboard</span>
                     </div>
