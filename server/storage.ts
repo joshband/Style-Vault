@@ -31,6 +31,20 @@ export interface IStorage {
   getGeneratedImages(): Promise<GeneratedImage[]>;
   getGeneratedImagesByStyle(styleId: string): Promise<GeneratedImage[]>;
   createGeneratedImage(image: InsertGeneratedImage): Promise<GeneratedImage>;
+
+  // Job operations for async task tracking
+  createJob(job: InsertJob): Promise<Job>;
+  getJobById(id: string): Promise<Job | undefined>;
+  getJobsByStyleId(styleId: string): Promise<Job[]>;
+  getActiveJobs(): Promise<Job[]>;
+  updateJobStatus(id: string, status: JobStatus, updates?: {
+    progress?: number;
+    progressMessage?: string;
+    output?: Record<string, any>;
+    error?: string;
+  }): Promise<Job | undefined>;
+  incrementJobRetry(id: string): Promise<Job | undefined>;
+  cleanupOldJobs(olderThanDays?: number): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
