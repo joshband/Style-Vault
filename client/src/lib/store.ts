@@ -15,13 +15,42 @@ export interface StylePreview {
 }
 
 export interface MetadataTags {
+  // Core visual characteristics
   mood: string[];
   colorFamily: string[];
-  era: string[];
-  medium: string[];
-  subjects: string[];
   lighting: string[];
   texture: string[];
+  
+  // Art historical context
+  era: string[];
+  artPeriod: string[];
+  historicalInfluences: string[];
+  similarArtists: string[];
+  
+  // Technical aspects
+  medium: string[];
+  subjects: string[];
+  
+  // Application guidance
+  usageExamples: string[];
+  
+  // Subjective Visual DNA - Emotional Resonance
+  narrativeTone: string[];
+  sensoryPalette: string[];
+  movementRhythm: string[];
+  
+  // Subjective Visual DNA - Design Voice
+  stylisticPrinciples: string[];
+  signatureMotifs: string[];
+  contrastDynamics: string[];
+  
+  // Subjective Visual DNA - Experiential Impact
+  psychologicalEffect: string[];
+  culturalResonance: string[];
+  audiencePerception: string[];
+  
+  // Search keywords
+  keywords: string[];
 }
 
 export interface MoodBoardEntry {
@@ -76,6 +105,9 @@ export interface Style {
 
   // Metadata Tags for visual descriptors
   metadataTags?: MetadataTags;
+  
+  // Enrichment status
+  metadataEnrichmentStatus?: "pending" | "queued" | "processing" | "complete" | "failed";
 
   // AI-generated mood board and UI concepts
   moodBoard?: MoodBoardAssets | null;

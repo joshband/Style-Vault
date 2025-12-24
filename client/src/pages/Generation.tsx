@@ -156,11 +156,59 @@ export default function Generation() {
             </div>
             
             {/* Style Info */}
-            <div className="flex flex-col justify-center">
+            <div className="flex flex-col justify-center flex-1">
               <h1 className="text-xl md:text-2xl font-serif font-medium text-foreground">{style.name}</h1>
               <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{style.description}</p>
             </div>
           </div>
+          
+          {/* Visual DNA Tags */}
+          {style.metadataTags && style.metadataEnrichmentStatus === "complete" && (
+            <div className="mt-4 pt-4 border-t border-border space-y-3">
+              <div className="flex items-center gap-2">
+                <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Visual DNA</h4>
+                <InfoTooltip testId="tooltip-visual-dna">{FEATURE_EXPLANATIONS.visualDNA}</InfoTooltip>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {/* Mood */}
+                {style.metadataTags.mood?.length > 0 && style.metadataTags.mood.map((tag: string) => (
+                  <span key={`mood-${tag}`} className="text-xs px-2 py-1 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 rounded-full" data-testid={`tag-mood-${tag}`}>
+                    {tag}
+                  </span>
+                ))}
+                {/* Art Period */}
+                {style.metadataTags.artPeriod?.length > 0 && style.metadataTags.artPeriod.map((tag: string) => (
+                  <span key={`artPeriod-${tag}`} className="text-xs px-2 py-1 bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 rounded-full" data-testid={`tag-artPeriod-${tag}`}>
+                    {tag}
+                  </span>
+                ))}
+                {/* Color Family */}
+                {style.metadataTags.colorFamily?.length > 0 && style.metadataTags.colorFamily.map((tag: string) => (
+                  <span key={`colorFamily-${tag}`} className="text-xs px-2 py-1 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 rounded-full" data-testid={`tag-colorFamily-${tag}`}>
+                    {tag}
+                  </span>
+                ))}
+                {/* Narrative Tone */}
+                {style.metadataTags.narrativeTone?.length > 0 && style.metadataTags.narrativeTone.map((tag: string) => (
+                  <span key={`narrativeTone-${tag}`} className="text-xs px-2 py-1 bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300 rounded-full" data-testid={`tag-narrativeTone-${tag}`}>
+                    {tag}
+                  </span>
+                ))}
+                {/* Psychological Effect */}
+                {style.metadataTags.psychologicalEffect?.length > 0 && style.metadataTags.psychologicalEffect.map((tag: string) => (
+                  <span key={`psychologicalEffect-${tag}`} className="text-xs px-2 py-1 bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300 rounded-full" data-testid={`tag-psychologicalEffect-${tag}`}>
+                    {tag}
+                  </span>
+                ))}
+                {/* Cultural Resonance */}
+                {style.metadataTags.culturalResonance?.length > 0 && style.metadataTags.culturalResonance.map((tag: string) => (
+                  <span key={`culturalResonance-${tag}`} className="text-xs px-2 py-1 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 rounded-full" data-testid={`tag-culturalResonance-${tag}`}>
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Prompt Input */}
