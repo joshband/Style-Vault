@@ -1,7 +1,44 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, jsonb, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+// Job status types for async operations
+export type JobStatus = "queued" | "running" | "succeeded" | "failed" | "canceled";
+export type JobType = 
+  | "style_analysis" 
+  | "preview_generation" 
+  | "image_generation" 
+  | "cv_extraction" 
+  | "metadata_enrichment"
+  | "mood_board_generation"
+  | "ui_concepts_generation";
+
+// Jobs table for tracking async operations with progress
+export const jobs = pgTable("jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  type: text("type").$type<JobType>().notNull(),
+  status: text("status").$type<JobStatus>().default("queued").notNull(),
+  progress: integer("progress").default(0).notNull(),
+  progressMessage: text("progress_message"),
+  input: jsonb("input").$type<Record<string, any>>().notNull(),
+  output: jsonb("output").$type<Record<string, any>>(),
+  error: text("error"),
+  retryCount: integer("retry_count").default(0).notNull(),
+  maxRetries: integer("max_retries").default(3).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  styleId: varchar("style_id"),
+});
+
+export const insertJobSchema = createInsertSchema(jobs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertJob = z.infer<typeof insertJobSchema>;
+export type Job = typeof jobs.$inferSelect;
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
