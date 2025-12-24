@@ -66,37 +66,40 @@ function extractTokenSummary(tokens: Record<string, any>): TokenSummary {
 }
 
 function buildMoodBoardPrompt(request: MoodBoardRequest, summary: TokenSummary): string {
-  const { styleName, metadataTags } = request;
+  const { styleName, styleDescription, metadataTags } = request;
 
   const colorList = summary.colors.map((c) => `${c.name}: ${c.hex}`).join(", ");
   const moodKeywords = metadataTags.mood.slice(0, 4).join(", ") || "refined, artistic";
   const eraKeywords = metadataTags.era.slice(0, 2).join(", ") || "contemporary";
   const textureKeywords = metadataTags.texture.slice(0, 3).join(", ") || summary.texture.finish;
   const lightingKeywords = metadataTags.lighting.slice(0, 2).join(", ") || summary.lighting.type;
+  const mediumKeywords = metadataTags.medium.slice(0, 2).join(", ") || "digital";
 
-  return `Create a visually cohesive mood board collage for the "${styleName}" design style.
+  return `Create a stunning, high-fidelity mood board collage that perfectly captures the visual essence of "${styleName}".
 
-LAYOUT: A Pinterest-style grid collage with varied tile sizes in a 3:4 portrait aspect ratio. Include 8-12 tiles arranged asymmetrically.
+STYLE ESSENCE: ${styleDescription}
 
-REQUIRED ELEMENTS:
-1. COLOR PALETTE: A horizontal strip of 5-6 color swatches showing: ${colorList}
-2. TYPOGRAPHY SPECIMEN: Large display text with style keywords like "${moodKeywords.toUpperCase()}" in bold display typeface
-3. TEXTURE SAMPLES: 2-3 tiles showing abstract textures matching: ${textureKeywords}
-4. ART REFERENCE TILES: 2-3 tiles with swirling, painterly abstract patterns using the color palette (like Van Gogh or impressionist style)
-5. MATERIAL OBJECTS: 1-2 vintage-inspired 3D objects like radio knobs, oscilloscopes, or industrial controls rendered in the style's colors
-6. MOOD KEYWORDS: Typography tiles with keywords like "${moodKeywords}", "${eraKeywords}", displayed as graphic design elements
+LAYOUT: A sophisticated Pinterest-style grid collage with varied tile sizes in a 3:4 portrait aspect ratio. Include 8-12 tiles arranged asymmetrically with thin gaps.
 
-COLOR PALETTE TO USE:
+CRITICAL COLOR PALETTE - USE THESE EXACT COLORS:
 ${summary.colors.map((c) => `- ${c.name}: ${c.hex}`).join("\n")}
 
-STYLE CHARACTERISTICS:
-- Era/Movement: ${eraKeywords}
-- Mood: ${moodKeywords}
-- Textures: ${textureKeywords}
-- Lighting: ${lightingKeywords}
-- Typography feels: ${summary.typography.serif} for headers, ${summary.typography.sans} for body
+REQUIRED ELEMENTS (each should deeply reflect the style's aesthetic):
+1. COLOR PALETTE STRIP: A horizontal strip of color swatches matching: ${colorList}
+2. HERO TYPOGRAPHY: Large display text with style keywords "${moodKeywords.toUpperCase()}" - the typography itself should LOOK like the style (aged, modern, painterly, etc.)
+3. TEXTURE SAMPLES: 2-3 tiles showing abstract textures that match "${textureKeywords}" - these should feel authentic to the style's visual language
+4. ARTISTIC REFERENCE TILES: 2-3 tiles with abstract patterns/paintings that capture the movement/era: ${eraKeywords}. Use brushstrokes, gradients, or patterns that embody the style.
+5. EVOCATIVE OBJECTS: 1-2 tiles showing objects that represent the style's world - could be vintage equipment, natural elements, architectural details
+6. ATMOSPHERE: Ensure the overall lighting feels like "${lightingKeywords}" - warm, cool, dramatic, or soft accordingly
 
-The overall feel should be aspirational design inspiration - something a designer would pin to communicate the visual direction of a project. Use cream/off-white gaps between tiles. Make it feel editorial and curated.`;
+VISUAL COHERENCE RULES:
+- Every element should feel like it belongs to the same visual universe
+- The texture of paper/surfaces should match the style's era: ${eraKeywords}
+- Colors should be rich and accurate to the palette provided
+- Medium should feel like: ${mediumKeywords}
+- Mood should evoke: ${moodKeywords}
+
+Make this feel like a premium design agency's style exploration - editorial, refined, and deeply evocative of the visual direction.`;
 }
 
 function buildUiConceptPrompt(
@@ -104,59 +107,108 @@ function buildUiConceptPrompt(
   summary: TokenSummary,
   conceptType: "audioPlugin" | "dashboard" | "componentLibrary"
 ): string {
-  const { styleName } = request;
+  const { styleName, styleDescription, metadataTags } = request;
   const colorList = summary.colors.map((c) => `${c.name}: ${c.hex}`).join(", ");
+  const moodKeywords = metadataTags.mood.slice(0, 4).join(", ") || "refined, artistic";
+  const textureKeywords = metadataTags.texture.slice(0, 3).join(", ") || summary.texture.finish;
+  const lightingKeywords = metadataTags.lighting.slice(0, 2).join(", ") || summary.lighting.type;
+  const eraKeywords = metadataTags.era.slice(0, 2).join(", ") || "contemporary";
 
   const conceptPrompts = {
-    audioPlugin: `Create a UI mockup of an audio plugin/synthesizer interface in the "${styleName}" visual style.
+    audioPlugin: `Create a stunning, photorealistic UI mockup of a professional audio plugin/synthesizer interface that FULLY embodies the "${styleName}" visual style.
 
-LAYOUT: A 16:9 landscape interface with a textured background.
+STYLE TO CAPTURE: ${styleDescription}
 
-REQUIRED UI ELEMENTS:
-- 3-4 large circular knobs with labels (WARMTH, BOOST, RESONANCE, etc.)
-- A waveform display panel showing oscilloscope-style graphics
-- Grid of small LED-style buttons or step sequencer pads
-- Sliders and faders with labeled tracks
-- Status indicators and small displays
-- A header bar with the plugin name
+CRITICAL - This interface must LOOK and FEEL like ${styleName}:
+- Every surface, knob, and element should have textures matching: ${textureKeywords}
+- Lighting should feel: ${lightingKeywords}
+- Overall mood should be: ${moodKeywords}
+- Visual era/aesthetic: ${eraKeywords}
 
-Apply these colors throughout: ${colorList}
+COLOR PALETTE - USE THESE EXACT COLORS:
+${summary.colors.map((c) => `- ${c.name}: ${c.hex}`).join("\n")}
 
-The interface should feel tactile and dimensional - knobs should look glossy and touchable. Use the texture and lighting characteristics of the style. The background should have subtle texture matching the style's aesthetic.`,
+LAYOUT: A 16:9 landscape interface.
 
-    dashboard: `Create a UI mockup of a data dashboard interface in the "${styleName}" visual style.
+REQUIRED UI ELEMENTS (styled to match the aesthetic):
+- 3-4 large circular knobs with tactile textures matching the style
+- A waveform/oscilloscope display using the color palette
+- Grid of buttons or sequencer pads 
+- Sliders and faders
+- VU meters or level indicators
+- Plugin name header
 
-LAYOUT: A 16:9 landscape dashboard with multiple panels.
+VISUAL TREATMENT:
+- Surfaces should have the texture of: ${textureKeywords}
+- Lighting should create: ${lightingKeywords} effects on the 3D elements
+- The whole interface should feel like it belongs in the world of ${styleName}
+- Every detail from shadows to highlights should reinforce the style
 
-REQUIRED UI ELEMENTS:
-- A sidebar with navigation icons and menu items
-- 2-3 chart/graph panels (line charts, bar charts, or gauges)
-- Card components with metrics and KPIs
-- A header bar with title and action buttons
-- Data tables or list components
-- Progress bars and status indicators
+Make this look like a premium, production-ready plugin that a designer would be proud to showcase.`,
 
-Apply these colors throughout: ${colorList}
+    dashboard: `Create a stunning, high-fidelity UI mockup of a modern data dashboard that FULLY embodies the "${styleName}" visual style.
 
-Use primary colors for key actions and accents, secondary for supporting elements. The charts and graphs should use the color palette. Background panels should use the surface and background colors from the style.`,
+STYLE TO CAPTURE: ${styleDescription}
 
-    componentLibrary: `Create a UI component showcase poster in the "${styleName}" visual style.
+CRITICAL - This dashboard must LOOK and FEEL like ${styleName}:
+- Every panel, card, and element should reflect: ${textureKeywords}
+- Lighting/atmosphere should feel: ${lightingKeywords}
+- Overall mood should be: ${moodKeywords}
+- Visual era/aesthetic: ${eraKeywords}
 
-LAYOUT: A 3:4 portrait grid showing various UI components.
+COLOR PALETTE - USE THESE EXACT COLORS:
+${summary.colors.map((c) => `- ${c.name}: ${c.hex}`).join("\n")}
 
-REQUIRED ELEMENTS:
-- Typography specimen: "THE ART OF DESIGN" or similar in display type
-- Alphabet specimen showing character set
-- Button components in various states
-- Icon set (play, pause, arrows, settings)
-- Form elements (toggles, sliders, checkboxes)
-- Color palette strip
-- Layout/grid demonstration
-- Small interface fragment showing components in context
+LAYOUT: A 16:9 landscape dashboard.
 
-Apply these colors throughout: ${colorList}
+REQUIRED UI ELEMENTS (each styled to match the aesthetic):
+- Sidebar navigation with icons
+- 2-3 data visualization panels (charts/graphs using the palette colors)
+- Metric cards with KPIs
+- Header bar with title
+- Tables or list components
+- Progress indicators
 
-The poster should feel like a designer's reference sheet - organized, systematic, but also aesthetically beautiful. Use the style's typography and texture characteristics throughout.`,
+VISUAL TREATMENT:
+- Card surfaces should have texture: ${textureKeywords}
+- Charts should use the exact color palette provided
+- Shadows and depth should feel like: ${lightingKeywords}
+- Typography should feel appropriate for: ${eraKeywords}
+- The entire interface should be cohesive with the style's visual language
+
+This should look like a real, polished application that demonstrates how ${styleName} translates into functional UI.`,
+
+    componentLibrary: `Create a beautiful UI component showcase poster that perfectly embodies the "${styleName}" visual style.
+
+STYLE TO CAPTURE: ${styleDescription}
+
+CRITICAL - Every component must LOOK and FEEL like ${styleName}:
+- Surfaces and elements should have: ${textureKeywords}
+- Lighting/rendering should feel: ${lightingKeywords}
+- Overall mood should be: ${moodKeywords}
+- Visual era/aesthetic: ${eraKeywords}
+
+COLOR PALETTE - USE THESE EXACT COLORS:
+${summary.colors.map((c) => `- ${c.name}: ${c.hex}`).join("\n")}
+
+LAYOUT: A 3:4 portrait design system poster.
+
+REQUIRED ELEMENTS (each deeply styled):
+- Large typography specimen: Display text that LOOKS like the style
+- Alphabet/character set specimen
+- Button components (primary, secondary, disabled states) - styled with textures
+- Icon set (play, pause, settings, arrows) - styled appropriately
+- Form elements (toggles, sliders, checkboxes, inputs) - with style's texture
+- Color palette strip with swatches
+- A small UI fragment showing components in context
+
+VISUAL TREATMENT:
+- This should look like a premium design system documentation page
+- Every element should reinforce the ${styleName} aesthetic
+- Typography, shadows, borders - all should feel cohesive
+- The poster itself should feel like art - beautiful and inspirational
+
+Make this look like something from a top design agency - polished, cohesive, and deeply evocative of the style.`,
   };
 
   return conceptPrompts[conceptType];
@@ -218,6 +270,7 @@ export async function generateUiConcepts(
   const conceptTypes: Array<"audioPlugin" | "dashboard" | "componentLibrary"> = [
     "audioPlugin",
     "dashboard",
+    "componentLibrary",
   ];
 
   for (const conceptType of conceptTypes) {
@@ -245,7 +298,7 @@ export async function generateUiConcepts(
     }
   }
 
-  result.status = result.audioPlugin || result.dashboard ? "complete" : "failed";
+  result.status = result.audioPlugin || result.dashboard || result.componentLibrary ? "complete" : "failed";
   return result;
 }
 

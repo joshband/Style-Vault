@@ -47,6 +47,48 @@ export async function registerRoutes(
     try {
       const validatedData = insertStyleSchema.parse(req.body);
       const style = await storage.createStyle(validatedData);
+      
+      // Auto-trigger mood board generation in background (don't await)
+      setImmediate(async () => {
+        try {
+          console.log(`Auto-generating mood board for style: ${style.id}`);
+          
+          // Mark as generating
+          await storage.updateStyleMoodBoard(
+            style.id,
+            { collage: "", status: "generating" },
+            { status: "generating" }
+          );
+          
+          // Generate all assets
+          const { moodBoard, uiConcepts } = await generateAllMoodBoardAssets({
+            styleName: style.name,
+            styleDescription: style.description,
+            tokens: style.tokens,
+            metadataTags: style.metadataTags || {
+              mood: [],
+              colorFamily: [],
+              era: [],
+              medium: [],
+              subjects: [],
+              lighting: [],
+              texture: [],
+            },
+            referenceImageBase64: style.referenceImages?.[0],
+          });
+          
+          await storage.updateStyleMoodBoard(style.id, moodBoard, uiConcepts);
+          console.log(`Mood board generation complete for style: ${style.id}`);
+        } catch (error) {
+          console.error(`Background mood board generation failed for ${style.id}:`, error);
+          await storage.updateStyleMoodBoard(
+            style.id,
+            { collage: "", status: "failed" },
+            { status: "failed" }
+          );
+        }
+      });
+      
       res.status(201).json(style);
     } catch (error) {
       console.error("Error creating style:", error);
