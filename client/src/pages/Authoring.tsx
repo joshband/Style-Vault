@@ -5,9 +5,11 @@ import { useLocation } from "wouter";
 import { createStyle, SAMPLE_TOKENS } from "@/lib/store";
 import { TokenViewer } from "@/components/token-viewer";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Authoring() {
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
   const [step, setStep] = useState<1 | 2>(1);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -158,6 +160,15 @@ export default function Authoring() {
 
   const handleSave = async () => {
     if (!generatedPreviews) return;
+    
+    if (!name.trim()) {
+      toast({
+        title: "Name required",
+        description: "Please enter a name for your style",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsSaving(true);
     try {
@@ -175,9 +186,19 @@ export default function Authoring() {
         metadataTags: metadataTags
       });
       
+      toast({
+        title: "Style saved!",
+        description: `"${name}" has been committed to your vault`,
+      });
+      
       setLocation("/");
     } catch (error) {
       console.error("Failed to save style:", error);
+      toast({
+        title: "Save failed",
+        description: error instanceof Error ? error.message : "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsSaving(false);
     }
@@ -353,9 +374,19 @@ export default function Authoring() {
                 </button>
                 <button 
                    onClick={handleSave}
-                   className="order-1 sm:order-2 bg-primary text-primary-foreground px-4 md:px-6 py-2 rounded-sm flex items-center justify-center gap-2 text-xs md:text-sm font-medium hover:bg-primary/90 transition-colors"
+                   disabled={isSaving}
+                   className="order-1 sm:order-2 bg-primary text-primary-foreground px-4 md:px-6 py-2 rounded-sm flex items-center justify-center gap-2 text-xs md:text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+                   data-testid="button-commit-style"
                 >
-                  Commit to Vault <ArrowRight size={14} />
+                  {isSaving ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" /> Saving...
+                    </>
+                  ) : (
+                    <>
+                      Commit to Vault <ArrowRight size={14} />
+                    </>
+                  )}
                 </button>
              </div>
           </div>
