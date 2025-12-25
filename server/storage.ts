@@ -558,10 +558,10 @@ export class DatabaseStorage implements IStorage {
 
   // Background processing helpers
   async getStylesWithUuidNames(): Promise<Style[]> {
-    // Find styles where name matches UUID pattern (8-4-4-4-12 hex format)
-    // or starts with common UUID prefixes like the style ID
+    // Find styles where name matches UUID pattern, camera filenames, or other placeholder patterns
     const allStyles = await db.select().from(styles);
     const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const cameraPattern = /^(IMG|DSC|DCIM|PXL|Screenshot)[_-]?\d{3,}/i;
     
     return allStyles.filter(style => {
       // Check if name matches UUID pattern
@@ -570,6 +570,8 @@ export class DatabaseStorage implements IStorage {
       if (style.name === style.id) return true;
       // Check if name starts with "Style from " followed by hex (truncated ID)
       if (/^Style from [0-9a-f]{8}$/i.test(style.name)) return true;
+      // Check if name looks like a camera filename (IMG_0367, DSC0001, PXL_20231225, etc.)
+      if (cameraPattern.test(style.name)) return true;
       return false;
     });
   }
