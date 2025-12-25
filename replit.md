@@ -53,9 +53,19 @@ Preferred communication style: Simple, everyday language.
 - **Key Tables**:
   - `users` - User accounts (Replit Auth, with email, name, profile image)
   - `sessions` - Session storage for auth
-  - `styles` - Visual style definitions with tokens, previews, and metadata
+  - `styles` - Visual style definitions with tokens, previews, and metadata (includes creatorId for ownership tracking)
+  - `bookmarks` - User bookmarks for saving favorite styles
+  - `ratings` - User ratings and reviews for styles
   - `generatedImages` - Images generated using styles
   - `conversations`/`messages` - Chat history for AI interactions
+
+### User Features
+- **Bookmarking**: Users can save/unsave styles to their collection
+  - Endpoints: `GET/POST/DELETE /api/styles/:id/bookmark`
+- **Ratings & Reviews**: 1-5 star ratings with optional review text
+  - Endpoints: `GET /api/styles/:id/ratings` (average), `GET /api/styles/:id/my-rating`, `POST /api/styles/:id/rating`
+- **Creator Tracking**: Styles linked to the user who created them via `creatorId`
+- **Protected Routes**: All user-specific endpoints require authentication via `isAuthenticated` middleware
 
 ### AI Integration
 - **Provider**: Google Gemini via Replit AI Integrations
