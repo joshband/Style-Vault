@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Style, type InsertStyle, type GeneratedImage, type InsertGeneratedImage, type MoodBoardAssets, type UiConceptAssets, type MetadataTags, type MetadataEnrichmentStatus, type Job, type InsertJob, type JobStatus, type JobType, users, styles, generatedImages, jobs } from "@shared/schema";
+import { type User, type InsertUser, type Style, type InsertStyle, type GeneratedImage, type InsertGeneratedImage, type MoodBoardAssets, type UiConceptAssets, type MetadataTags, type MetadataEnrichmentStatus, type Job, type InsertJob, type JobStatus, type JobType, type Batch, type InsertBatch, users, styles, generatedImages, jobs, batches } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, or, inArray } from "drizzle-orm";
 
@@ -36,6 +36,7 @@ export interface IStorage {
   createJob(job: InsertJob): Promise<Job>;
   getJobById(id: string): Promise<Job | undefined>;
   getJobsByStyleId(styleId: string): Promise<Job[]>;
+  getJobsByBatchId(batchId: string): Promise<Job[]>;
   getActiveJobs(): Promise<Job[]>;
   getRecentJobs(limit?: number): Promise<Job[]>;
   updateJobStatus(id: string, status: JobStatus, updates?: {
@@ -46,6 +47,12 @@ export interface IStorage {
   }): Promise<Job | undefined>;
   incrementJobRetry(id: string): Promise<Job | undefined>;
   cleanupOldJobs(olderThanDays?: number): Promise<number>;
+
+  // Batch operations
+  createBatch(batch: InsertBatch): Promise<Batch>;
+  getBatchById(id: string): Promise<Batch | undefined>;
+  updateBatchProgress(id: string, completedItems: number, failedItems: number): Promise<Batch | undefined>;
+  updateBatchStatus(id: string, status: JobStatus): Promise<Batch | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -295,6 +302,59 @@ export class DatabaseStorage implements IStorage {
         )
       );
     return 0; // Drizzle doesn't easily return affected row count
+  }
+
+  async getJobsByBatchId(batchId: string): Promise<Job[]> {
+    return db
+      .select()
+      .from(jobs)
+      .where(eq(jobs.batchId, batchId))
+      .orderBy(desc(jobs.createdAt));
+  }
+
+  // Batch operations
+  async createBatch(insertBatch: InsertBatch): Promise<Batch> {
+    const [batch] = await db.insert(batches).values(insertBatch).returning();
+    return batch;
+  }
+
+  async getBatchById(id: string): Promise<Batch | undefined> {
+    const [batch] = await db.select().from(batches).where(eq(batches.id, id));
+    return batch;
+  }
+
+  async updateBatchProgress(id: string, completedItems: number, failedItems: number): Promise<Batch | undefined> {
+    const batch = await this.getBatchById(id);
+    if (!batch) return undefined;
+
+    const isComplete = (completedItems + failedItems) >= batch.totalItems;
+    const status = isComplete 
+      ? (failedItems === batch.totalItems ? "failed" : "succeeded")
+      : "running";
+
+    const [updated] = await db
+      .update(batches)
+      .set({ 
+        completedItems, 
+        failedItems,
+        status,
+        completedAt: isComplete ? new Date() : null,
+      })
+      .where(eq(batches.id, id))
+      .returning();
+    return updated;
+  }
+
+  async updateBatchStatus(id: string, status: JobStatus): Promise<Batch | undefined> {
+    const [updated] = await db
+      .update(batches)
+      .set({ 
+        status,
+        completedAt: (status === "succeeded" || status === "failed" || status === "canceled") ? new Date() : null,
+      })
+      .where(eq(batches.id, id))
+      .returning();
+    return updated;
   }
 }
 
