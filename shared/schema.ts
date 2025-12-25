@@ -157,6 +157,7 @@ export const styles = pgTable("styles", {
   name: text("name").notNull(),
   description: text("description").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  shareCode: varchar("share_code").unique(),
   referenceImages: jsonb("reference_images").$type<string[]>().default([]),
   previews: jsonb("previews").$type<{
     portrait: string;
