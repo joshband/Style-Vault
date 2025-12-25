@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Style, type InsertStyle, type GeneratedImage, type InsertGeneratedImage, type MoodBoardAssets, type UiConceptAssets, type MetadataTags, type MetadataEnrichmentStatus, type Job, type InsertJob, type JobStatus, type JobType, type Batch, type InsertBatch, users, styles, generatedImages, jobs, batches } from "@shared/schema";
+import { type User, type InsertUser, type Style, type InsertStyle, type GeneratedImage, type InsertGeneratedImage, type MoodBoardAssets, type UiConceptAssets, type MetadataTags, type MetadataEnrichmentStatus, type Job, type InsertJob, type JobStatus, type JobType, type Batch, type InsertBatch, type StyleSpec, users, styles, generatedImages, jobs, batches } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, or, inArray, sql } from "drizzle-orm";
 
@@ -61,6 +61,9 @@ export interface IStorage {
   getStylesNeedingAssets(): Promise<Style[]>;
   updateStyleName(id: string, name: string): Promise<Style | undefined>;
   hasActiveJobForStyle(styleId: string, jobTypes: JobType[]): Promise<boolean>;
+
+  // Style spec operations
+  updateStyleSpec(id: string, spec: StyleSpec): Promise<Style | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -445,6 +448,18 @@ export class DatabaseStorage implements IStorage {
         )
       );
     return activeJobs.length > 0;
+  }
+
+  async updateStyleSpec(id: string, spec: StyleSpec): Promise<Style | undefined> {
+    const [updated] = await db
+      .update(styles)
+      .set({ 
+        styleSpec: spec,
+        updatedAt: new Date(),
+      })
+      .where(eq(styles.id, id))
+      .returning();
+    return updated;
   }
 }
 

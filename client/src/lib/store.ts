@@ -79,12 +79,20 @@ export interface UiConceptAssets {
   history: UiConceptEntry[];
 }
 
+export interface StyleSpec {
+  usageGuidelines: string;
+  designNotes: string;
+  updatedAt: string;
+}
+
 export interface Style {
   id: string;
   name: string;
   description: string;
   createdAt: string;
+  updatedAt?: string | null;
   shareCode?: string | null;
+  styleSpec?: StyleSpec | null;
   
   // Images
   referenceImages: string[];
