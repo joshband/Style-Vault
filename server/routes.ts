@@ -978,8 +978,9 @@ async function processBatchInBackground(batchId: string) {
         });
 
         // Create style with default tokens (similar to Author page approach)
+        // Use AI-generated styleName for unique, contextual naming
         const style = await storage.createStyle({
-          name: input.name || analysis.styleName || `Style from ${input.imageId.substring(0, 8)}`,
+          name: analysis.styleName || input.name || `Style from ${input.imageId.substring(0, 8)}`,
           description: analysis.description,
           referenceImages: [input.imageBase64],
           previews: {
@@ -1007,6 +1008,9 @@ async function processBatchInBackground(batchId: string) {
           progressMessage: "Complete",
           output: { styleId: style.id },
         });
+
+        // Invalidate cache immediately so new style appears in vault
+        cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
 
         return { success: true, styleId: style.id };
       } catch (error) {
