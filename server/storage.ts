@@ -13,6 +13,13 @@ export interface StyleSummary {
   thumbnailPreview: string | null;
 }
 
+export interface PaginatedStyleSummaries {
+  items: StyleSummary[];
+  total: number;
+  hasMore: boolean;
+  nextCursor: string | null;
+}
+
 export interface IStorage {
   // User operations
   getUser(id: string): Promise<User | undefined>;
@@ -22,6 +29,8 @@ export interface IStorage {
   // Style operations
   getStyles(): Promise<Style[]>;
   getStyleSummaries(): Promise<StyleSummary[]>;
+  getStyleSummariesPaginated(limit: number, cursor?: string): Promise<PaginatedStyleSummaries>;
+  getStyleCount(): Promise<number>;
   getStyleById(id: string): Promise<Style | undefined>;
   getStyleByShareCode(shareCode: string): Promise<Style | undefined>;
   createStyle(style: InsertStyle): Promise<Style>;
@@ -113,6 +122,74 @@ export class DatabaseStorage implements IStorage {
       uiConceptsStatus: (s.uiConcepts as any)?.status || "pending",
       thumbnailPreview: (s.previews as any)?.landscape || (s.previews as any)?.portrait || null,
     }));
+  }
+
+  async getStyleSummariesPaginated(limit: number, cursor?: string): Promise<PaginatedStyleSummaries> {
+    const queryLimit = Math.min(limit, 50);
+    
+    let query = db
+      .select({
+        id: styles.id,
+        name: styles.name,
+        description: styles.description,
+        createdAt: styles.createdAt,
+        metadataTags: styles.metadataTags,
+        moodBoard: styles.moodBoard,
+        uiConcepts: styles.uiConcepts,
+        previews: styles.previews,
+      })
+      .from(styles)
+      .orderBy(desc(styles.createdAt))
+      .limit(queryLimit + 1);
+    
+    if (cursor) {
+      const cursorDate = new Date(cursor);
+      query = db
+        .select({
+          id: styles.id,
+          name: styles.name,
+          description: styles.description,
+          createdAt: styles.createdAt,
+          metadataTags: styles.metadataTags,
+          moodBoard: styles.moodBoard,
+          uiConcepts: styles.uiConcepts,
+          previews: styles.previews,
+        })
+        .from(styles)
+        .where(sql`${styles.createdAt} < ${cursorDate}`)
+        .orderBy(desc(styles.createdAt))
+        .limit(queryLimit + 1);
+    }
+    
+    const results = await query;
+    const hasMore = results.length > queryLimit;
+    const items = hasMore ? results.slice(0, queryLimit) : results;
+    
+    const total = await this.getStyleCount();
+    const nextCursor = hasMore && items.length > 0 
+      ? items[items.length - 1].createdAt.toISOString() 
+      : null;
+    
+    return {
+      items: items.map(s => ({
+        id: s.id,
+        name: s.name,
+        description: s.description,
+        createdAt: s.createdAt,
+        metadataTags: s.metadataTags,
+        moodBoardStatus: (s.moodBoard as any)?.status || "pending",
+        uiConceptsStatus: (s.uiConcepts as any)?.status || "pending",
+        thumbnailPreview: (s.previews as any)?.landscape || (s.previews as any)?.portrait || null,
+      })),
+      total,
+      hasMore,
+      nextCursor,
+    };
+  }
+
+  async getStyleCount(): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)::int` }).from(styles);
+    return result[0]?.count ?? 0;
   }
 
   async getStyleById(id: string): Promise<Style | undefined> {
