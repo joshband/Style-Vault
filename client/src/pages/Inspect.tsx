@@ -3,7 +3,7 @@ import { fetchStyleById, type Style } from "@/lib/store";
 import { Layout } from "@/components/layout";
 import { TokenViewer } from "@/components/token-viewer";
 import { CVTokenExplorer } from "@/components/cv-token-explorer";
-import { ArrowLeft, Download, Loader2, ChevronDown, ChevronUp, Eye, Palette, MessageSquare } from "lucide-react";
+import { ArrowLeft, Download, Loader2, ChevronDown, ChevronUp, Eye, Palette, MessageSquare, FlaskConical, AlertTriangle } from "lucide-react";
 import { Link } from "wouter";
 import { useState, useEffect, type ReactNode } from "react";
 import { AiMoodBoard } from "@/components/ai-mood-board";
@@ -249,30 +249,6 @@ export default function Inspect() {
               )}
             </div>
 
-            {/* Collapsible CV Explorer */}
-            {style.referenceImages && style.referenceImages.length > 0 && (
-              <div className="border border-border rounded-lg overflow-hidden">
-                <button
-                  onClick={() => setExplorerExpanded(!explorerExpanded)}
-                  className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
-                  data-testid="toggle-cv-explorer"
-                >
-                  <div className="flex items-center gap-2">
-                    <Eye size={16} className="text-muted-foreground" />
-                    <span className="text-sm font-medium text-foreground">CV Token Explorer</span>
-                  </div>
-                  {explorerExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                </button>
-                {explorerExpanded && (
-                  <div className="p-4 pt-0 border-t border-border animate-in fade-in duration-200">
-                    <CVTokenExplorer 
-                      referenceImage={style.referenceImages?.[0]} 
-                      styleName={style.name}
-                    />
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </section>
 
@@ -327,6 +303,70 @@ export default function Inspect() {
             </div>
           </div>
         </section>
+
+        {/* Section 4: Experimental / Diagnostic (CV Token Explorer) */}
+        {style.referenceImages && style.referenceImages.length > 0 && (
+          <section className="space-y-0 pb-12 border-t border-dashed border-border pt-8">
+            <div className="flex items-start gap-3 mb-6">
+              <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-600">
+                <FlaskConical size={20} />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-serif font-medium text-foreground">Experimental Diagnostics</h2>
+                  <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 bg-amber-500/10 text-amber-700 rounded-full">
+                    Beta
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Developer tools for analyzing reference images
+                </p>
+              </div>
+            </div>
+
+            {/* CV Limitations Warning */}
+            <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/30 rounded-lg mb-6">
+              <AlertTriangle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                  CV extraction is for educational purposes only
+                </p>
+                <p className="text-xs text-amber-700 dark:text-amber-300/80 leading-relaxed">
+                  This tool uses deterministic computer vision heuristics (edge detection, color clustering, gradient analysis) 
+                  to extract design patterns from images. Results are approximate and should not be confused with the 
+                  authoritative AI-extracted tokens above. Use this to understand how classical CV algorithms 
+                  interpret visual elements.
+                </p>
+              </div>
+            </div>
+
+            {/* Collapsible CV Explorer */}
+            <div className="border border-border rounded-lg overflow-hidden bg-muted/30">
+              <button
+                onClick={() => setExplorerExpanded(!explorerExpanded)}
+                className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
+                data-testid="toggle-cv-explorer"
+              >
+                <div className="flex items-center gap-3">
+                  <Eye size={18} className="text-muted-foreground" />
+                  <div className="text-left">
+                    <span className="text-sm font-medium text-foreground block">CV Token Explorer</span>
+                    <span className="text-xs text-muted-foreground">Analyze reference image with computer vision</span>
+                  </div>
+                </div>
+                {explorerExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+              </button>
+              {explorerExpanded && (
+                <div className="p-4 pt-0 border-t border-border animate-in fade-in duration-200">
+                  <CVTokenExplorer 
+                    referenceImage={style.referenceImages?.[0]} 
+                    styleName={style.name}
+                  />
+                </div>
+              )}
+            </div>
+          </section>
+        )}
       </div>
     </Layout>
   );
