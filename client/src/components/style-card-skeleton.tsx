@@ -6,19 +6,24 @@ interface StyleCardSkeletonProps {
 
 export function StyleCardSkeleton({ className }: StyleCardSkeletonProps) {
   return (
-    <div className={cn("flex flex-col bg-card border border-border rounded-lg overflow-hidden", className)}>
-      <div className="aspect-[12/4] bg-muted animate-pulse" />
+    <div className={cn(
+      "flex flex-col bg-card border border-border rounded-lg overflow-hidden",
+      className
+    )}>
+      {/* Image placeholder - matches 16/10 aspect ratio */}
+      <div className="aspect-[16/10] bg-muted animate-pulse" />
+      
+      {/* Content area */}
       <div className="p-4 flex flex-col gap-2">
-        <div className="flex justify-between items-start">
-          <div className="h-6 w-32 bg-muted rounded animate-pulse" />
-          <div className="h-4 w-10 bg-muted rounded animate-pulse" />
-        </div>
+        {/* Title line */}
+        <div className="h-5 w-2/3 bg-muted rounded animate-pulse" />
+        
+        {/* Summary lines */}
         <div className="h-4 w-full bg-muted rounded animate-pulse" />
-        <div className="h-4 w-3/4 bg-muted rounded animate-pulse" />
-        <div className="mt-auto pt-3 flex items-center justify-between">
-          <div className="h-4 w-16 bg-muted rounded animate-pulse" />
-          <div className="h-4 w-12 bg-muted rounded animate-pulse" />
-        </div>
+        <div className="h-4 w-4/5 bg-muted rounded animate-pulse" />
+        
+        {/* Date */}
+        <div className="h-3 w-24 bg-muted rounded animate-pulse mt-1" />
       </div>
     </div>
   );
