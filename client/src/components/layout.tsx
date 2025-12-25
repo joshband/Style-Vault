@@ -1,8 +1,18 @@
 import { Link, useLocation } from "wouter";
-import { Compass, PenTool, Layers, Search, Settings, Menu, X, Eye, Wand2 } from "lucide-react";
+import { Compass, PenTool, Layers, Search, Settings, Menu, X, Eye, Wand2, LogIn, LogOut, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { ActiveJobsIndicator } from "./active-jobs-indicator";
+import { useAuth } from "@/hooks/use-auth";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type AppMode = "explore" | "inspect" | "author" | "generate";
 
@@ -30,6 +40,7 @@ const modeDescriptions: Record<AppMode, string> = {
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { user, isLoading: authLoading, isAuthenticated } = useAuth();
   
   const currentMode = getCurrentMode(location);
 
@@ -139,7 +150,50 @@ export function Layout({ children }: { children: React.ReactNode }) {
               />
             </div>
             
-            <ActiveJobsIndicator className="ml-auto" />
+            <div className="flex items-center gap-3 ml-auto">
+              <ActiveJobsIndicator />
+              
+              {authLoading ? (
+                <div className="w-8 h-8 rounded-full bg-muted animate-pulse" />
+              ) : isAuthenticated && user ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="relative h-8 w-8 rounded-full" data-testid="user-menu-trigger">
+                      <Avatar className="h-8 w-8">
+                        {user.profileImageUrl ? (
+                          <AvatarImage src={user.profileImageUrl} alt={user.firstName || user.email || "User"} />
+                        ) : null}
+                        <AvatarFallback>
+                          {user.firstName?.[0] || user.email?.[0]?.toUpperCase() || <User size={14} />}
+                        </AvatarFallback>
+                      </Avatar>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <div className="px-2 py-1.5">
+                      <p className="text-sm font-medium">
+                        {user.firstName} {user.lastName}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{user.email}</p>
+                    </div>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <a href="/api/logout" className="flex items-center gap-2 cursor-pointer" data-testid="logout-button">
+                        <LogOut size={14} />
+                        Sign out
+                      </a>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <Button variant="outline" size="sm" asChild data-testid="login-button">
+                  <a href="/api/login" className="flex items-center gap-2">
+                    <LogIn size={14} />
+                    <span className="hidden sm:inline">Sign in</span>
+                  </a>
+                </Button>
+              )}
+            </div>
          </header>
 
          <div className="flex-1 p-4 sm:p-6 md:p-8 max-w-7xl mx-auto w-full overflow-auto">
