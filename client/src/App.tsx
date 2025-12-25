@@ -14,6 +14,7 @@ import BatchUpload from "@/pages/BatchUpload";
 import SharedStyle from "@/pages/SharedStyle";
 import SavedStyles from "@/pages/SavedStyles";
 import Remix from "@/pages/Remix";
+import Creator from "@/pages/Creator";
 
 function Router() {
   return (
@@ -26,6 +27,7 @@ function Router() {
       <Route path="/batch" component={BatchUpload} />
       <Route path="/saved" component={SavedStyles} />
       <Route path="/remix" component={Remix} />
+      <Route path="/creator/:creatorId" component={Creator} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -65,6 +65,13 @@ Preferred communication style: Simple, everyday language.
 - **Ratings & Reviews**: 1-5 star ratings with optional review text
   - Endpoints: `GET /api/styles/:id/ratings` (average), `GET /api/styles/:id/my-rating`, `POST /api/styles/:id/rating`
 - **Creator Tracking**: Styles linked to the user who created them via `creatorId`
+  - Creator name displayed on style cards and inspect page as clickable link
+  - `/creator/:creatorId` page shows all styles by a specific creator
+  - Endpoints: `GET /api/creators/:creatorId` (info), `GET /api/creators/:creatorId/styles` (styles)
+- **Public/Private Visibility**: Styles have an `isPublic` field (default: true)
+  - Owners can toggle visibility via button on Inspect page
+  - Private styles only visible to their creator
+  - Endpoint: `PATCH /api/styles/:id/visibility` (owner only)
 - **Protected Routes**: All user-specific endpoints require authentication via `isAuthenticated` middleware
 
 ### AI Integration

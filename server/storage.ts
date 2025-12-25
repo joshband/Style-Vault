@@ -1,4 +1,5 @@
 import { type Style, type InsertStyle, type GeneratedImage, type InsertGeneratedImage, type MoodBoardAssets, type UiConceptAssets, type MetadataTags, type MetadataEnrichmentStatus, type Job, type InsertJob, type JobStatus, type JobType, type Batch, type InsertBatch, type StyleSpec, type ImageAssetType, type Bookmark, type InsertBookmark, type Rating, type InsertRating, styles, generatedImages, jobs, batches, imageAssets, bookmarks, ratings } from "@shared/schema";
+import { users } from "@shared/models/auth";
 import { db } from "./db";
 import { eq, desc, and, or, inArray, sql } from "drizzle-orm";
 
@@ -12,6 +13,9 @@ export interface StyleSummary {
   uiConceptsStatus: string;
   thumbnailPreview: string | null;
   imageIds?: Record<string, string>;
+  creatorId?: string | null;
+  creatorName?: string | null;
+  isPublic?: boolean;
 }
 
 export interface PaginatedStyleSummaries {
@@ -70,6 +74,12 @@ export interface IStorage {
   // Style spec operations
   updateStyleSpec(id: string, spec: StyleSpec): Promise<Style | undefined>;
 
+  // Style visibility and creator operations
+  getStylesByCreator(creatorId: string): Promise<StyleSummary[]>;
+  getPublicStyleSummaries(): Promise<StyleSummary[]>;
+  updateStyleVisibility(id: string, isPublic: boolean): Promise<Style | undefined>;
+  getCreatorInfo(userId: string): Promise<{ id: string; name: string } | undefined>;
+
   // Bookmark operations
   getBookmarksByUser(userId: string): Promise<Bookmark[]>;
   getBookmarkedStyleSummaries(userId: string): Promise<StyleSummary[]>;
@@ -103,8 +113,13 @@ export class DatabaseStorage implements IStorage {
         moodBoard: styles.moodBoard,
         uiConcepts: styles.uiConcepts,
         previews: styles.previews,
+        creatorId: styles.creatorId,
+        isPublic: styles.isPublic,
+        creatorFirstName: users.firstName,
+        creatorLastName: users.lastName,
       })
       .from(styles)
+      .leftJoin(users, eq(styles.creatorId, users.id))
       .orderBy(desc(styles.createdAt));
     
     return allStyles.map(s => ({
@@ -116,6 +131,11 @@ export class DatabaseStorage implements IStorage {
       moodBoardStatus: (s.moodBoard as any)?.status || "pending",
       uiConceptsStatus: (s.uiConcepts as any)?.status || "pending",
       thumbnailPreview: (s.previews as any)?.landscape || (s.previews as any)?.portrait || null,
+      creatorId: s.creatorId,
+      creatorName: s.creatorFirstName && s.creatorLastName 
+        ? `${s.creatorFirstName} ${s.creatorLastName}` 
+        : s.creatorFirstName || null,
+      isPublic: s.isPublic,
     }));
   }
 
@@ -128,6 +148,10 @@ export class DatabaseStorage implements IStorage {
       description: styles.description,
       createdAt: styles.createdAt,
       referenceImages: styles.referenceImages,
+      creatorId: styles.creatorId,
+      isPublic: styles.isPublic,
+      creatorFirstName: users.firstName,
+      creatorLastName: users.lastName,
     };
     
     let results;
@@ -136,6 +160,7 @@ export class DatabaseStorage implements IStorage {
       results = await db
         .select(selectFields)
         .from(styles)
+        .leftJoin(users, eq(styles.creatorId, users.id))
         .where(sql`${styles.createdAt} < ${cursorDate}`)
         .orderBy(desc(styles.createdAt))
         .limit(queryLimit + 1);
@@ -143,6 +168,7 @@ export class DatabaseStorage implements IStorage {
       results = await db
         .select(selectFields)
         .from(styles)
+        .leftJoin(users, eq(styles.creatorId, users.id))
         .orderBy(desc(styles.createdAt))
         .limit(queryLimit + 1);
     }
@@ -168,6 +194,11 @@ export class DatabaseStorage implements IStorage {
           moodBoardStatus: "complete",
           uiConceptsStatus: "complete",
           thumbnailPreview: thumbnail,
+          creatorId: s.creatorId,
+          creatorName: s.creatorFirstName && s.creatorLastName 
+            ? `${s.creatorFirstName} ${s.creatorLastName}` 
+            : s.creatorFirstName || null,
+          isPublic: s.isPublic,
         };
       }),
       total,
@@ -200,6 +231,9 @@ export class DatabaseStorage implements IStorage {
     uiConceptsStatus: string;
     styleSpec: any;
     updatedAt: Date | null;
+    creatorId: string | null;
+    creatorName: string | null;
+    isPublic: boolean;
   } | undefined> {
     const [result] = await db
       .select({
@@ -216,8 +250,13 @@ export class DatabaseStorage implements IStorage {
         uiConcepts: styles.uiConcepts,
         styleSpec: styles.styleSpec,
         updatedAt: styles.updatedAt,
+        creatorId: styles.creatorId,
+        isPublic: styles.isPublic,
+        creatorFirstName: users.firstName,
+        creatorLastName: users.lastName,
       })
       .from(styles)
+      .leftJoin(users, eq(styles.creatorId, users.id))
       .where(eq(styles.id, id));
     
     if (!result) return undefined;
@@ -236,6 +275,11 @@ export class DatabaseStorage implements IStorage {
       uiConceptsStatus: (result.uiConcepts as any)?.status || "pending",
       styleSpec: result.styleSpec,
       updatedAt: result.updatedAt,
+      creatorId: result.creatorId,
+      creatorName: result.creatorFirstName && result.creatorLastName 
+        ? `${result.creatorFirstName} ${result.creatorLastName}` 
+        : result.creatorFirstName || null,
+      isPublic: result.isPublic,
     };
   }
 
@@ -632,6 +676,106 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
+  // Style visibility and creator operations
+  async getStylesByCreator(creatorId: string): Promise<StyleSummary[]> {
+    const creatorStyles = await db
+      .select({
+        id: styles.id,
+        name: styles.name,
+        description: styles.description,
+        createdAt: styles.createdAt,
+        metadataTags: styles.metadataTags,
+        moodBoard: styles.moodBoard,
+        uiConcepts: styles.uiConcepts,
+        previews: styles.previews,
+        creatorId: styles.creatorId,
+        isPublic: styles.isPublic,
+        creatorFirstName: users.firstName,
+        creatorLastName: users.lastName,
+      })
+      .from(styles)
+      .leftJoin(users, eq(styles.creatorId, users.id))
+      .where(eq(styles.creatorId, creatorId))
+      .orderBy(desc(styles.createdAt));
+    
+    return creatorStyles.map(s => ({
+      id: s.id,
+      name: s.name,
+      description: s.description,
+      createdAt: s.createdAt,
+      metadataTags: s.metadataTags,
+      moodBoardStatus: (s.moodBoard as any)?.status || "pending",
+      uiConceptsStatus: (s.uiConcepts as any)?.status || "pending",
+      thumbnailPreview: (s.previews as any)?.landscape || (s.previews as any)?.portrait || null,
+      creatorId: s.creatorId,
+      creatorName: s.creatorFirstName && s.creatorLastName 
+        ? `${s.creatorFirstName} ${s.creatorLastName}` 
+        : s.creatorFirstName || null,
+      isPublic: s.isPublic,
+    }));
+  }
+
+  async getPublicStyleSummaries(): Promise<StyleSummary[]> {
+    const publicStyles = await db
+      .select({
+        id: styles.id,
+        name: styles.name,
+        description: styles.description,
+        createdAt: styles.createdAt,
+        metadataTags: styles.metadataTags,
+        moodBoard: styles.moodBoard,
+        uiConcepts: styles.uiConcepts,
+        previews: styles.previews,
+        creatorId: styles.creatorId,
+        isPublic: styles.isPublic,
+        creatorFirstName: users.firstName,
+        creatorLastName: users.lastName,
+      })
+      .from(styles)
+      .leftJoin(users, eq(styles.creatorId, users.id))
+      .where(eq(styles.isPublic, true))
+      .orderBy(desc(styles.createdAt));
+    
+    return publicStyles.map(s => ({
+      id: s.id,
+      name: s.name,
+      description: s.description,
+      createdAt: s.createdAt,
+      metadataTags: s.metadataTags,
+      moodBoardStatus: (s.moodBoard as any)?.status || "pending",
+      uiConceptsStatus: (s.uiConcepts as any)?.status || "pending",
+      thumbnailPreview: (s.previews as any)?.landscape || (s.previews as any)?.portrait || null,
+      creatorId: s.creatorId,
+      creatorName: s.creatorFirstName && s.creatorLastName 
+        ? `${s.creatorFirstName} ${s.creatorLastName}` 
+        : s.creatorFirstName || null,
+      isPublic: s.isPublic,
+    }));
+  }
+
+  async updateStyleVisibility(id: string, isPublic: boolean): Promise<Style | undefined> {
+    const [updated] = await db
+      .update(styles)
+      .set({ 
+        isPublic,
+        updatedAt: new Date(),
+      })
+      .where(eq(styles.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getCreatorInfo(userId: string): Promise<{ id: string; name: string } | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, userId));
+    if (!user) return undefined;
+    return {
+      id: user.id,
+      name: user.firstName && user.lastName 
+        ? `${user.firstName} ${user.lastName}` 
+        : user.firstName || user.email || "Unknown",
+    };
+  }
+
   // Bookmark operations
   async getBookmarksByUser(userId: string): Promise<Bookmark[]> {
     return db.select().from(bookmarks).where(eq(bookmarks.userId, userId)).orderBy(desc(bookmarks.createdAt));
@@ -648,9 +792,14 @@ export class DatabaseStorage implements IStorage {
         moodBoard: styles.moodBoard,
         uiConcepts: styles.uiConcepts,
         previews: styles.previews,
+        creatorId: styles.creatorId,
+        isPublic: styles.isPublic,
+        creatorFirstName: users.firstName,
+        creatorLastName: users.lastName,
       })
       .from(bookmarks)
       .innerJoin(styles, eq(bookmarks.styleId, styles.id))
+      .leftJoin(users, eq(styles.creatorId, users.id))
       .where(eq(bookmarks.userId, userId))
       .orderBy(desc(bookmarks.createdAt));
 
@@ -663,6 +812,11 @@ export class DatabaseStorage implements IStorage {
       moodBoardStatus: (s.moodBoard as any)?.status || "pending",
       uiConceptsStatus: (s.uiConcepts as any)?.status || "pending",
       thumbnailPreview: (s.previews as any)?.landscape || (s.previews as any)?.portrait || null,
+      creatorId: s.creatorId,
+      creatorName: s.creatorFirstName && s.creatorLastName 
+        ? `${s.creatorFirstName} ${s.creatorLastName}` 
+        : s.creatorFirstName || null,
+      isPublic: s.isPublic,
     }));
   }
 
