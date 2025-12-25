@@ -1,11 +1,10 @@
 import { cn } from "@/lib/utils";
-import { Trash2, AlertCircle, Palette, Loader2 } from "lucide-react";
+import { Trash2, AlertCircle, Palette } from "lucide-react";
 import { Link } from "wouter";
-import { memo, useEffect, useState, useCallback } from "react";
+import { memo, useState, useCallback, useRef } from "react";
 import { trackStyleView } from "@/lib/suggestions";
 import { motion, AnimatePresence } from "framer-motion";
 import { queryClient } from "@/lib/queryClient";
-import { useActiveJobs } from "@/hooks/use-job";
 
 interface StyleSummary {
   id: string;
@@ -29,15 +28,13 @@ const StyleCardComponent = memo(function StyleCard({ style, className, onDelete 
   const [isDragging, setIsDragging] = useState(false);
   const [dragX, setDragX] = useState(0);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const { data: jobs } = useActiveJobs(style.id);
-  
-  const activeJobCount = jobs?.filter(j => j.status === "queued" || j.status === "running").length || 0;
-  
-  useEffect(() => {
-    trackStyleView(style.id);
-  }, [style.id]);
+  const hasTrackedView = useRef(false);
 
   const handlePrefetch = useCallback(() => {
+    if (!hasTrackedView.current) {
+      hasTrackedView.current = true;
+      trackStyleView(style.id);
+    }
     queryClient.prefetchQuery({
       queryKey: ["/api/styles", style.id],
       queryFn: async () => {
@@ -141,17 +138,6 @@ const StyleCardComponent = memo(function StyleCard({ style, className, onDelete 
               ) : (
                 <div className="flex-1 h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted/50">
                   <Palette className="w-10 h-10 text-muted-foreground/20" />
-                </div>
-              )}
-              
-              {/* Active jobs indicator badge */}
-              {activeJobCount > 0 && (
-                <div 
-                  className="absolute top-2 right-2 flex items-center gap-1 px-1.5 py-0.5 bg-primary/90 text-primary-foreground text-[10px] font-medium rounded-full"
-                  title={`${activeJobCount} background task${activeJobCount > 1 ? 's' : ''} running`}
-                >
-                  <Loader2 size={10} className="animate-spin" />
-                  <span>{activeJobCount}</span>
                 </div>
               )}
             </div>
