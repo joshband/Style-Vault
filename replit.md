@@ -31,12 +31,28 @@ Preferred communication style: Simple, everyday language.
 - **API Pattern**: RESTful JSON endpoints under `/api/` prefix
 - **Build Process**: esbuild for server bundling, Vite for client
 
+### Authentication
+- **Provider**: Replit Auth (OpenID Connect)
+- **Location**: `server/replit_integrations/auth/` - Auth module files
+- **Schema**: `shared/models/auth.ts` - Users and sessions tables
+- **Features**:
+  - Sign in with Google, GitHub, X, Apple, or email
+  - Session management via PostgreSQL
+  - User profile with email, name, and profile image
+- **Routes**:
+  - `GET /api/login` - Start login flow
+  - `GET /api/logout` - Sign out
+  - `GET /api/auth/user` - Get current user
+- **Client Hook**: `useAuth()` in `client/src/hooks/use-auth.ts`
+- **UI**: User menu in header with login/logout functionality
+
 ### Data Storage
 - **Database**: PostgreSQL via Drizzle ORM
 - **Schema Location**: `shared/schema.ts` (shared between client and server)
 - **Migrations**: Drizzle Kit with `db:push` command
 - **Key Tables**:
-  - `users` - Basic user accounts
+  - `users` - User accounts (Replit Auth, with email, name, profile image)
+  - `sessions` - Session storage for auth
   - `styles` - Visual style definitions with tokens, previews, and metadata
   - `generatedImages` - Images generated using styles
   - `conversations`/`messages` - Chat history for AI interactions

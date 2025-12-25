@@ -13,6 +13,7 @@ import { sql } from "drizzle-orm";
 import { cache, CACHE_KEYS } from "./cache";
 import type { MetadataTags } from "@shared/schema";
 import { getJobProgress, startJobInBackground } from "./job-runner";
+import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
 
 function getDefaultMetadataTags(): MetadataTags {
   return {
@@ -44,6 +45,10 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // Setup authentication BEFORE other routes
+  await setupAuth(app);
+  registerAuthRoutes(app);
+
   // Health check endpoint for diagnosing database connectivity
   app.get("/api/health", async (req, res) => {
     try {
