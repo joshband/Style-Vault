@@ -4,7 +4,7 @@ import { useLocation, Link } from "wouter";
 import { createStyle, SAMPLE_TOKENS } from "@/lib/store";
 import { useToast } from "@/hooks/use-toast";
 import { useJob, Job } from "@/hooks/use-job";
-import { compressImage, getImageSizeKB } from "@/lib/image-utils";
+import { compressImage, getImageSizeKB, compressPreviews, compressDataUrl } from "@/lib/image-utils";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 
@@ -365,6 +365,8 @@ export default function Author() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const [saveProgress, setSaveProgress] = useState<string>("Preparing...");
+  
   const handleCreateStyle = async () => {
     if (!name.trim()) {
       toast({
@@ -381,11 +383,26 @@ export default function Author() {
     setSaveError(null); // Clear previous errors
 
     try {
+      // Compress images before saving to reduce payload size
+      setSaveProgress("Compressing images...");
+      
+      let compressedReference: string | null = null;
+      if (referenceImage) {
+        compressedReference = await compressDataUrl(referenceImage, 1200, 0.8);
+      }
+      
+      let compressedPreviews = { stillLife: "", landscape: "", portrait: "" };
+      if (generatedPreviews) {
+        compressedPreviews = await compressPreviews(generatedPreviews);
+      }
+      
+      setSaveProgress("Saving to vault...");
+      
       await createStyle({
         name: name.trim(),
         description: description.trim(),
-        referenceImages: referenceImage ? [referenceImage] : [],
-        previews: generatedPreviews || { stillLife: "", landscape: "", portrait: "" },
+        referenceImages: compressedReference ? [compressedReference] : [],
+        previews: compressedPreviews,
         tokens: SAMPLE_TOKENS,
         promptScaffolding: {
           base: description,
@@ -396,8 +413,8 @@ export default function Author() {
       });
 
       toast({
-        title: "Style created successfully",
-        description: `"${name}" has been added to your library`,
+        title: "Style saved successfully",
+        description: `"${name}" has been added to your vault`,
       });
 
       setLocation("/");
@@ -406,12 +423,13 @@ export default function Author() {
       setSaveError(classified);
       
       toast({
-        title: "Creation failed",
+        title: "Save failed",
         description: classified.message,
         variant: "destructive",
       });
     } finally {
       setIsSaving(false);
+      setSaveProgress("Preparing...");
     }
   };
 
@@ -682,15 +700,31 @@ export default function Author() {
 
           {/* Step 2: Review & Commit */}
           {step === 2 && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="text-center space-y-2">
                 <h1 className="text-2xl md:text-3xl font-serif font-medium text-foreground">
                   Review Your Style
                 </h1>
                 <p className="text-muted-foreground text-sm">
-                  Finalize the name and description before creating
+                  Finalize the name and description before saving
                 </p>
               </div>
+
+              {/* Reference Image - Fixed at top */}
+              {referenceImage && (
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Reference Image
+                  </label>
+                  <div className="relative aspect-video max-w-md mx-auto border border-border rounded-xl overflow-hidden bg-muted">
+                    <img
+                      src={referenceImage}
+                      alt="Reference"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Preview Generation Error Alert with Retry */}
               {generateError && (
@@ -846,7 +880,7 @@ export default function Author() {
                   {isSaving ? (
                     <>
                       <Loader2 size={18} className="animate-spin" />
-                      Creating...
+                      {saveProgress}
                     </>
                   ) : isGenerating ? (
                     <>
@@ -855,8 +889,8 @@ export default function Author() {
                     </>
                   ) : (
                     <>
-                      <Wand2 size={18} />
-                      Create Style
+                      <Check size={18} />
+                      Save Style
                     </>
                   )}
                 </button>
