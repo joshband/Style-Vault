@@ -147,15 +147,22 @@ export async function registerRoutes(
   // Get all styles (lightweight summaries for list view)
   app.get("/api/styles", async (req, res) => {
     try {
-      // Check cache first
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+      const cursor = req.query.cursor as string | undefined;
+      
+      if (limit) {
+        const result = await storage.getStyleSummariesPaginated(limit, cursor);
+        res.set('Cache-Control', 'public, max-age=10, stale-while-revalidate=30');
+        return res.json(result);
+      }
+      
       let styles = cache.get<any[]>(CACHE_KEYS.STYLE_SUMMARIES);
       
       if (!styles) {
         styles = await storage.getStyleSummaries();
-        cache.set(CACHE_KEYS.STYLE_SUMMARIES, styles, 30 * 1000); // 30 second TTL
+        cache.set(CACHE_KEYS.STYLE_SUMMARIES, styles, 30 * 1000);
       }
       
-      // Add cache headers for browser/CDN caching
       res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
       res.json(styles);
     } catch (error) {
