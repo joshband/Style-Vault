@@ -24,6 +24,7 @@ interface StyleSummary {
   uiConceptsStatus: string;
   styleSpec: StyleSpec | null;
   updatedAt: string | null;
+  imageIds?: Record<string, string>;
 }
 
 interface StyleAssets {
@@ -209,7 +210,7 @@ export default function Inspect() {
             </p>
           </div>
           
-          {summary.referenceImages && summary.referenceImages.length > 0 && (
+          {(summary.imageIds?.reference || (summary.referenceImages && summary.referenceImages.length > 0)) && (
             <div className="space-y-2">
               <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 Source Reference
@@ -217,22 +218,16 @@ export default function Inspect() {
               <div className="max-w-md">
                 <div className="rounded-lg overflow-hidden border border-border bg-muted/30">
                   <img 
-                    src={summary.referenceImages[0]} 
+                    src={summary.imageIds?.reference 
+                      ? `/api/images/${summary.imageIds.reference}?size=medium`
+                      : summary.referenceImages[0]
+                    } 
                     alt="Source reference" 
                     className="w-full h-auto object-contain"
                     loading="lazy"
                     data-testid="img-reference-main"
                   />
                 </div>
-                {summary.referenceImages.length > 1 && (
-                  <div className="flex gap-2 mt-2">
-                    {summary.referenceImages.slice(1).map((img, i) => (
-                      <div key={i} className="w-16 h-16 rounded-lg overflow-hidden border border-border">
-                        <img src={img} alt={`Reference ${i + 2}`} className="w-full h-full object-cover" loading="lazy" />
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
             </div>
           )}
@@ -310,10 +305,13 @@ export default function Inspect() {
               ) : (
                 <>
                   <div className="col-span-1 sm:col-span-2 aspect-video bg-muted rounded-lg overflow-hidden border border-border relative group">
-                    {previews.landscape ? (
+                    {(summary.imageIds?.preview_landscape || previews.landscape) ? (
                       <>
                         <img 
-                          src={previews.landscape} 
+                          src={summary.imageIds?.preview_landscape 
+                            ? `/api/images/${summary.imageIds.preview_landscape}?size=medium`
+                            : previews.landscape
+                          } 
                           alt="Landscape preview" 
                           className="absolute inset-0 w-full h-full object-cover"
                           loading="lazy"
@@ -329,10 +327,13 @@ export default function Inspect() {
                     )}
                   </div>
                   <div className="aspect-[3/4] bg-muted rounded-lg overflow-hidden border border-border relative">
-                    {previews.portrait ? (
+                    {(summary.imageIds?.preview_portrait || previews.portrait) ? (
                       <>
                         <img 
-                          src={previews.portrait} 
+                          src={summary.imageIds?.preview_portrait
+                            ? `/api/images/${summary.imageIds.preview_portrait}?size=medium`
+                            : previews.portrait
+                          } 
                           alt="Portrait preview" 
                           className="absolute inset-0 w-full h-full object-cover"
                           loading="lazy"
@@ -348,10 +349,13 @@ export default function Inspect() {
                     )}
                   </div>
                   <div className="aspect-square bg-muted rounded-lg overflow-hidden border border-border relative">
-                    {previews.stillLife ? (
+                    {(summary.imageIds?.preview_still_life || previews.stillLife) ? (
                       <>
                         <img 
-                          src={previews.stillLife} 
+                          src={summary.imageIds?.preview_still_life
+                            ? `/api/images/${summary.imageIds.preview_still_life}?size=medium`
+                            : previews.stillLife
+                          } 
                           alt="Still life preview" 
                           className="absolute inset-0 w-full h-full object-cover"
                           loading="lazy"
