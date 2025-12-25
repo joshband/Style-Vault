@@ -1,4 +1,4 @@
-import { type Style, type InsertStyle, type GeneratedImage, type InsertGeneratedImage, type MoodBoardAssets, type UiConceptAssets, type MetadataTags, type MetadataEnrichmentStatus, type Job, type InsertJob, type JobStatus, type JobType, type Batch, type InsertBatch, type StyleSpec, type ImageAssetType, type Bookmark, type InsertBookmark, type Rating, type InsertRating, styles, generatedImages, jobs, batches, imageAssets, bookmarks, ratings } from "@shared/schema";
+import { type Style, type InsertStyle, type GeneratedImage, type InsertGeneratedImage, type MoodBoardAssets, type UiConceptAssets, type MetadataTags, type MetadataEnrichmentStatus, type Job, type InsertJob, type JobStatus, type JobType, type Batch, type InsertBatch, type StyleSpec, type ImageAssetType, type Bookmark, type InsertBookmark, type Rating, type InsertRating, type Collection, type InsertCollection, type CollectionItem, type InsertCollectionItem, styles, generatedImages, jobs, batches, imageAssets, bookmarks, ratings, collections, collectionItems } from "@shared/schema";
 import { users } from "@shared/models/auth";
 import { db } from "./db";
 import { eq, desc, and, or, inArray, sql } from "drizzle-orm";
@@ -94,6 +94,19 @@ export interface IStorage {
   createOrUpdateRating(rating: InsertRating): Promise<Rating>;
   deleteRating(userId: string, styleId: string): Promise<void>;
   getStyleAverageRating(styleId: string): Promise<{ average: number; count: number }>;
+
+  // Collection operations
+  getCollectionsByUser(userId: string): Promise<Collection[]>;
+  getCollectionById(id: string): Promise<Collection | undefined>;
+  createCollection(collection: InsertCollection): Promise<Collection>;
+  updateCollection(id: string, updates: Partial<InsertCollection>): Promise<Collection | undefined>;
+  deleteCollection(id: string): Promise<void>;
+  getCollectionItems(collectionId: string): Promise<CollectionItem[]>;
+  getCollectionStyleSummaries(collectionId: string): Promise<StyleSummary[]>;
+  addStyleToCollection(collectionId: string, styleId: string): Promise<CollectionItem>;
+  removeStyleFromCollection(collectionId: string, styleId: string): Promise<void>;
+  isStyleInCollection(collectionId: string, styleId: string): Promise<boolean>;
+  getCollectionsContainingStyle(userId: string, styleId: string): Promise<Collection[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -891,6 +904,114 @@ export class DatabaseStorage implements IStorage {
       average: Math.round((sum / styleRatings.length) * 10) / 10, 
       count: styleRatings.length 
     };
+  }
+
+  // Collection operations
+  async getCollectionsByUser(userId: string): Promise<Collection[]> {
+    return db.select().from(collections).where(eq(collections.userId, userId)).orderBy(desc(collections.createdAt));
+  }
+
+  async getCollectionById(id: string): Promise<Collection | undefined> {
+    const [collection] = await db.select().from(collections).where(eq(collections.id, id));
+    return collection;
+  }
+
+  async createCollection(collection: InsertCollection): Promise<Collection> {
+    const [created] = await db.insert(collections).values(collection).returning();
+    return created;
+  }
+
+  async updateCollection(id: string, updates: Partial<InsertCollection>): Promise<Collection | undefined> {
+    const [updated] = await db
+      .update(collections)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(collections.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteCollection(id: string): Promise<void> {
+    await db.delete(collectionItems).where(eq(collectionItems.collectionId, id));
+    await db.delete(collections).where(eq(collections.id, id));
+  }
+
+  async getCollectionItems(collectionId: string): Promise<CollectionItem[]> {
+    return db.select().from(collectionItems).where(eq(collectionItems.collectionId, collectionId)).orderBy(desc(collectionItems.addedAt));
+  }
+
+  async getCollectionStyleSummaries(collectionId: string): Promise<StyleSummary[]> {
+    const items = await this.getCollectionItems(collectionId);
+    if (items.length === 0) return [];
+    
+    const styleIds = items.map(i => i.styleId);
+    const collectionStyles = await db
+      .select({
+        id: styles.id,
+        name: styles.name,
+        description: styles.description,
+        createdAt: styles.createdAt,
+        metadataTags: styles.metadataTags,
+        moodBoard: styles.moodBoard,
+        uiConcepts: styles.uiConcepts,
+        previews: styles.previews,
+        creatorId: styles.creatorId,
+        isPublic: styles.isPublic,
+        creatorFirstName: users.firstName,
+        creatorLastName: users.lastName,
+      })
+      .from(styles)
+      .leftJoin(users, eq(styles.creatorId, users.id))
+      .where(inArray(styles.id, styleIds));
+    
+    return collectionStyles.map(s => ({
+      id: s.id,
+      name: s.name,
+      description: s.description,
+      createdAt: s.createdAt,
+      metadataTags: s.metadataTags,
+      moodBoardStatus: (s.moodBoard as MoodBoardAssets)?.status || "pending",
+      uiConceptsStatus: (s.uiConcepts as UiConceptAssets)?.status || "pending",
+      thumbnailPreview: (s.previews as any)?.landscape || null,
+      creatorId: s.creatorId,
+      creatorName: s.creatorFirstName && s.creatorLastName 
+        ? `${s.creatorFirstName} ${s.creatorLastName}` 
+        : s.creatorFirstName || null,
+      isPublic: s.isPublic,
+    }));
+  }
+
+  async addStyleToCollection(collectionId: string, styleId: string): Promise<CollectionItem> {
+    const existing = await this.isStyleInCollection(collectionId, styleId);
+    if (existing) {
+      const [item] = await db.select().from(collectionItems)
+        .where(and(eq(collectionItems.collectionId, collectionId), eq(collectionItems.styleId, styleId)));
+      return item;
+    }
+    const [created] = await db.insert(collectionItems).values({ collectionId, styleId }).returning();
+    return created;
+  }
+
+  async removeStyleFromCollection(collectionId: string, styleId: string): Promise<void> {
+    await db.delete(collectionItems).where(
+      and(eq(collectionItems.collectionId, collectionId), eq(collectionItems.styleId, styleId))
+    );
+  }
+
+  async isStyleInCollection(collectionId: string, styleId: string): Promise<boolean> {
+    const [item] = await db.select().from(collectionItems)
+      .where(and(eq(collectionItems.collectionId, collectionId), eq(collectionItems.styleId, styleId)));
+    return !!item;
+  }
+
+  async getCollectionsContainingStyle(userId: string, styleId: string): Promise<Collection[]> {
+    const userCollections = await this.getCollectionsByUser(userId);
+    const result: Collection[] = [];
+    for (const collection of userCollections) {
+      if (await this.isStyleInCollection(collection.id, styleId)) {
+        result.push(collection);
+      }
+    }
+    return result;
   }
 }
 
