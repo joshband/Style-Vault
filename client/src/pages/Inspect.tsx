@@ -4,7 +4,7 @@ import { Layout } from "@/components/layout";
 import { TokenViewer } from "@/components/token-viewer";
 import { ArrowLeft, Download, Loader2, ChevronDown, ChevronUp, Eye, Palette, MessageSquare, Share2, Check, Copy } from "lucide-react";
 import { Link } from "wouter";
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { AiMoodBoard } from "@/components/ai-mood-board";
 import { ActiveJobsIndicator } from "@/components/active-jobs-indicator";
 
@@ -34,6 +34,33 @@ export default function Inspect() {
   const [style, setStyle] = useState<Style | null>(null);
   const [loading, setLoading] = useState(true);
   const [tokensExpanded, setTokensExpanded] = useState(false);
+  const [shareCode, setShareCode] = useState<string | null>(null);
+  const [shareLoading, setShareLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleShare = useCallback(async () => {
+    if (!id) return;
+    setShareLoading(true);
+    try {
+      const res = await fetch(`/api/styles/${id}/share`, { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        setShareCode(data.shareCode);
+      }
+    } catch (error) {
+      console.error("Failed to generate share code:", error);
+    } finally {
+      setShareLoading(false);
+    }
+  }, [id]);
+
+  const handleCopyLink = useCallback(() => {
+    if (!shareCode) return;
+    const shareUrl = `${window.location.origin}/shared/${shareCode}`;
+    navigator.clipboard.writeText(shareUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [shareCode]);
 
   const refetchStyle = () => {
     if (id) {
@@ -151,15 +178,53 @@ export default function Inspect() {
             </div>
           )}
           
-          <div className="flex items-center gap-4 text-xs text-muted-foreground pt-2">
-            <time dateTime={style.createdAt}>
-              Created {new Date(style.createdAt).toLocaleDateString(undefined, { 
-                month: 'long', 
-                day: 'numeric', 
-                year: 'numeric' 
-              })}
-            </time>
-            <ActiveJobsIndicator styleId={id} />
+          <div className="flex items-center justify-between pt-2">
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+              <time dateTime={style.createdAt}>
+                Created {new Date(style.createdAt).toLocaleDateString(undefined, { 
+                  month: 'long', 
+                  day: 'numeric', 
+                  year: 'numeric' 
+                })}
+              </time>
+              <ActiveJobsIndicator styleId={id} />
+            </div>
+            
+            <div className="flex items-center gap-2">
+              {shareCode ? (
+                <button
+                  onClick={handleCopyLink}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-muted/50 hover:bg-muted transition-colors"
+                  data-testid="button-copy-share-link"
+                >
+                  {copied ? (
+                    <>
+                      <Check size={14} className="text-green-500" />
+                      <span>Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={14} />
+                      <span className="font-mono">{shareCode}</span>
+                    </>
+                  )}
+                </button>
+              ) : (
+                <button
+                  onClick={handleShare}
+                  disabled={shareLoading}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-muted/50 hover:bg-muted transition-colors disabled:opacity-50"
+                  data-testid="button-share-style"
+                >
+                  {shareLoading ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Share2 size={14} />
+                  )}
+                  <span>Share</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
