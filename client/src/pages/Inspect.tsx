@@ -7,6 +7,7 @@ import { ArrowLeft, Download, Loader2, ChevronDown, ChevronUp, Eye, Palette, Mes
 import { Link } from "wouter";
 import { useState, useEffect, type ReactNode } from "react";
 import { AiMoodBoard } from "@/components/ai-mood-board";
+import { ActiveJobsIndicator } from "@/components/active-jobs-indicator";
 
 interface SectionHeaderProps {
   icon: ReactNode;
@@ -103,6 +104,7 @@ export default function Inspect() {
                 year: 'numeric' 
               })}
             </time>
+            <ActiveJobsIndicator styleId={id} />
           </div>
         </div>
 
