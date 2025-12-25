@@ -37,6 +37,7 @@ export interface IStorage {
   getJobById(id: string): Promise<Job | undefined>;
   getJobsByStyleId(styleId: string): Promise<Job[]>;
   getActiveJobs(): Promise<Job[]>;
+  getRecentJobs(limit?: number): Promise<Job[]>;
   updateJobStatus(id: string, status: JobStatus, updates?: {
     progress?: number;
     progressMessage?: string;
@@ -217,6 +218,14 @@ export class DatabaseStorage implements IStorage {
       .from(jobs)
       .where(inArray(jobs.status, ["queued", "running"]))
       .orderBy(desc(jobs.createdAt));
+  }
+
+  async getRecentJobs(limit: number = 50): Promise<Job[]> {
+    return db
+      .select()
+      .from(jobs)
+      .orderBy(desc(jobs.createdAt))
+      .limit(limit);
   }
 
   async updateJobStatus(id: string, status: JobStatus, updates?: {
