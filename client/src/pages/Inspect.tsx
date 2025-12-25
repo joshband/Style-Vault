@@ -4,7 +4,9 @@ import { Layout } from "@/components/layout";
 import { TokenViewer } from "@/components/token-viewer";
 import { ColorPaletteSwatches } from "@/components/color-palette-swatches";
 import { StyleSpecEditor } from "@/components/style-spec-editor";
-import { ArrowLeft, Download, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Palette, MessageSquare, Share2, Check, Copy, Droplets, FileEdit, Bookmark, Star, User } from "lucide-react";
+import { ArrowLeft, Download, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Palette, MessageSquare, Share2, Check, Copy, Droplets, FileEdit, Bookmark, Star, User, FolderPlus, Folder, Plus } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { AiMoodBoard } from "@/components/ai-mood-board";
@@ -99,6 +101,16 @@ export default function Inspect() {
   const [isPublic, setIsPublic] = useState<boolean>(true);
   const [visibilityLoading, setVisibilityLoading] = useState(false);
   
+  // Collection state
+  interface Collection {
+    id: string;
+    name: string;
+    description: string | null;
+  }
+  const [collections, setCollections] = useState<Collection[]>([]);
+  const [styleCollections, setStyleCollections] = useState<Set<string>>(new Set());
+  const [collectionsLoading, setCollectionsLoading] = useState(false);
+  
   // Check if current user is the creator
   const isOwner = isAuthenticated && user?.id === summary?.creatorId;
 
@@ -187,15 +199,17 @@ export default function Inspect() {
     }
   }, [id, isOwner, isPublic]);
 
-  // Load bookmark and rating status
+  // Load bookmark, rating, and collection status
   useEffect(() => {
     if (!id || !isAuthenticated) return;
     
     const loadUserData = async () => {
       try {
-        const [bookmarkRes, ratingRes] = await Promise.all([
+        const [bookmarkRes, ratingRes, collectionsRes, styleCollectionsRes] = await Promise.all([
           fetch(`/api/styles/${id}/bookmark`),
           fetch(`/api/styles/${id}/my-rating`),
+          fetch(`/api/collections`),
+          fetch(`/api/styles/${id}/collections`),
         ]);
         
         if (bookmarkRes.ok) {
@@ -210,6 +224,16 @@ export default function Inspect() {
             setUserReview(data.review || "");
           }
         }
+        
+        if (collectionsRes.ok) {
+          const data = await collectionsRes.json();
+          setCollections(data);
+        }
+        
+        if (styleCollectionsRes.ok) {
+          const data = await styleCollectionsRes.json();
+          setStyleCollections(new Set(data.map((c: Collection) => c.id)));
+        }
       } catch (error) {
         console.error("Failed to load user data:", error);
       }
@@ -217,6 +241,29 @@ export default function Inspect() {
     
     loadUserData();
   }, [id, isAuthenticated]);
+  
+  const handleToggleCollection = useCallback(async (collectionId: string) => {
+    if (!id || !isAuthenticated) return;
+    setCollectionsLoading(true);
+    try {
+      const isInCollection = styleCollections.has(collectionId);
+      if (isInCollection) {
+        await fetch(`/api/collections/${collectionId}/styles/${id}`, { method: "DELETE" });
+        setStyleCollections(prev => {
+          const next = new Set(prev);
+          next.delete(collectionId);
+          return next;
+        });
+      } else {
+        await fetch(`/api/collections/${collectionId}/styles/${id}`, { method: "POST" });
+        setStyleCollections(prev => new Set(prev).add(collectionId));
+      }
+    } catch (error) {
+      console.error("Failed to toggle collection:", error);
+    } finally {
+      setCollectionsLoading(false);
+    }
+  }, [id, isAuthenticated, styleCollections]);
 
   // Load average rating (public)
   useEffect(() => {
@@ -434,6 +481,67 @@ export default function Inspect() {
                   )}
                   <span>{isBookmarked ? "Saved" : "Save"}</span>
                 </button>
+              )}
+              
+              {/* Add to Collection button */}
+              {isAuthenticated && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      disabled={collectionsLoading}
+                      className={`inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors disabled:opacity-50 ${
+                        styleCollections.size > 0
+                          ? "border-blue-500 bg-blue-500/10 text-blue-600 hover:bg-blue-500/20"
+                          : "border-border bg-muted/50 hover:bg-muted"
+                      }`}
+                      data-testid="button-add-to-collection"
+                    >
+                      {collectionsLoading ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <FolderPlus size={14} />
+                      )}
+                      <span>{styleCollections.size > 0 ? `In ${styleCollections.size}` : "Collect"}</span>
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    {collections.length === 0 ? (
+                      <div className="px-2 py-3 text-center">
+                        <p className="text-xs text-muted-foreground mb-2">No collections yet</p>
+                        <Link href="/saved" className="text-xs text-blue-500 hover:underline">
+                          Create your first collection
+                        </Link>
+                      </div>
+                    ) : (
+                      <>
+                        {collections.map((collection) => (
+                          <DropdownMenuItem
+                            key={collection.id}
+                            onClick={() => handleToggleCollection(collection.id)}
+                            className="cursor-pointer"
+                            data-testid={`collection-option-${collection.id}`}
+                          >
+                            <div className="flex items-center gap-2 w-full">
+                              {styleCollections.has(collection.id) ? (
+                                <Check size={14} className="text-green-500" />
+                              ) : (
+                                <Folder size={14} className="text-muted-foreground" />
+                              )}
+                              <span className="flex-1 truncate">{collection.name}</span>
+                            </div>
+                          </DropdownMenuItem>
+                        ))}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem asChild>
+                          <Link href="/saved" className="flex items-center gap-2 cursor-pointer" data-testid="link-manage-collections">
+                            <Plus size={14} />
+                            <span>Manage Collections</span>
+                          </Link>
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
               
               {/* Share button */}
