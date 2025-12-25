@@ -13,7 +13,9 @@ export type JobType =
   | "metadata_enrichment"
   | "mood_board_generation"
   | "ui_concepts_generation"
-  | "batch_style_creation";
+  | "batch_style_creation"
+  | "style_name_repair"
+  | "background_asset_generation";
 
 // Jobs table for tracking async operations with progress
 export const jobs = pgTable("jobs", {
