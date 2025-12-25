@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Upload, Wand2, ArrowRight, ArrowLeft, Loader2, X, Layers, Check, Sparkles } from "lucide-react";
+import { Upload, Wand2, ArrowRight, ArrowLeft, Loader2, X, Layers, Check, Sparkles, AlertCircle, RefreshCw } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { createStyle, SAMPLE_TOKENS } from "@/lib/store";
 import { useToast } from "@/hooks/use-toast";
@@ -8,12 +8,72 @@ import { cn } from "@/lib/utils";
 
 type WizardStep = 1 | 2;
 type InputMode = "image" | "prompt" | null;
+type ErrorType = "ai_unavailable" | "cv_disabled" | "network" | "unknown" | null;
+
+interface AuthorError {
+  type: ErrorType;
+  message: string;
+  canRetry: boolean;
+}
 
 interface TokenSummary {
   colorCount: number;
   hasTypography: boolean;
   hasSpacing: boolean;
   hasShadows: boolean;
+}
+
+// Classify errors into human-readable categories
+function classifyError(error: unknown, context: string): AuthorError {
+  const message = error instanceof Error ? error.message : String(error);
+  const lowerMessage = message.toLowerCase();
+  
+  // AI/Gemini service errors
+  if (lowerMessage.includes("ai service") || 
+      lowerMessage.includes("gemini") ||
+      lowerMessage.includes("model") ||
+      lowerMessage.includes("503") ||
+      lowerMessage.includes("rate limit") ||
+      lowerMessage.includes("quota")) {
+    return {
+      type: "ai_unavailable",
+      message: `AI service is temporarily unavailable. Your ${context} has been preserved - you can retry when the service recovers.`,
+      canRetry: true,
+    };
+  }
+  
+  // CV extraction disabled
+  if (lowerMessage.includes("cv extraction") || 
+      lowerMessage.includes("cv_extraction_enabled") ||
+      lowerMessage.includes("python") ||
+      lowerMessage.includes("opencv")) {
+    return {
+      type: "cv_disabled",
+      message: "Computer vision analysis is not available. Standard AI analysis will be used instead.",
+      canRetry: false,
+    };
+  }
+  
+  // Network errors
+  if (lowerMessage.includes("network") || 
+      lowerMessage.includes("fetch") ||
+      lowerMessage.includes("connection") ||
+      lowerMessage.includes("timeout") ||
+      lowerMessage.includes("econnrefused") ||
+      lowerMessage.includes("failed to fetch")) {
+    return {
+      type: "network",
+      message: `Network connection failed during ${context}. Please check your connection and try again.`,
+      canRetry: true,
+    };
+  }
+  
+  // Unknown errors
+  return {
+    type: "unknown",
+    message: message || `Something went wrong during ${context}. Please try again.`,
+    canRetry: true,
+  };
 }
 
 function getTokenSummary(tokens: any): TokenSummary {
@@ -51,15 +111,25 @@ export default function Author() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Error state - preserved across retries
+  const [analyzeError, setAnalyzeError] = useState<AuthorError | null>(null);
+  const [generateError, setGenerateError] = useState<AuthorError | null>(null);
+  const [saveError, setSaveError] = useState<AuthorError | null>(null);
+
+  // Submission guard - any operation in progress blocks others
+  const isProcessing = isAnalyzing || isGenerating || isSaving;
 
   const hasValidInput = inputMode === "image" ? !!referenceImage : (inputMode === "prompt" && textPrompt.trim().length >= 10);
   const canProceedToStep2 = hasValidInput && !isAnalyzing;
 
   const handleFileSelect = async (file: File) => {
     if (!file.type.startsWith("image/")) return;
+    if (isProcessing) return; // Prevent duplicate submissions
 
     setIsAnalyzing(true);
     setInputMode("image");
+    setAnalyzeError(null); // Clear previous errors
 
     try {
       const compressedDataUrl = await compressImage(file);
@@ -79,13 +149,27 @@ export default function Author() {
           const { styleName, description: desc } = await response.json();
           setName(styleName || "");
           setDescription(desc || "");
+          setAnalyzeError(null);
         } else {
+          // Non-OK response - try to get error details
+          let errorText = "Analysis failed";
+          try {
+            const errorData = await response.json();
+            errorText = errorData.error || errorData.message || errorText;
+          } catch {}
+          
+          const classified = classifyError(new Error(errorText), "image analysis");
+          setAnalyzeError(classified);
           setFallbackFromFile(file.name);
         }
-      } catch {
+      } catch (error) {
+        const classified = classifyError(error, "image analysis");
+        setAnalyzeError(classified);
         setFallbackFromFile(file.name);
       }
-    } catch {
+    } catch (error) {
+      const classified = classifyError(error, "image compression");
+      setAnalyzeError(classified);
       setFallbackFromFile(file.name);
     } finally {
       setIsAnalyzing(false);
@@ -117,9 +201,10 @@ export default function Author() {
   };
 
   const proceedToStep2 = async () => {
-    if (!canProceedToStep2) return;
+    if (!canProceedToStep2 || isProcessing) return; // Prevent duplicate submissions
 
     setIsGenerating(true);
+    setGenerateError(null); // Clear previous errors
 
     try {
       const response = await fetch("/api/generate-previews", {
@@ -139,22 +224,77 @@ export default function Author() {
           landscape: previews.landscape || "",
           portrait: previews.portrait || "",
         });
+        setGenerateError(null);
+        setStep(2);
       } else {
-        setGeneratedPreviews({
-          stillLife: "",
-          landscape: "",
-          portrait: "",
-        });
+        // Non-OK response - try to get error details
+        let errorText = "Preview generation failed";
+        try {
+          const errorData = await response.json();
+          errorText = errorData.error || errorData.message || errorText;
+        } catch {}
+        
+        const classified = classifyError(new Error(errorText), "preview generation");
+        setGenerateError(classified);
+        
+        // Still proceed to step 2 with empty previews if possible
+        setGeneratedPreviews({ stillLife: "", landscape: "", portrait: "" });
+        setStep(2);
       }
-    } catch {
-      setGeneratedPreviews({
-        stillLife: "",
-        landscape: "",
-        portrait: "",
-      });
+    } catch (error) {
+      const classified = classifyError(error, "preview generation");
+      setGenerateError(classified);
+      
+      // Still proceed to step 2 with empty previews
+      setGeneratedPreviews({ stillLife: "", landscape: "", portrait: "" });
+      setStep(2);
     } finally {
       setIsGenerating(false);
-      setStep(2);
+    }
+  };
+  
+  // Retry preview generation from step 2
+  const retryPreviewGeneration = async () => {
+    if (isProcessing) return;
+    
+    setIsGenerating(true);
+    setGenerateError(null);
+
+    try {
+      const response = await fetch("/api/generate-previews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          styleName: name,
+          styleDescription: description,
+          referenceImageBase64: referenceImage,
+        }),
+      });
+
+      if (response.ok) {
+        const { previews } = await response.json();
+        setGeneratedPreviews({
+          stillLife: previews.stillLife || "",
+          landscape: previews.landscape || "",
+          portrait: previews.portrait || "",
+        });
+        setGenerateError(null);
+        toast({
+          title: "Previews generated",
+          description: "Your style previews are now ready",
+        });
+      } else {
+        let errorText = "Preview generation failed";
+        try {
+          const errorData = await response.json();
+          errorText = errorData.error || errorData.message || errorText;
+        } catch {}
+        setGenerateError(classifyError(new Error(errorText), "preview generation"));
+      }
+    } catch (error) {
+      setGenerateError(classifyError(error, "preview generation"));
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -170,6 +310,9 @@ export default function Author() {
     setName("");
     setDescription("");
     setGeneratedPreviews(null);
+    setAnalyzeError(null);
+    setGenerateError(null);
+    setSaveError(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -183,7 +326,11 @@ export default function Author() {
       return;
     }
 
+    if (isProcessing) return; // Prevent duplicate submissions
+
     setIsSaving(true);
+    setSaveError(null); // Clear previous errors
+
     try {
       await createStyle({
         name: name.trim(),
@@ -200,15 +347,18 @@ export default function Author() {
       });
 
       toast({
-        title: "Style created!",
+        title: "Style created successfully",
         description: `"${name}" has been added to your library`,
       });
 
       setLocation("/");
     } catch (error) {
+      const classified = classifyError(error, "saving your style");
+      setSaveError(classified);
+      
       toast({
         title: "Creation failed",
-        description: error instanceof Error ? error.message : "Something went wrong",
+        description: classified.message,
         variant: "destructive",
       });
     } finally {
@@ -330,7 +480,8 @@ export default function Author() {
                     />
                     <button
                       onClick={resetWizard}
-                      className="absolute top-3 right-3 bg-black/60 hover:bg-black/80 text-white p-2 rounded-lg transition-colors"
+                      disabled={isProcessing}
+                      className="absolute top-3 right-3 bg-black/60 hover:bg-black/80 text-white p-2 rounded-lg transition-colors disabled:opacity-50"
                       data-testid="button-remove-image"
                     >
                       <X size={16} />
@@ -344,7 +495,21 @@ export default function Author() {
                       </div>
                     )}
                   </div>
-                  {!isAnalyzing && (
+                  
+                  {/* Analysis Error Alert */}
+                  {analyzeError && !isAnalyzing && (
+                    <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl" data-testid="alert-analyze-error">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-amber-800 dark:text-amber-200">{analyzeError.message}</p>
+                          <p className="text-xs text-muted-foreground mt-1">Using fallback name and description. You can still proceed.</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {!isAnalyzing && !analyzeError && (
                     <div className="text-center">
                       <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-green-500/10 text-green-600 rounded-full text-sm">
                         <Check size={14} />
@@ -386,7 +551,8 @@ export default function Author() {
                   <div className="flex items-center justify-between">
                     <button
                       onClick={resetWizard}
-                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      disabled={isProcessing}
+                      className="text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Use image instead
                     </button>
@@ -454,6 +620,53 @@ export default function Author() {
                   Finalize the name and description before creating
                 </p>
               </div>
+
+              {/* Preview Generation Error Alert with Retry */}
+              {generateError && (
+                <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl" data-testid="alert-generate-error">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Preview generation issue</p>
+                      <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">{generateError.message}</p>
+                      {generateError.canRetry && (
+                        <button
+                          onClick={retryPreviewGeneration}
+                          disabled={isProcessing}
+                          className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-200 bg-amber-500/20 hover:bg-amber-500/30 rounded-lg transition-colors disabled:opacity-50"
+                          data-testid="button-retry-previews"
+                        >
+                          {isProcessing ? (
+                            <>
+                              <Loader2 size={12} className="animate-spin" />
+                              {isGenerating ? "Retrying..." : "Please wait..."}
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCw size={12} />
+                              Retry Preview Generation
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Save Error Alert with Retry */}
+              {saveError && (
+                <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl" data-testid="alert-save-error">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-red-800 dark:text-red-200">Could not create style</p>
+                      <p className="text-sm text-red-700 dark:text-red-300 mt-1">{saveError.message}</p>
+                      <p className="text-xs text-muted-foreground mt-2">Your input has been preserved. You can try again.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Editable Name */}
               <div className="space-y-2">
@@ -541,7 +754,8 @@ export default function Author() {
               <div className="flex gap-3 pt-4">
                 <button
                   onClick={goBackToStep1}
-                  className="flex-1 h-12 border border-border rounded-xl flex items-center justify-center gap-2 text-sm font-medium hover:bg-muted/50 transition-colors"
+                  disabled={isProcessing}
+                  className="flex-1 h-12 border border-border rounded-xl flex items-center justify-center gap-2 text-sm font-medium hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   data-testid="button-back"
                 >
                   <ArrowLeft size={18} />
@@ -549,10 +763,10 @@ export default function Author() {
                 </button>
                 <button
                   onClick={handleCreateStyle}
-                  disabled={!name.trim() || isSaving}
+                  disabled={!name.trim() || isProcessing}
                   className={cn(
                     "flex-[2] h-12 rounded-xl flex items-center justify-center gap-2 text-sm font-medium transition-all",
-                    name.trim()
+                    name.trim() && !isProcessing
                       ? "bg-primary text-primary-foreground hover:opacity-90"
                       : "bg-muted text-muted-foreground cursor-not-allowed"
                   )}
@@ -562,6 +776,11 @@ export default function Author() {
                     <>
                       <Loader2 size={18} className="animate-spin" />
                       Creating...
+                    </>
+                  ) : isGenerating ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Processing...
                     </>
                   ) : (
                     <>
