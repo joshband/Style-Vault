@@ -180,9 +180,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     </div>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
-                      <Link href="/saved" className="flex items-center gap-2 cursor-pointer" data-testid="saved-styles-link">
+                      <Link href="/saved" className="flex items-center gap-2 cursor-pointer" data-testid="library-link">
                         <Bookmark size={14} />
-                        My Saved Styles
+                        My Library
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
