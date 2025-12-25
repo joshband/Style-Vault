@@ -4,7 +4,7 @@ import { Layout } from "@/components/layout";
 import { TokenViewer } from "@/components/token-viewer";
 import { ColorPaletteSwatches } from "@/components/color-palette-swatches";
 import { StyleSpecEditor } from "@/components/style-spec-editor";
-import { ArrowLeft, Download, Loader2, ChevronDown, ChevronUp, Eye, Palette, MessageSquare, Share2, Check, Copy, Droplets, FileEdit, Bookmark, Star } from "lucide-react";
+import { ArrowLeft, Download, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Palette, MessageSquare, Share2, Check, Copy, Droplets, FileEdit, Bookmark, Star, User } from "lucide-react";
 import { Link } from "wouter";
 import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { AiMoodBoard } from "@/components/ai-mood-board";
@@ -26,6 +26,9 @@ interface StyleSummary {
   styleSpec: StyleSpec | null;
   updatedAt: string | null;
   imageIds?: Record<string, string>;
+  creatorId?: string | null;
+  creatorName?: string | null;
+  isPublic?: boolean;
 }
 
 interface StyleAssets {
@@ -91,6 +94,13 @@ export default function Inspect() {
   const [avgRating, setAvgRating] = useState<{ average: number; count: number }>({ average: 0, count: 0 });
   const [ratingLoading, setRatingLoading] = useState(false);
   const [hoveredStar, setHoveredStar] = useState<number>(0);
+  
+  // Visibility state
+  const [isPublic, setIsPublic] = useState<boolean>(true);
+  const [visibilityLoading, setVisibilityLoading] = useState(false);
+  
+  // Check if current user is the creator
+  const isOwner = isAuthenticated && user?.id === summary?.creatorId;
 
   const handleShare = useCallback(async () => {
     if (!id) return;
@@ -158,6 +168,25 @@ export default function Inspect() {
     }
   }, [id, isAuthenticated, userReview]);
 
+  const handleToggleVisibility = useCallback(async () => {
+    if (!id || !isOwner) return;
+    setVisibilityLoading(true);
+    try {
+      const res = await fetch(`/api/styles/${id}/visibility`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isPublic: !isPublic }),
+      });
+      if (res.ok) {
+        setIsPublic(!isPublic);
+      }
+    } catch (error) {
+      console.error("Failed to toggle visibility:", error);
+    } finally {
+      setVisibilityLoading(false);
+    }
+  }, [id, isOwner, isPublic]);
+
   // Load bookmark and rating status
   useEffect(() => {
     if (!id || !isAuthenticated) return;
@@ -217,6 +246,9 @@ export default function Inspect() {
         setSummary(data);
         if (data?.shareCode) {
           setShareCode(data.shareCode);
+        }
+        if (data?.isPublic !== undefined) {
+          setIsPublic(data.isPublic);
         }
       })
       .finally(() => setLoading(false));
@@ -309,10 +341,39 @@ export default function Inspect() {
           </Link>
           
           <div className="space-y-2">
-            <h1 className="text-3xl md:text-4xl font-serif font-medium text-foreground">{summary.name}</h1>
+            <div className="flex items-start justify-between gap-4">
+              <h1 className="text-3xl md:text-4xl font-serif font-medium text-foreground">{summary.name}</h1>
+              {isOwner && (
+                <button
+                  onClick={handleToggleVisibility}
+                  disabled={visibilityLoading}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border border-border hover:bg-muted transition-colors"
+                  data-testid="button-toggle-visibility"
+                >
+                  {visibilityLoading ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : isPublic ? (
+                    <Eye size={14} />
+                  ) : (
+                    <EyeOff size={14} />
+                  )}
+                  <span>{isPublic ? "Public" : "Private"}</span>
+                </button>
+              )}
+            </div>
             <p className="text-muted-foreground text-lg font-light leading-relaxed max-w-2xl">
               {summary.description}
             </p>
+            {summary.creatorName && summary.creatorId && (
+              <Link 
+                href={`/creator/${summary.creatorId}`}
+                className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+                data-testid={`link-creator-${summary.creatorId}`}
+              >
+                <User size={14} />
+                <span>by {summary.creatorName}</span>
+              </Link>
+            )}
           </div>
           
           {(summary.imageIds?.reference || (summary.referenceImages && summary.referenceImages.length > 0)) && (
@@ -464,16 +525,16 @@ export default function Inspect() {
             <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Canonical Previews
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 sm:grid-rows-[auto_auto]">
               {assetsLoading ? (
                 <>
-                  <PreviewSkeleton aspect="col-span-1 sm:col-span-2 aspect-video" />
-                  <PreviewSkeleton aspect="aspect-[3/4]" />
-                  <PreviewSkeleton aspect="aspect-square" />
+                  <PreviewSkeleton aspect="col-span-1 sm:col-span-4 aspect-video" />
+                  <PreviewSkeleton aspect="sm:col-span-2 sm:row-span-2 aspect-[3/4]" />
+                  <PreviewSkeleton aspect="sm:col-span-2 aspect-square" />
                 </>
               ) : (
                 <>
-                  <div className="col-span-1 sm:col-span-2 aspect-video bg-muted rounded-lg overflow-hidden border border-border relative group">
+                  <div className="col-span-1 sm:col-span-4 aspect-video bg-muted rounded-lg overflow-hidden border border-border relative group">
                     {(summary.imageIds?.preview_landscape || previews.landscape) ? (
                       <>
                         <img 
@@ -495,7 +556,7 @@ export default function Inspect() {
                       </div>
                     )}
                   </div>
-                  <div className="aspect-[3/4] bg-muted rounded-lg overflow-hidden border border-border relative">
+                  <div className="sm:col-span-2 sm:row-span-2 aspect-[3/4] bg-muted rounded-lg overflow-hidden border border-border relative">
                     {(summary.imageIds?.preview_portrait || previews.portrait) ? (
                       <>
                         <img 
@@ -517,7 +578,7 @@ export default function Inspect() {
                       </div>
                     )}
                   </div>
-                  <div className="aspect-square bg-muted rounded-lg overflow-hidden border border-border relative">
+                  <div className="sm:col-span-2 h-full bg-muted rounded-lg overflow-hidden border border-border relative">
                     {(summary.imageIds?.preview_still_life || previews.stillLife) ? (
                       <>
                         <img 

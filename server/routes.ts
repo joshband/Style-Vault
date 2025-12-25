@@ -152,6 +152,8 @@ export async function registerRoutes(
   // Get all style summaries (simple list for remix/select UIs)
   app.get("/api/styles/summaries", async (req, res) => {
     try {
+      const userId = (req.user as any)?.claims?.sub;
+      
       let styles = cache.get<any[]>(CACHE_KEYS.STYLE_SUMMARIES);
       
       if (!styles) {
@@ -159,8 +161,13 @@ export async function registerRoutes(
         cache.set(CACHE_KEYS.STYLE_SUMMARIES, styles, 30 * 1000);
       }
       
+      // Filter to show public styles + user's own private styles
+      const visibleStyles = styles.filter((s: any) => 
+        s.isPublic !== false || s.creatorId === userId
+      );
+      
       res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
-      res.json(styles);
+      res.json(visibleStyles);
     } catch (error) {
       console.error("Error fetching style summaries:", error);
       res.status(500).json({
@@ -175,6 +182,7 @@ export async function registerRoutes(
     try {
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
       const cursor = req.query.cursor as string | undefined;
+      const userId = (req.user as any)?.claims?.sub;
       
       if (limit) {
         const result = await storage.getStyleSummariesPaginated(limit, cursor);
@@ -188,8 +196,13 @@ export async function registerRoutes(
           imageIds: imageIdsMap.get(item.id) || {},
         }));
         
+        // Filter to show public styles + user's own private styles
+        const visibleItems = itemsWithImageIds.filter((s: any) => 
+          s.isPublic !== false || s.creatorId === userId
+        );
+        
         res.set('Cache-Control', 'public, max-age=10, stale-while-revalidate=30');
-        return res.json({ ...result, items: itemsWithImageIds });
+        return res.json({ ...result, items: visibleItems });
       }
       
       let styles = cache.get<any[]>(CACHE_KEYS.STYLE_SUMMARIES);
@@ -199,8 +212,13 @@ export async function registerRoutes(
         cache.set(CACHE_KEYS.STYLE_SUMMARIES, styles, 30 * 1000);
       }
       
+      // Filter to show public styles + user's own private styles
+      const visibleStyles = styles.filter((s: any) => 
+        s.isPublic !== false || s.creatorId === userId
+      );
+      
       res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
-      res.json(styles);
+      res.json(visibleStyles);
     } catch (error) {
       console.error("Error fetching styles:", error);
       res.status(500).json({
@@ -757,6 +775,73 @@ export async function registerRoutes(
       res.status(500).json({ 
         error: error instanceof Error ? error.message : "Failed to save remixed style" 
       });
+    }
+  });
+
+  // ========== CREATOR/VISIBILITY ROUTES ==========
+
+  // Get styles by a specific creator
+  app.get("/api/creators/:creatorId/styles", async (req, res) => {
+    try {
+      const { creatorId } = req.params;
+      const userId = (req.user as any)?.claims?.sub;
+      
+      const creatorStyles = await storage.getStylesByCreator(creatorId);
+      
+      // Filter to only show public styles unless the viewer is the creator
+      const visibleStyles = creatorStyles.filter(s => 
+        s.isPublic || s.creatorId === userId
+      );
+      
+      res.json(visibleStyles);
+    } catch (error) {
+      console.error("Error fetching creator styles:", error);
+      res.status(500).json({ error: "Failed to fetch creator styles" });
+    }
+  });
+
+  // Get creator info
+  app.get("/api/creators/:creatorId", async (req, res) => {
+    try {
+      const { creatorId } = req.params;
+      const creatorInfo = await storage.getCreatorInfo(creatorId);
+      
+      if (!creatorInfo) {
+        return res.status(404).json({ error: "Creator not found" });
+      }
+      
+      res.json(creatorInfo);
+    } catch (error) {
+      console.error("Error fetching creator info:", error);
+      res.status(500).json({ error: "Failed to fetch creator info" });
+    }
+  });
+
+  // Update style visibility (requires auth, must be owner)
+  app.patch("/api/styles/:id/visibility", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any)?.claims?.sub;
+      const { id } = req.params;
+      const { isPublic } = req.body;
+      
+      if (typeof isPublic !== "boolean") {
+        return res.status(400).json({ error: "isPublic must be a boolean" });
+      }
+      
+      const style = await storage.getStyleById(id);
+      if (!style) {
+        return res.status(404).json({ error: "Style not found" });
+      }
+      
+      if (style.creatorId !== userId) {
+        return res.status(403).json({ error: "You can only change visibility of your own styles" });
+      }
+      
+      const updated = await storage.updateStyleVisibility(id, isPublic);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating visibility:", error);
+      res.status(500).json({ error: "Failed to update style visibility" });
     }
   });
 

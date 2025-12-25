@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { Trash2, AlertCircle, Palette } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { memo, useState, useCallback, useRef } from "react";
 import { trackStyleView } from "@/lib/suggestions";
 import { motion, AnimatePresence } from "framer-motion";
@@ -17,6 +17,9 @@ interface StyleSummary {
   thumbnailPreview?: string | null;
   imageIds?: Record<string, string>;
   tokens?: any;
+  creatorId?: string | null;
+  creatorName?: string | null;
+  isPublic?: boolean;
 }
 
 interface StyleCardProps {
@@ -30,6 +33,7 @@ const StyleCardComponent = memo(function StyleCard({ style, className, onDelete 
   const [dragX, setDragX] = useState(0);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const hasTrackedView = useRef(false);
+  const [, navigate] = useLocation();
 
   const handlePrefetch = useCallback(() => {
     if (!hasTrackedView.current) {
@@ -159,16 +163,31 @@ const StyleCardComponent = memo(function StyleCard({ style, className, onDelete 
                 {style.description}
               </p>
 
-              <time 
-                dateTime={style.createdAt}
-                className="text-xs text-muted-foreground/70 mt-1"
-              >
-                {new Date(style.createdAt).toLocaleDateString(undefined, { 
-                  month: 'long', 
-                  day: 'numeric',
-                  year: 'numeric'
-                })}
-              </time>
+              <div className="flex items-center justify-between mt-1">
+                <time 
+                  dateTime={style.createdAt}
+                  className="text-xs text-muted-foreground/70"
+                >
+                  {new Date(style.createdAt).toLocaleDateString(undefined, { 
+                    month: 'long', 
+                    day: 'numeric',
+                    year: 'numeric'
+                  })}
+                </time>
+                {style.creatorName && style.creatorId && (
+                  <span
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      navigate(`/creator/${style.creatorId}`);
+                    }}
+                    className="text-xs text-primary hover:underline cursor-pointer"
+                    data-testid={`link-creator-${style.creatorId}`}
+                  >
+                    by {style.creatorName}
+                  </span>
+                )}
+              </div>
             </div>
           </motion.div>
         </Link>

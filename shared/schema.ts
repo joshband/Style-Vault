@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, jsonb, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, jsonb, integer, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -157,6 +157,7 @@ export const styles = pgTable("styles", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at"),
   creatorId: varchar("creator_id"),
+  isPublic: boolean("is_public").default(true).notNull(),
   shareCode: varchar("share_code").unique(),
   styleSpec: jsonb("style_spec").$type<StyleSpec>(),
   referenceImages: jsonb("reference_images").$type<string[]>().default([]),
