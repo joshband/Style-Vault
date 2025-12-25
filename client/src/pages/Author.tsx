@@ -1,10 +1,12 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Upload, Wand2, ArrowRight, ArrowLeft, Loader2, X, Layers, Check, Sparkles, AlertCircle, RefreshCw } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { createStyle, SAMPLE_TOKENS } from "@/lib/store";
 import { useToast } from "@/hooks/use-toast";
+import { useJob, Job } from "@/hooks/use-job";
 import { compressImage, getImageSizeKB } from "@/lib/image-utils";
 import { cn } from "@/lib/utils";
+import { Progress } from "@/components/ui/progress";
 
 type WizardStep = 1 | 2;
 type InputMode = "image" | "prompt" | null;
@@ -117,6 +119,62 @@ export default function Author() {
   const [generateError, setGenerateError] = useState<AuthorError | null>(null);
   const [saveError, setSaveError] = useState<AuthorError | null>(null);
 
+  // Job-based progress tracking
+  const [analysisJobId, setAnalysisJobId] = useState<string | null>(null);
+  const [previewJobId, setPreviewJobId] = useState<string | null>(null);
+  const pendingFileRef = useRef<File | null>(null);
+
+  // Hook into analysis job status
+  const { job: analysisJob } = useJob(analysisJobId, {
+    onSuccess: useCallback((job: Job) => {
+      if (job.output) {
+        setName(job.output.styleName || "");
+        setDescription(job.output.description || "");
+        setAnalyzeError(null);
+      }
+      setIsAnalyzing(false);
+      setAnalysisJobId(null);
+    }, []),
+    onError: useCallback((job: Job) => {
+      const classified = classifyError(new Error(job.error || "Analysis failed"), "image analysis");
+      setAnalyzeError(classified);
+      if (pendingFileRef.current) {
+        setFallbackFromFile(pendingFileRef.current.name);
+      }
+      setIsAnalyzing(false);
+      setAnalysisJobId(null);
+    }, []),
+  });
+
+  // Hook into preview job status
+  const handlePreviewSuccess = useCallback((job: Job) => {
+    if (job.output) {
+      setGeneratedPreviews({
+        stillLife: job.output.stillLife || "",
+        landscape: job.output.landscape || "",
+        portrait: job.output.portrait || "",
+      });
+      setGenerateError(null);
+    }
+    setIsGenerating(false);
+    setPreviewJobId(null);
+    setStep(2);
+  }, []);
+
+  const handlePreviewError = useCallback((job: Job) => {
+    const classified = classifyError(new Error(job.error || "Preview generation failed"), "preview generation");
+    setGenerateError(classified);
+    setGeneratedPreviews({ stillLife: "", landscape: "", portrait: "" });
+    setIsGenerating(false);
+    setPreviewJobId(null);
+    setStep(2);
+  }, []);
+
+  const { job: previewJob } = useJob(previewJobId, {
+    onSuccess: handlePreviewSuccess,
+    onError: handlePreviewError,
+  });
+
   // Submission guard - any operation in progress blocks others
   const isProcessing = isAnalyzing || isGenerating || isSaving;
 
@@ -130,6 +188,7 @@ export default function Author() {
     setIsAnalyzing(true);
     setInputMode("image");
     setAnalyzeError(null); // Clear previous errors
+    pendingFileRef.current = file;
 
     try {
       const compressedDataUrl = await compressImage(file);
@@ -139,17 +198,17 @@ export default function Author() {
       setReferenceImage(compressedDataUrl);
 
       try {
-        const response = await fetch("/api/analyze-image", {
+        // Use job-based endpoint for progress tracking
+        const response = await fetch("/api/jobs/analyze-image", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ imageBase64: compressedDataUrl }),
         });
 
         if (response.ok) {
-          const { styleName, description: desc } = await response.json();
-          setName(styleName || "");
-          setDescription(desc || "");
-          setAnalyzeError(null);
+          const { jobId } = await response.json();
+          setAnalysisJobId(jobId);
+          // Job polling will handle success/error via useJob hook
         } else {
           // Non-OK response - try to get error details
           let errorText = "Analysis failed";
@@ -161,17 +220,18 @@ export default function Author() {
           const classified = classifyError(new Error(errorText), "image analysis");
           setAnalyzeError(classified);
           setFallbackFromFile(file.name);
+          setIsAnalyzing(false);
         }
       } catch (error) {
         const classified = classifyError(error, "image analysis");
         setAnalyzeError(classified);
         setFallbackFromFile(file.name);
+        setIsAnalyzing(false);
       }
     } catch (error) {
       const classified = classifyError(error, "image compression");
       setAnalyzeError(classified);
       setFallbackFromFile(file.name);
-    } finally {
       setIsAnalyzing(false);
     }
   };
@@ -207,7 +267,8 @@ export default function Author() {
     setGenerateError(null); // Clear previous errors
 
     try {
-      const response = await fetch("/api/generate-previews", {
+      // Use job-based endpoint for progress tracking
+      const response = await fetch("/api/jobs/generate-previews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -218,14 +279,9 @@ export default function Author() {
       });
 
       if (response.ok) {
-        const { previews } = await response.json();
-        setGeneratedPreviews({
-          stillLife: previews.stillLife || "",
-          landscape: previews.landscape || "",
-          portrait: previews.portrait || "",
-        });
-        setGenerateError(null);
-        setStep(2);
+        const { jobId } = await response.json();
+        setPreviewJobId(jobId);
+        // Job polling will handle success/error via useJob hook
       } else {
         // Non-OK response - try to get error details
         let errorText = "Preview generation failed";
@@ -239,6 +295,7 @@ export default function Author() {
         
         // Still proceed to step 2 with empty previews if possible
         setGeneratedPreviews({ stillLife: "", landscape: "", portrait: "" });
+        setIsGenerating(false);
         setStep(2);
       }
     } catch (error) {
@@ -247,9 +304,8 @@ export default function Author() {
       
       // Still proceed to step 2 with empty previews
       setGeneratedPreviews({ stillLife: "", landscape: "", portrait: "" });
-      setStep(2);
-    } finally {
       setIsGenerating(false);
+      setStep(2);
     }
   };
   
@@ -261,7 +317,8 @@ export default function Author() {
     setGenerateError(null);
 
     try {
-      const response = await fetch("/api/generate-previews", {
+      // Use job-based endpoint for progress tracking
+      const response = await fetch("/api/jobs/generate-previews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -272,17 +329,9 @@ export default function Author() {
       });
 
       if (response.ok) {
-        const { previews } = await response.json();
-        setGeneratedPreviews({
-          stillLife: previews.stillLife || "",
-          landscape: previews.landscape || "",
-          portrait: previews.portrait || "",
-        });
-        setGenerateError(null);
-        toast({
-          title: "Previews generated",
-          description: "Your style previews are now ready",
-        });
+        const { jobId } = await response.json();
+        setPreviewJobId(jobId);
+        // Job polling will handle success/error via useJob hook
       } else {
         let errorText = "Preview generation failed";
         try {
@@ -290,10 +339,10 @@ export default function Author() {
           errorText = errorData.error || errorData.message || errorText;
         } catch {}
         setGenerateError(classifyError(new Error(errorText), "preview generation"));
+        setIsGenerating(false);
       }
     } catch (error) {
       setGenerateError(classifyError(error, "preview generation"));
-    } finally {
       setIsGenerating(false);
     }
   };
@@ -487,10 +536,20 @@ export default function Author() {
                       <X size={16} />
                     </button>
                     {isAnalyzing && (
-                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                        <div className="flex items-center gap-2 text-white text-sm">
-                          <Loader2 size={18} className="animate-spin" />
-                          Analyzing image...
+                      <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center p-4">
+                        <div className="w-full max-w-xs space-y-3">
+                          <div className="flex items-center justify-center gap-2 text-white text-sm">
+                            <Loader2 size={18} className="animate-spin" />
+                            <span>{analysisJob?.progressMessage || "Analyzing image..."}</span>
+                          </div>
+                          <Progress 
+                            value={analysisJob?.progress || 0} 
+                            className="h-2 bg-white/20" 
+                            data-testid="progress-analysis"
+                          />
+                          <div className="text-center text-xs text-white/70">
+                            {analysisJob?.progress || 0}%
+                          </div>
                         </div>
                       </div>
                     )}
@@ -576,7 +635,7 @@ export default function Author() {
               />
 
               {/* Next Button */}
-              <div className="pt-4">
+              <div className="pt-4 space-y-3">
                 <button
                   onClick={proceedToStep2}
                   disabled={!canProceedToStep2 || isGenerating}
@@ -591,7 +650,7 @@ export default function Author() {
                   {isGenerating ? (
                     <>
                       <Loader2 size={18} className="animate-spin" />
-                      Generating previews...
+                      {previewJob?.progressMessage || "Generating previews..."}
                     </>
                   ) : (
                     <>
@@ -600,8 +659,20 @@ export default function Author() {
                     </>
                   )}
                 </button>
-                {!hasValidInput && inputMode && (
-                  <p className="text-xs text-muted-foreground text-center mt-2">
+                {isGenerating && previewJob && (
+                  <div className="space-y-1">
+                    <Progress 
+                      value={previewJob.progress} 
+                      className="h-2" 
+                      data-testid="progress-preview"
+                    />
+                    <div className="text-center text-xs text-muted-foreground">
+                      {previewJob.progress}%
+                    </div>
+                  </div>
+                )}
+                {!hasValidInput && inputMode && !isGenerating && (
+                  <p className="text-xs text-muted-foreground text-center">
                     {inputMode === "image" ? "Upload an image to continue" : "Enter at least 10 characters"}
                   </p>
                 )}
