@@ -106,7 +106,7 @@ Preferred communication style: Simple, everyday language.
   - Max Retries: 3 attempts
   - Backoff: Exponential (2s × 2^attempt)
   - Polling: 1-2 second intervals
-- **Job Types**: token_extraction, preview_generation, image_generation, mood_board, metadata_enrichment
+- **Job Types**: token_extraction, preview_generation, image_generation, mood_board, metadata_enrichment, style_name_repair, background_asset_generation
 - **Job States**: queued → running → succeeded/failed/canceled
 - **API Endpoints**:
   - `GET /api/jobs/:id` - Get job status with progress
@@ -117,6 +117,28 @@ Preferred communication style: Simple, everyday language.
   - `useJob` hook for status polling (`client/src/hooks/use-job.ts`)
   - `JobProgress` component for UI (`client/src/components/job-progress.tsx`)
   - `ErrorBoundary` for graceful error recovery (`client/src/components/error-boundary.tsx`)
+
+### Background Worker System
+- **Location**: `server/background-worker.ts` - Autonomous asset generation
+- **Startup**: Automatically starts with server, 5-second initial delay
+- **Scheduler Interval**: 60 seconds between cycles
+- **Concurrency**: Max 2 parallel background jobs (p-limit)
+- **Features**:
+  - **Style Name Repair**: Detects styles with UUID-like names and re-analyzes images to generate proper contextual names
+  - **Asset Generation**: Automatically generates mood boards and UI concepts for all styles until complete (1 mood board + 2 UI concepts per style)
+  - **Deduplication**: Checks for active jobs before enqueueing to prevent duplicate work
+  - **Cache Invalidation**: Updates style summaries cache after each successful operation
+- **Detection Logic**:
+  - UUID names: Matches `^[0-9a-f]{8}-...` pattern or `Style from [hex8]` fallback names
+  - Missing assets: No completed mood board OR fewer than 2 UI concepts (audioPlugin, dashboard, componentLibrary)
+
+### Style Sharing
+- **Share Codes**: 6-character alphanumeric codes (excludes I, O, 0, 1 to avoid confusion)
+- **API Endpoints**:
+  - `POST /api/styles/:id/share` - Generate or retrieve share code for a style
+  - `GET /api/shared/:code` - Fetch style by share code (public access)
+- **UI**: Share button on Inspect page with copy-to-clipboard functionality
+- **Public Page**: `/shared/:code` displays style details for external viewing
 
 ### Key Design Decisions
 
