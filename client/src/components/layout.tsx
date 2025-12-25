@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Compass, PenTool, Layers, Search, Settings, Menu, X, Eye, Wand2, LogIn, LogOut, User, Bookmark } from "lucide-react";
+import { Compass, PenTool, Layers, Search, Settings, Menu, X, Eye, Wand2, LogIn, LogOut, User, Bookmark, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { ActiveJobsIndicator } from "./active-jobs-indicator";
@@ -14,12 +14,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-type AppMode = "explore" | "inspect" | "author" | "generate";
+type AppMode = "explore" | "inspect" | "author" | "generate" | "remix";
 
 function getCurrentMode(path: string): AppMode {
   if (path.startsWith("/style/")) return "inspect";
   if (path.startsWith("/generate/")) return "generate";
   if (path === "/create") return "author";
+  if (path === "/remix") return "remix";
   return "explore";
 }
 
@@ -28,6 +29,7 @@ const modeLabels: Record<AppMode, string> = {
   inspect: "Inspect",
   author: "Create",
   generate: "Generate",
+  remix: "Remix",
 };
 
 const modeDescriptions: Record<AppMode, string> = {
@@ -35,6 +37,7 @@ const modeDescriptions: Record<AppMode, string> = {
   inspect: "Analyze style details",
   author: "Create a new style",
   generate: "Generate with a style",
+  remix: "Blend styles together",
 };
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -47,6 +50,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const navItems = [
     { href: "/", label: "Explore", icon: Compass, mode: "explore" as AppMode },
     { href: "/create", label: "Create", icon: PenTool, mode: "author" as AppMode },
+    { href: "/remix", label: "Remix", icon: Sparkles, mode: "remix" as AppMode },
   ];
 
   return (
