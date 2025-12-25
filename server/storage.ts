@@ -191,6 +191,76 @@ export class DatabaseStorage implements IStorage {
     return style;
   }
 
+  async getStyleCoreSummary(id: string): Promise<{
+    id: string;
+    name: string;
+    description: string;
+    createdAt: Date;
+    tokens: any;
+    referenceImages: string[];
+    metadataTags: any;
+    promptScaffolding: any;
+    shareCode: string | null;
+    moodBoardStatus: string;
+    uiConceptsStatus: string;
+    styleSpec: any;
+    updatedAt: Date | null;
+  } | undefined> {
+    const [result] = await db
+      .select({
+        id: styles.id,
+        name: styles.name,
+        description: styles.description,
+        createdAt: styles.createdAt,
+        tokens: styles.tokens,
+        referenceImages: styles.referenceImages,
+        metadataTags: styles.metadataTags,
+        promptScaffolding: styles.promptScaffolding,
+        shareCode: styles.shareCode,
+        moodBoard: styles.moodBoard,
+        uiConcepts: styles.uiConcepts,
+        styleSpec: styles.styleSpec,
+        updatedAt: styles.updatedAt,
+      })
+      .from(styles)
+      .where(eq(styles.id, id));
+    
+    if (!result) return undefined;
+    
+    return {
+      id: result.id,
+      name: result.name,
+      description: result.description,
+      createdAt: result.createdAt,
+      tokens: result.tokens,
+      referenceImages: result.referenceImages as string[],
+      metadataTags: result.metadataTags,
+      promptScaffolding: result.promptScaffolding,
+      shareCode: result.shareCode,
+      moodBoardStatus: (result.moodBoard as any)?.status || "pending",
+      uiConceptsStatus: (result.uiConcepts as any)?.status || "pending",
+      styleSpec: result.styleSpec,
+      updatedAt: result.updatedAt,
+    };
+  }
+
+  async getStyleAssets(id: string): Promise<{
+    previews: any;
+    moodBoard: any;
+    uiConcepts: any;
+  } | undefined> {
+    const [result] = await db
+      .select({
+        previews: styles.previews,
+        moodBoard: styles.moodBoard,
+        uiConcepts: styles.uiConcepts,
+      })
+      .from(styles)
+      .where(eq(styles.id, id));
+    
+    return result;
+  }
+
   async getStyleByShareCode(shareCode: string): Promise<Style | undefined> {
     const [style] = await db.select().from(styles).where(eq(styles.shareCode, shareCode));
     return style;

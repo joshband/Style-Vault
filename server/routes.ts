@@ -205,6 +205,36 @@ export async function registerRoutes(
     }
   });
 
+  // Get lightweight style summary (for fast initial load)
+  app.get("/api/styles/:id/summary", async (req, res) => {
+    try {
+      const summary = await storage.getStyleCoreSummary(req.params.id);
+      if (!summary) {
+        return res.status(404).json({ error: "Style not found" });
+      }
+      res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+      res.json(summary);
+    } catch (error) {
+      console.error("Error fetching style summary:", error);
+      res.status(500).json({ error: "Failed to fetch style summary" });
+    }
+  });
+
+  // Get heavy style assets (previews, mood board, UI concepts)
+  app.get("/api/styles/:id/assets", async (req, res) => {
+    try {
+      const assets = await storage.getStyleAssets(req.params.id);
+      if (!assets) {
+        return res.status(404).json({ error: "Style not found" });
+      }
+      res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
+      res.json(assets);
+    } catch (error) {
+      console.error("Error fetching style assets:", error);
+      res.status(500).json({ error: "Failed to fetch style assets" });
+    }
+  });
+
   // Create a new style
   app.post("/api/styles", async (req, res) => {
     try {
