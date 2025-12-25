@@ -223,6 +223,29 @@ export const insertStyleSchema = createInsertSchema(styles).omit({
 export type InsertStyle = z.infer<typeof insertStyleSchema>;
 export type Style = typeof styles.$inferSelect;
 
+// Image assets table - stores images with size variants for optimized loading
+export type ImageAssetType = "reference" | "preview_portrait" | "preview_landscape" | "preview_still_life" | "mood_board" | "ui_audio_plugin" | "ui_dashboard" | "ui_component_library" | "generated";
+
+export const imageAssets = pgTable("image_assets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  styleId: varchar("style_id"),
+  type: text("type").$type<ImageAssetType>().notNull(),
+  originalWidth: integer("original_width"),
+  originalHeight: integer("original_height"),
+  originalData: text("original_data").notNull(),
+  thumbData: text("thumb_data"),
+  mediumData: text("medium_data"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertImageAssetSchema = createInsertSchema(imageAssets).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertImageAsset = z.infer<typeof insertImageAssetSchema>;
+export type ImageAsset = typeof imageAssets.$inferSelect;
+
 // Generated images table - stores images created using styles (admin only)
 export const generatedImages = pgTable("generated_images", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

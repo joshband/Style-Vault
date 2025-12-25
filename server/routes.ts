@@ -527,6 +527,100 @@ export async function registerRoutes(
     });
   });
 
+  // Image assets API - serve optimized images by ID
+  app.get("/api/images/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const size = (req.query.size as string) || "medium";
+      
+      if (!["thumb", "medium", "full"].includes(size)) {
+        return res.status(400).json({ error: "Invalid size. Use: thumb, medium, or full" });
+      }
+      
+      const { getImage } = await import("./image-service");
+      const image = await getImage(id, size as "thumb" | "medium" | "full");
+      
+      if (!image) {
+        return res.status(404).json({ error: "Image not found" });
+      }
+      
+      // Parse base64 and serve as binary with appropriate cache headers
+      const matches = image.data.match(/^data:([^;]+);base64,(.+)$/);
+      if (matches) {
+        const mimeType = matches[1];
+        const buffer = Buffer.from(matches[2], "base64");
+        
+        res.set({
+          "Content-Type": mimeType,
+          "Cache-Control": "public, max-age=31536000, immutable",
+          "Content-Length": buffer.length.toString(),
+        });
+        return res.send(buffer);
+      }
+      
+      // Fallback: return as JSON if not valid base64
+      res.json(image);
+    } catch (error) {
+      console.error("Error serving image:", error);
+      res.status(500).json({ error: "Failed to serve image" });
+    }
+  });
+
+  // Migrate all existing style images to the new image_assets table
+  app.post("/api/admin/migrate-images", async (req, res) => {
+    try {
+      const { migrateStyleImages } = await import("./image-service");
+      const allStyles = await storage.getStyles();
+      
+      const results: { styleId: string; styleName: string; migrated: number; error?: string }[] = [];
+      
+      for (const style of allStyles) {
+        try {
+          const imageIds = await migrateStyleImages(style.id, {
+            referenceImages: style.referenceImages as string[] | undefined,
+            previews: style.previews as any,
+            moodBoard: style.moodBoard as any,
+            uiConcepts: style.uiConcepts as any,
+          });
+          
+          results.push({
+            styleId: style.id,
+            styleName: style.name,
+            migrated: Object.keys(imageIds).length,
+          });
+        } catch (err) {
+          results.push({
+            styleId: style.id,
+            styleName: style.name,
+            migrated: 0,
+            error: err instanceof Error ? err.message : "Unknown error",
+          });
+        }
+      }
+      
+      const totalMigrated = results.reduce((sum, r) => sum + r.migrated, 0);
+      res.json({
+        message: `Migrated ${totalMigrated} images from ${results.length} styles`,
+        results,
+      });
+    } catch (error) {
+      console.error("Migration error:", error);
+      res.status(500).json({ error: "Migration failed" });
+    }
+  });
+
+  // Get image asset IDs for a style
+  app.get("/api/styles/:id/image-ids", async (req, res) => {
+    try {
+      const { getImagesByStyle } = await import("./image-service");
+      const imageIds = await getImagesByStyle(req.params.id);
+      res.json(imageIds);
+    } catch (error) {
+      console.error("Error getting image IDs:", error);
+      res.status(500).json({ error: "Failed to get image IDs" });
+    }
+  });
+
   // Generate canonical preview images for a style
   app.post("/api/generate-previews", async (req, res) => {
     try {
