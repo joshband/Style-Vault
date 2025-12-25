@@ -4,6 +4,7 @@ import { StyleCardSkeleton } from "@/components/style-card-skeleton";
 import { Layout } from "@/components/layout";
 import { motion, AnimatePresence } from "framer-motion";
 import { RefreshCw, PenTool } from "lucide-react";
+import { useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
@@ -19,6 +20,7 @@ export default function Explore() {
       return response.json();
     },
     staleTime: 60000,
+    refetchOnWindowFocus: true,
     retry: 3,
     retryDelay: (attempt) => Math.min(500 * attempt, 2000),
   });
@@ -32,11 +34,11 @@ export default function Explore() {
     },
   });
 
-  const handleStyleDelete = async (deletedId: string) => {
+  const handleStyleDelete = useCallback((deletedId: string) => {
     deleteMutation.mutate(deletedId);
-  };
+  }, [deleteMutation]);
 
-  const handleRetry = () => refetch();
+  const handleRetry = useCallback(() => refetch(), [refetch]);
 
   if (isLoading) {
     return (
