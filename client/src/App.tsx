@@ -10,7 +10,7 @@ import Explore from "@/pages/Explore";
 import Inspect from "@/pages/Inspect";
 import Author from "@/pages/Author";
 import Generate from "@/pages/Generate";
-import Diagnostics from "@/pages/Diagnostics";
+import BatchUpload from "@/pages/BatchUpload";
 
 function Router() {
   return (
@@ -19,7 +19,7 @@ function Router() {
       <Route path="/style/:id" component={Inspect} />
       <Route path="/create" component={Author} />
       <Route path="/generate/:styleId" component={Generate} />
-      <Route path="/diagnostics" component={Diagnostics} />
+      <Route path="/batch" component={BatchUpload} />
       <Route component={NotFound} />
     </Switch>
   );

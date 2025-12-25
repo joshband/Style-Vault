@@ -834,5 +834,206 @@ export async function registerRoutes(
     }
   });
 
+  // Create a batch of styles from multiple images
+  app.post("/api/batch/create", async (req, res) => {
+    try {
+      const { images } = req.body;
+      
+      if (!Array.isArray(images) || images.length === 0) {
+        return res.status(400).json({ error: "No images provided" });
+      }
+      
+      if (images.length > 10) {
+        return res.status(400).json({ error: "Maximum 10 images per batch" });
+      }
+
+      // Create batch record
+      const batch = await storage.createBatch({
+        status: "running",
+        totalItems: images.length,
+        completedItems: 0,
+        failedItems: 0,
+      });
+
+      // Create individual jobs for each image
+      const jobPromises = images.map(async (img: { id: string; name: string; imageBase64: string }) => {
+        return storage.createJob({
+          type: "batch_style_creation",
+          status: "queued",
+          input: {
+            imageId: img.id,
+            name: img.name,
+            imageBase64: img.imageBase64,
+          },
+          styleId: null,
+          batchId: batch.id,
+          progress: 0,
+        });
+      });
+
+      await Promise.all(jobPromises);
+
+      // Start processing in background
+      processBatchInBackground(batch.id);
+
+      res.json({ batchId: batch.id });
+    } catch (error) {
+      console.error("Error creating batch:", error);
+      res.status(500).json({
+        error: "Failed to create batch",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // Get batch status
+  app.get("/api/batch/:id", async (req, res) => {
+    try {
+      const batch = await storage.getBatchById(req.params.id);
+      if (!batch) {
+        return res.status(404).json({ error: "Batch not found" });
+      }
+
+      const jobs = await storage.getJobsByBatchId(batch.id);
+
+      res.json({
+        ...batch,
+        jobs: jobs.map(j => ({
+          id: j.id,
+          status: j.status,
+          progress: j.progress,
+          progressMessage: j.progressMessage,
+          error: j.error,
+          input: { imageId: (j.input as any)?.imageId, name: (j.input as any)?.name },
+          styleId: (j.output as any)?.styleId || null,
+        })),
+      });
+    } catch (error) {
+      console.error("Error fetching batch:", error);
+      res.status(500).json({
+        error: "Failed to fetch batch",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
   return httpServer;
+}
+
+// Default tokens for batch-created styles (same structure as frontend SAMPLE_TOKENS)
+const DEFAULT_TOKENS = {
+  "color": {
+    "primary": { "$type": "color", "$value": "#2A2A2A", "$description": "Primary color" },
+    "secondary": { "$type": "color", "$value": "#6B5B4D", "$description": "Secondary color" },
+    "accent": { "$type": "color", "$value": "#FF4D4D", "$description": "Accent color" },
+    "background": { "$type": "color", "$value": "#F5F5F5", "$description": "Background color" },
+    "surface": { "$type": "color", "$value": "#FFFFFF", "$description": "Surface color" },
+  },
+  "typography": {
+    "fontFamily": {
+      "serif": { "$type": "fontFamily", "$value": "Lora, Georgia, serif", "$description": "Serif font" },
+      "sans": { "$type": "fontFamily", "$value": "Inter, sans-serif", "$description": "Sans font" },
+    },
+  },
+  "spacing": {
+    "base": { "$type": "dimension", "$value": "16px", "$description": "Base spacing unit" },
+  },
+};
+
+// Background batch processing with throttled concurrency
+async function processBatchInBackground(batchId: string) {
+  const pLimit = (await import("p-limit")).default;
+  const limit = pLimit(3); // Max 3 concurrent Gemini calls
+  
+  try {
+    const jobs = await storage.getJobsByBatchId(batchId);
+    
+    const processJob = async (job: any) => {
+      try {
+        await storage.updateJobStatus(job.id, "running", {
+          progress: 10,
+          progressMessage: "Analyzing image...",
+        });
+
+        const input = job.input as { imageId: string; name: string; imageBase64: string };
+        
+        // Analyze image - gets styleName, description, and metadataTags
+        const analysis = await analyzeImageForStyle(input.imageBase64);
+        
+        await storage.updateJobStatus(job.id, "running", {
+          progress: 40,
+          progressMessage: "Generating previews...",
+        });
+
+        // Generate previews using analysis results
+        const previews = await generateCanonicalPreviews({
+          styleName: analysis.styleName,
+          styleDescription: analysis.description,
+          referenceImageBase64: input.imageBase64,
+        });
+
+        await storage.updateJobStatus(job.id, "running", {
+          progress: 70,
+          progressMessage: "Creating style...",
+        });
+
+        // Create style with default tokens (similar to Author page approach)
+        const style = await storage.createStyle({
+          name: input.name || analysis.styleName || `Style from ${input.imageId.substring(0, 8)}`,
+          description: analysis.description,
+          referenceImages: [input.imageBase64],
+          previews: {
+            portrait: previews.portrait || "",
+            landscape: previews.landscape || "",
+            stillLife: previews.stillLife || "",
+          },
+          tokens: DEFAULT_TOKENS,
+          promptScaffolding: {
+            base: analysis.description,
+            modifiers: ["auto-generated", "batch-upload"],
+            negative: "blurry, low quality, distorted",
+          },
+          metadataTags: getDefaultMetadataTags(),
+          metadataEnrichmentStatus: "pending",
+          moodBoard: { status: "pending", history: [] },
+          uiConcepts: { status: "pending", history: [] },
+        });
+
+        // Queue for enrichment
+        queueStyleForEnrichment(style.id);
+
+        await storage.updateJobStatus(job.id, "succeeded", {
+          progress: 100,
+          progressMessage: "Complete",
+          output: { styleId: style.id },
+        });
+
+        return { success: true, styleId: style.id };
+      } catch (error) {
+        console.error(`Batch job ${job.id} failed:`, error);
+        await storage.updateJobStatus(job.id, "failed", {
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
+        return { success: false };
+      }
+    };
+
+    // Process all jobs with concurrency limit
+    const results = await Promise.all(
+      jobs.map(job => limit(() => processJob(job)))
+    );
+
+    // Update batch status
+    const completed = results.filter(r => r.success).length;
+    const failed = results.filter(r => !r.success).length;
+    
+    await storage.updateBatchProgress(batchId, completed, failed);
+    
+    // Invalidate cache
+    cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
+    
+  } catch (error) {
+    console.error("Batch processing failed:", error);
+    await storage.updateBatchStatus(batchId, "failed");
+  }
 }

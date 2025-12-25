@@ -12,7 +12,8 @@ export type JobType =
   | "cv_extraction" 
   | "metadata_enrichment"
   | "mood_board_generation"
-  | "ui_concepts_generation";
+  | "ui_concepts_generation"
+  | "batch_style_creation";
 
 // Jobs table for tracking async operations with progress
 export const jobs = pgTable("jobs", {
@@ -30,7 +31,27 @@ export const jobs = pgTable("jobs", {
   startedAt: timestamp("started_at"),
   completedAt: timestamp("completed_at"),
   styleId: varchar("style_id"),
+  batchId: varchar("batch_id"),
 });
+
+// Batches table for tracking batch operations
+export const batches = pgTable("batches", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  status: text("status").$type<JobStatus>().default("queued").notNull(),
+  totalItems: integer("total_items").default(0).notNull(),
+  completedItems: integer("completed_items").default(0).notNull(),
+  failedItems: integer("failed_items").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const insertBatchSchema = createInsertSchema(batches).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertBatch = z.infer<typeof insertBatchSchema>;
+export type Batch = typeof batches.$inferSelect;
 
 export const insertJobSchema = createInsertSchema(jobs).omit({
   id: true,

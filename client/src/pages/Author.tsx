@@ -509,29 +509,42 @@ export default function Author() {
 
               {/* Input Options */}
               {!inputMode && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Upload Image Option */}
-                  <div
-                    onDragOver={handleDragOver}
-                    onDrop={handleDrop}
-                    onClick={() => fileInputRef.current?.click()}
-                    className="aspect-square border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center text-muted-foreground hover:bg-muted/50 hover:border-primary/50 transition-all cursor-pointer p-6"
-                    data-testid="dropzone-image"
-                  >
-                    <Upload size={40} className="mb-4 opacity-50" />
-                    <span className="text-sm font-medium text-center">Upload Reference Image</span>
-                    <span className="text-xs mt-2 opacity-60 text-center">Drag & drop or click to browse</span>
-                  </div>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Upload Image Option */}
+                    <div
+                      onDragOver={handleDragOver}
+                      onDrop={handleDrop}
+                      onClick={() => fileInputRef.current?.click()}
+                      className="aspect-square border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center text-muted-foreground hover:bg-muted/50 hover:border-primary/50 transition-all cursor-pointer p-6"
+                      data-testid="dropzone-image"
+                    >
+                      <Upload size={40} className="mb-4 opacity-50" />
+                      <span className="text-sm font-medium text-center">Upload Reference Image</span>
+                      <span className="text-xs mt-2 opacity-60 text-center">Drag & drop or click to browse</span>
+                    </div>
 
-                  {/* Text Prompt Option */}
-                  <div
-                    onClick={() => setInputMode("prompt")}
-                    className="aspect-square border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center text-muted-foreground hover:bg-muted/50 hover:border-primary/50 transition-all cursor-pointer p-6"
-                    data-testid="option-prompt"
-                  >
-                    <Sparkles size={40} className="mb-4 opacity-50" />
-                    <span className="text-sm font-medium text-center">Describe with Words</span>
-                    <span className="text-xs mt-2 opacity-60 text-center">Enter a text description</span>
+                    {/* Text Prompt Option */}
+                    <div
+                      onClick={() => setInputMode("prompt")}
+                      className="aspect-square border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center text-muted-foreground hover:bg-muted/50 hover:border-primary/50 transition-all cursor-pointer p-6"
+                      data-testid="option-prompt"
+                    >
+                      <Sparkles size={40} className="mb-4 opacity-50" />
+                      <span className="text-sm font-medium text-center">Describe with Words</span>
+                      <span className="text-xs mt-2 opacity-60 text-center">Enter a text description</span>
+                    </div>
+                  </div>
+                  
+                  {/* Batch upload link */}
+                  <div className="text-center">
+                    <Link 
+                      href="/batch" 
+                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      data-testid="link-batch-upload"
+                    >
+                      Have multiple images? <span className="underline">Try batch upload</span>
+                    </Link>
                   </div>
                 </div>
               )}
