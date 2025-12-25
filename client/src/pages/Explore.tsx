@@ -16,7 +16,7 @@ interface PaginatedResponse {
   nextCursor: string | null;
 }
 
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 6;
 
 export default function Explore() {
   const queryClient = useQueryClient();
