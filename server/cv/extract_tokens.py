@@ -577,10 +577,11 @@ def extract_colors(img, k=12):
     Extract dominant perceptual colors with harmony, contrast, and temperature analysis.
 
     Strategy:
-    - Downscale
-    - K-means clustering in RGB
-    - Convert to OKLCH
-    - Deduplicate by Delta-E
+    - Downscale for speed
+    - K-means clustering in RGB with weighted importance
+    - Convert to OKLCH for perceptual accuracy
+    - Deduplicate by Delta-E distance
+    - Balance palette across luminance ranges
     - Analyze harmony relationships
     - Calculate WCAG contrast ratios
     - Determine color temperature
@@ -592,25 +593,66 @@ def extract_colors(img, k=12):
         pixels,
         k,
         None,
-        (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0),
-        3,
+        (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 20, 0.5),
+        5,
         cv2.KMEANS_PP_CENTERS
     )
 
     counts = np.bincount(labels.flatten())
-    ranked = centers[np.argsort(-counts)]
-
-    colors = []
-    for c in ranked:
-        col = Color(f"rgb({int(c[2])},{int(c[1])},{int(c[0])})").convert("oklch")
-        colors.append(col)
-
-    unique = []
-    for c in colors:
-        if not any(c.delta_e(u) < 3 for u in unique):
-            unique.append(c)
+    total_pixels = np.sum(counts)
     
-    unique_8 = unique[:8]
+    cluster_data = []
+    for idx in range(len(centers)):
+        c = centers[idx]
+        weight = counts[idx] / total_pixels
+        col = Color(f"rgb({int(c[2])},{int(c[1])},{int(c[0])})").convert("oklch")
+        cluster_data.append({
+            'color': col,
+            'weight': weight,
+            'luminance': col['l']
+        })
+    
+    cluster_data.sort(key=lambda x: -x['weight'])
+    
+    unique = []
+    delta_threshold = 4
+    for cd in cluster_data:
+        c = cd['color']
+        is_unique = True
+        for existing in unique:
+            if c.delta_e(existing['color']) < delta_threshold:
+                is_unique = False
+                break
+        if is_unique:
+            unique.append(cd)
+    
+    dark = [c for c in unique if c['luminance'] < 0.35]
+    mid = [c for c in unique if 0.35 <= c['luminance'] < 0.7]
+    light = [c for c in unique if c['luminance'] >= 0.7]
+    
+    balanced = []
+    dark.sort(key=lambda x: -x['weight'])
+    mid.sort(key=lambda x: -x['weight'])
+    light.sort(key=lambda x: -x['weight'])
+    
+    balanced.extend(dark[:3])
+    balanced.extend(mid[:3])
+    balanced.extend(light[:2])
+    
+    if len(balanced) < 8:
+        remaining = [c for c in unique if c not in balanced]
+        remaining.sort(key=lambda x: -x['weight'])
+        balanced.extend(remaining[:8 - len(balanced)])
+    
+    if len(balanced) < 8 and len(cluster_data) > 0:
+        for cd in cluster_data:
+            if cd not in balanced:
+                balanced.append(cd)
+            if len(balanced) >= 8:
+                break
+    
+    balanced.sort(key=lambda x: -x['weight'])
+    unique_8 = [c['color'] for c in balanced[:min(8, len(balanced))]]
     
     harmony = analyze_color_harmony(unique_8)
     contrasts = analyze_contrast_pairs(unique_8)
@@ -1008,17 +1050,19 @@ def extract_colors_with_debug(img, k=12):
     """
     Extract colors with intermediate visualizations for walkthrough.
     Includes harmony analysis, WCAG contrast ratios, and temperature classification.
+    Uses improved weighted balancing algorithm for better palette accuracy.
     """
     img_small = resize_for_speed(img)
     pixels = img_small.reshape(-1, 3).astype(np.float32)
 
     _, labels, centers = cv2.kmeans(
         pixels, k, None,
-        (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0),
-        3, cv2.KMEANS_PP_CENTERS
+        (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 20, 0.5),
+        5, cv2.KMEANS_PP_CENTERS
     )
 
     counts = np.bincount(labels.flatten())
+    total_pixels = np.sum(counts)
     ranked = centers[np.argsort(-counts)]
     
     cluster_map = labels.reshape(img_small.shape[:2])
@@ -1026,23 +1070,65 @@ def extract_colors_with_debug(img, k=12):
     for i in range(k):
         cluster_vis[cluster_map == i] = ranked[min(i, len(ranked)-1)]
     
-    colors_rgb = [(int(c[2]), int(c[1]), int(c[0])) for c in ranked[:8]]
+    cluster_data = []
+    for idx in range(len(centers)):
+        c = centers[idx]
+        weight = counts[idx] / total_pixels
+        col = Color(f"rgb({int(c[2])},{int(c[1])},{int(c[0])})").convert("oklch")
+        cluster_data.append({
+            'color': col,
+            'weight': weight,
+            'luminance': col['l'],
+            'rgb': (int(c[2]), int(c[1]), int(c[0]))
+        })
+    
+    cluster_data.sort(key=lambda x: -x['weight'])
+    
+    unique = []
+    delta_threshold = 4
+    for cd in cluster_data:
+        c = cd['color']
+        is_unique = True
+        for existing in unique:
+            if c.delta_e(existing['color']) < delta_threshold:
+                is_unique = False
+                break
+        if is_unique:
+            unique.append(cd)
+    
+    dark = [c for c in unique if c['luminance'] < 0.35]
+    mid = [c for c in unique if 0.35 <= c['luminance'] < 0.7]
+    light = [c for c in unique if c['luminance'] >= 0.7]
+    
+    balanced = []
+    dark.sort(key=lambda x: -x['weight'])
+    mid.sort(key=lambda x: -x['weight'])
+    light.sort(key=lambda x: -x['weight'])
+    
+    balanced.extend(dark[:3])
+    balanced.extend(mid[:3])
+    balanced.extend(light[:2])
+    
+    if len(balanced) < 8:
+        remaining = [c for c in unique if c not in balanced]
+        remaining.sort(key=lambda x: -x['weight'])
+        balanced.extend(remaining[:8 - len(balanced)])
+    
+    if len(balanced) < 8 and len(cluster_data) > 0:
+        for cd in cluster_data:
+            if cd not in balanced:
+                balanced.append(cd)
+            if len(balanced) >= 8:
+                break
+    
+    balanced.sort(key=lambda x: -x['weight'])
+    palette_colors = balanced[:min(8, len(balanced))]
+    unique_8 = [c['color'] for c in palette_colors]
+    
     palette_bar = create_color_palette_visual(
-        [(c[2], c[1], c[0]) for c in ranked[:8]],  
+        [(c['rgb'][2], c['rgb'][1], c['rgb'][0]) for c in palette_colors],  
         img_small.shape
     )
-
-    colors = []
-    for c in ranked:
-        col = Color(f"rgb({int(c[2])},{int(c[1])},{int(c[0])})").convert("oklch")
-        colors.append(col)
-
-    unique = []
-    for c in colors:
-        if not any(c.delta_e(u) < 3 for u in unique):
-            unique.append(c)
-    
-    unique_8 = unique[:8]
     
     harmony = analyze_color_harmony(unique_8)
     contrasts = analyze_contrast_pairs(unique_8)
@@ -1073,17 +1159,18 @@ def extract_colors_with_debug(img, k=12):
         "debug": {
             "visuals": [
                 {"label": "Color Clusters", "description": "Image recolored using only the detected color clusters", "image": encode_image_base64(cluster_vis)},
-                {"label": "Extracted Palette", "description": "The final color palette after deduplication", "image": encode_image_base64(palette_bar)},
+                {"label": "Extracted Palette", "description": "The final color palette after luminance-balanced deduplication", "image": encode_image_base64(palette_bar)},
                 {"label": "Harmony Wheel", "description": f"Color positions on the wheel - {harmony['type']} harmony detected", "image": encode_image_base64(harmony_wheel)},
                 {"label": "Contrast Matrix", "description": f"WCAG contrast ratios - {contrasts['summary']['aaPassCount']}/{contrasts['summary']['totalPairs']} pairs pass AA", "image": encode_image_base64(contrast_matrix)},
             ],
             "steps": [
                 "We shrink the image to speed up processing",
-                "K-means clustering groups similar pixels into color families",
-                "We count how often each color appears and rank by popularity",
+                "K-means clustering (20 iterations) groups similar pixels into color families",
+                "We count how often each color appears and weight by pixel coverage",
                 "Colors are converted to OKLCH (a perceptual color space)",
-                "Very similar colors (Delta-E < 3) are merged to avoid duplicates",
-                "The top 8 unique colors become your palette",
+                "Very similar colors (Delta-E < 4) are merged to avoid duplicates",
+                "Colors are balanced across luminance ranges (dark/mid/light) for variety",
+                "The top 8 balanced colors become your palette",
                 f"HARMONY: Hue angles are analyzed - detected '{harmony['type']}' with {harmony['strength']*100:.0f}% strength",
                 f"CONTRAST: All {contrasts['summary']['totalPairs']} color pairs checked for WCAG compliance",
                 f"TEMPERATURE: Palette is '{temperature['temperature']}' (warm ratio: {temperature['warmRatio']*100:.0f}%)"
