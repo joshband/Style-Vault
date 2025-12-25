@@ -70,7 +70,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <div className="w-8 h-8 bg-foreground text-background flex items-center justify-center rounded-sm flex-shrink-0">
                 <Layers size={18} />
               </div>
-              <span className="font-serif font-bold text-lg tracking-tight hidden sm:inline">Design Token Style Explorer</span>
+              <span className="font-serif font-bold text-lg tracking-tight hidden sm:inline">Visual DNA</span>
             </div>
             <button 
               onClick={() => setSidebarOpen(false)}

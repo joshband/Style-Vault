@@ -441,7 +441,7 @@ export default function Author() {
       <header className="h-14 border-b border-border flex items-center justify-between px-4 md:px-8 bg-background/95 backdrop-blur-sm sticky top-0 z-20">
         <Link href="/" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
           <Layers size={20} />
-          <span className="font-serif font-medium text-sm">Style Explorer</span>
+          <span className="font-serif font-medium text-sm">Visual DNA</span>
         </Link>
         <Link 
           href="/" 
