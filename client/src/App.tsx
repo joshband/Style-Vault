@@ -10,6 +10,7 @@ import Explore from "@/pages/Explore";
 import Inspect from "@/pages/Inspect";
 import Author from "@/pages/Author";
 import Generate from "@/pages/Generate";
+import Diagnostics from "@/pages/Diagnostics";
 
 function Router() {
   return (
@@ -18,6 +19,7 @@ function Router() {
       <Route path="/style/:id" component={Inspect} />
       <Route path="/create" component={Author} />
       <Route path="/generate/:styleId" component={Generate} />
+      <Route path="/diagnostics" component={Diagnostics} />
       <Route component={NotFound} />
     </Switch>
   );

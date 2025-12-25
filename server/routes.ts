@@ -73,6 +73,77 @@ export async function registerRoutes(
     }
   });
 
+  // Diagnostics endpoint for operators - aggregates system health info
+  app.get("/api/diagnostics", async (req, res) => {
+    try {
+      // Health check
+      let health: any = { status: "unknown" };
+      try {
+        const startTime = Date.now();
+        await db.execute(sql`SELECT 1`);
+        const dbLatency = Date.now() - startTime;
+        const styles = await storage.getStyleSummaries();
+        health = {
+          status: "healthy",
+          database: "connected",
+          dbLatencyMs: dbLatency,
+          styleCount: styles.length,
+        };
+      } catch (error) {
+        health = {
+          status: "unhealthy",
+          database: "disconnected",
+          error: error instanceof Error ? error.message : "Unknown error",
+        };
+      }
+
+      // CV extraction status
+      const cvEnabled = isCVExtractionEnabled();
+
+      // Job queue stats - get recent jobs (all statuses) for diagnostics
+      const recentJobs = await storage.getRecentJobs(100);
+      const activeJobs = recentJobs.filter(j => j.status === "queued" || j.status === "running");
+      const jobStats = {
+        queued: recentJobs.filter(j => j.status === "queued").length,
+        running: recentJobs.filter(j => j.status === "running").length,
+        failed: recentJobs.filter(j => j.status === "failed").length,
+        succeeded: recentJobs.filter(j => j.status === "succeeded").length,
+        canceled: recentJobs.filter(j => j.status === "canceled").length,
+        queueDepth: activeJobs.length,
+        totalRecent: recentJobs.length,
+        jobs: recentJobs.map(j => ({
+          id: j.id,
+          type: j.type,
+          status: j.status,
+          progress: j.progress,
+          progressMessage: j.progressMessage,
+          error: j.error,
+          retryCount: j.retryCount,
+          maxRetries: j.maxRetries,
+          createdAt: j.createdAt,
+          completedAt: j.completedAt,
+          styleId: j.styleId,
+        })),
+      };
+
+      res.json({
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || "unknown",
+        health,
+        cvExtraction: {
+          enabled: cvEnabled,
+        },
+        jobs: jobStats,
+      });
+    } catch (error) {
+      console.error("Diagnostics error:", error);
+      res.status(500).json({
+        error: "Failed to gather diagnostics",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
   // Get all styles (lightweight summaries for list view)
   app.get("/api/styles", async (req, res) => {
     try {
