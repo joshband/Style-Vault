@@ -8,10 +8,13 @@ const ai = new GoogleGenAI({
   },
 });
 
+type ProgressCallback = (progress: number, message: string) => Promise<void>;
+
 interface PreviewGenerationRequest {
   styleName: string;
   styleDescription: string;
   referenceImageBase64?: string;
+  onProgress?: ProgressCallback;
 }
 
 interface PreviewImage {
@@ -120,7 +123,7 @@ The image should clearly demonstrate this style's ${characteristics[type]}. Keep
 export async function generateCanonicalPreviews(
   request: PreviewGenerationRequest
 ): Promise<PreviewImage> {
-  const { styleName, styleDescription } = request;
+  const { styleName, styleDescription, onProgress } = request;
 
   const result: PreviewImage = {
     portrait: generateStyledPlaceholder(384, 512, styleName, "portrait"),
@@ -129,16 +132,33 @@ export async function generateCanonicalPreviews(
   };
 
   try {
-    // Generate all 3 previews in parallel for ~3x speedup
-    const [portraitImage, landscapeImage, stillLifeImage] = await Promise.all([
-      generateSinglePreview(styleName, styleDescription, "portrait"),
-      generateSinglePreview(styleName, styleDescription, "landscape"),
-      generateSinglePreview(styleName, styleDescription, "stillLife"),
-    ]);
+    // If progress callback provided, generate sequentially with updates
+    if (onProgress) {
+      await onProgress(5, "Generating portrait preview...");
+      const portraitImage = await generateSinglePreview(styleName, styleDescription, "portrait");
+      if (portraitImage) result.portrait = portraitImage;
+      
+      await onProgress(35, "Generating landscape preview...");
+      const landscapeImage = await generateSinglePreview(styleName, styleDescription, "landscape");
+      if (landscapeImage) result.landscape = landscapeImage;
+      
+      await onProgress(65, "Generating still-life preview...");
+      const stillLifeImage = await generateSinglePreview(styleName, styleDescription, "stillLife");
+      if (stillLifeImage) result.stillLife = stillLifeImage;
+      
+      await onProgress(95, "Finalizing previews...");
+    } else {
+      // Generate all 3 previews in parallel for ~3x speedup (no progress tracking)
+      const [portraitImage, landscapeImage, stillLifeImage] = await Promise.all([
+        generateSinglePreview(styleName, styleDescription, "portrait"),
+        generateSinglePreview(styleName, styleDescription, "landscape"),
+        generateSinglePreview(styleName, styleDescription, "stillLife"),
+      ]);
 
-    if (portraitImage) result.portrait = portraitImage;
-    if (landscapeImage) result.landscape = landscapeImage;
-    if (stillLifeImage) result.stillLife = stillLifeImage;
+      if (portraitImage) result.portrait = portraitImage;
+      if (landscapeImage) result.landscape = landscapeImage;
+      if (stillLifeImage) result.stillLife = stillLifeImage;
+    }
   } catch (error) {
     console.error("Error in preview generation:", error instanceof Error ? error.message : String(error));
   }

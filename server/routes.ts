@@ -12,7 +12,7 @@ import { db } from "./db";
 import { sql } from "drizzle-orm";
 import { cache, CACHE_KEYS } from "./cache";
 import type { MetadataTags } from "@shared/schema";
-import { getJobProgress } from "./job-runner";
+import { getJobProgress, createAndRunJob } from "./job-runner";
 
 function getDefaultMetadataTags(): MetadataTags {
   return {
@@ -390,6 +390,67 @@ export async function registerRoutes(
       console.error("Error generating previews:", error);
       res.status(500).json({
         error: "Failed to generate preview images",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // Job-based image analysis with progress tracking
+  app.post("/api/jobs/analyze-image", async (req, res) => {
+    try {
+      const { imageBase64 } = req.body;
+
+      if (!imageBase64) {
+        return res.status(400).json({ error: "Image data required" });
+      }
+
+      const { job } = await createAndRunJob(
+        "style_analysis",
+        { imageBase64 },
+        async (input, onProgress) => {
+          return await analyzeImageForStyle(input.imageBase64, onProgress);
+        },
+        { maxRetries: 2, timeoutMs: 60000 }
+      );
+
+      res.json({ jobId: job.id, status: job.status });
+    } catch (error) {
+      console.error("Error creating analysis job:", error);
+      res.status(500).json({
+        error: "Failed to analyze image",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // Job-based preview generation with progress tracking
+  app.post("/api/jobs/generate-previews", async (req, res) => {
+    try {
+      const { styleName, styleDescription, referenceImageBase64 } = req.body;
+
+      if (!styleName || !styleDescription) {
+        return res.status(400).json({ error: "Style name and description required" });
+      }
+
+      const { job } = await createAndRunJob(
+        "preview_generation",
+        { styleName, styleDescription, referenceImageBase64 },
+        async (input, onProgress) => {
+          return await generateCanonicalPreviews({
+            styleName: input.styleName,
+            styleDescription: input.styleDescription,
+            referenceImageBase64: input.referenceImageBase64,
+            onProgress,
+          });
+        },
+        { maxRetries: 2, timeoutMs: 180000 }
+      );
+
+      res.json({ jobId: job.id, status: job.status });
+    } catch (error) {
+      console.error("Error creating preview job:", error);
+      res.status(500).json({
+        error: "Failed to generate previews",
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }

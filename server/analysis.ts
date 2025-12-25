@@ -24,10 +24,15 @@ export interface AnalysisResult {
   metadataTags: MetadataTags;
 }
 
+type ProgressCallback = (progress: number, message: string) => Promise<void>;
+
 /**
  * Analyze an uploaded image and generate creative style name and description using Gemini vision
  */
-export async function analyzeImageForStyle(imageBase64: string): Promise<AnalysisResult> {
+export async function analyzeImageForStyle(
+  imageBase64: string,
+  onProgress?: ProgressCallback
+): Promise<AnalysisResult> {
   try {
     // Remove data URL prefix if present
     let cleanBase64 = imageBase64;
@@ -38,6 +43,10 @@ export async function analyzeImageForStyle(imageBase64: string): Promise<Analysi
     // Ensure we have valid base64
     if (!cleanBase64 || cleanBase64.length < 100) {
       throw new Error("Invalid or incomplete image data");
+    }
+
+    if (onProgress) {
+      await onProgress(10, "Analyzing image characteristics...");
     }
 
     const response = await ai.models.generateContent({
@@ -77,6 +86,10 @@ Consider: Color palette, lighting, atmosphere, texture, surface qualities, compo
       ],
     });
 
+    if (onProgress) {
+      await onProgress(60, "Extracting style characteristics...");
+    }
+
     // Handle response - Gemini may return text in parts array
     let responseText = "";
     const candidates = response.candidates;
@@ -94,6 +107,10 @@ Consider: Color palette, lighting, atmosphere, texture, surface qualities, compo
 
     if (!responseText) {
       throw new Error("No text response from Gemini");
+    }
+
+    if (onProgress) {
+      await onProgress(80, "Processing style metadata...");
     }
 
     // Clean response - remove markdown code blocks if present
