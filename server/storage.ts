@@ -127,41 +127,31 @@ export class DatabaseStorage implements IStorage {
   async getStyleSummariesPaginated(limit: number, cursor?: string): Promise<PaginatedStyleSummaries> {
     const queryLimit = Math.min(limit, 50);
     
-    let query = db
-      .select({
-        id: styles.id,
-        name: styles.name,
-        description: styles.description,
-        createdAt: styles.createdAt,
-        metadataTags: styles.metadataTags,
-        moodBoard: styles.moodBoard,
-        uiConcepts: styles.uiConcepts,
-        previews: styles.previews,
-      })
-      .from(styles)
-      .orderBy(desc(styles.createdAt))
-      .limit(queryLimit + 1);
+    const selectFields = {
+      id: styles.id,
+      name: styles.name,
+      description: styles.description,
+      createdAt: styles.createdAt,
+      referenceImages: styles.referenceImages,
+    };
     
+    let results;
     if (cursor) {
       const cursorDate = new Date(cursor);
-      query = db
-        .select({
-          id: styles.id,
-          name: styles.name,
-          description: styles.description,
-          createdAt: styles.createdAt,
-          metadataTags: styles.metadataTags,
-          moodBoard: styles.moodBoard,
-          uiConcepts: styles.uiConcepts,
-          previews: styles.previews,
-        })
+      results = await db
+        .select(selectFields)
         .from(styles)
         .where(sql`${styles.createdAt} < ${cursorDate}`)
         .orderBy(desc(styles.createdAt))
         .limit(queryLimit + 1);
+    } else {
+      results = await db
+        .select(selectFields)
+        .from(styles)
+        .orderBy(desc(styles.createdAt))
+        .limit(queryLimit + 1);
     }
     
-    const results = await query;
     const hasMore = results.length > queryLimit;
     const items = hasMore ? results.slice(0, queryLimit) : results;
     
@@ -171,16 +161,20 @@ export class DatabaseStorage implements IStorage {
       : null;
     
     return {
-      items: items.map(s => ({
-        id: s.id,
-        name: s.name,
-        description: s.description,
-        createdAt: s.createdAt,
-        metadataTags: s.metadataTags,
-        moodBoardStatus: (s.moodBoard as any)?.status || "pending",
-        uiConceptsStatus: (s.uiConcepts as any)?.status || "pending",
-        thumbnailPreview: (s.previews as any)?.landscape || (s.previews as any)?.portrait || null,
-      })),
+      items: items.map(s => {
+        const refImages = s.referenceImages as string[] | null;
+        const thumbnail = refImages && refImages.length > 0 ? refImages[0] : null;
+        return {
+          id: s.id,
+          name: s.name,
+          description: s.description,
+          createdAt: s.createdAt,
+          metadataTags: null,
+          moodBoardStatus: "complete",
+          uiConceptsStatus: "complete",
+          thumbnailPreview: thumbnail,
+        };
+      }),
       total,
       hasMore,
       nextCursor,
