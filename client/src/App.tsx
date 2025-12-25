@@ -12,6 +12,7 @@ import Author from "@/pages/Author";
 import Generate from "@/pages/Generate";
 import BatchUpload from "@/pages/BatchUpload";
 import SharedStyle from "@/pages/SharedStyle";
+import SavedStyles from "@/pages/SavedStyles";
 
 function Router() {
   return (
@@ -22,6 +23,7 @@ function Router() {
       <Route path="/create" component={Author} />
       <Route path="/generate/:styleId" component={Generate} />
       <Route path="/batch" component={BatchUpload} />
+      <Route path="/saved" component={SavedStyles} />
       <Route component={NotFound} />
     </Switch>
   );

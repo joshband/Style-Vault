@@ -72,6 +72,7 @@ export interface IStorage {
 
   // Bookmark operations
   getBookmarksByUser(userId: string): Promise<Bookmark[]>;
+  getBookmarkedStyleSummaries(userId: string): Promise<StyleSummary[]>;
   getBookmark(userId: string, styleId: string): Promise<Bookmark | undefined>;
   createBookmark(bookmark: InsertBookmark): Promise<Bookmark>;
   deleteBookmark(userId: string, styleId: string): Promise<void>;
@@ -634,6 +635,29 @@ export class DatabaseStorage implements IStorage {
   // Bookmark operations
   async getBookmarksByUser(userId: string): Promise<Bookmark[]> {
     return db.select().from(bookmarks).where(eq(bookmarks.userId, userId)).orderBy(desc(bookmarks.createdAt));
+  }
+
+  async getBookmarkedStyleSummaries(userId: string): Promise<StyleSummary[]> {
+    const bookmarkedStyles = await db
+      .select({
+        id: styles.id,
+        name: styles.name,
+        description: styles.description,
+        createdAt: styles.createdAt,
+        metadataTags: styles.metadataTags,
+        moodBoard: styles.moodBoard,
+        uiConcepts: styles.uiConcepts,
+        previews: styles.previews,
+      })
+      .from(bookmarks)
+      .innerJoin(styles, eq(bookmarks.styleId, styles.id))
+      .where(eq(bookmarks.userId, userId))
+      .orderBy(desc(bookmarks.createdAt));
+
+    return bookmarkedStyles.map((style) => ({
+      ...style,
+      thumbnailUrl: style.moodBoard?.thumbnailUrl || style.previews?.landscape || null,
+    }));
   }
 
   async getBookmark(userId: string, styleId: string): Promise<Bookmark | undefined> {

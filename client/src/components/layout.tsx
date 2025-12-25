@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Compass, PenTool, Layers, Search, Settings, Menu, X, Eye, Wand2, LogIn, LogOut, User } from "lucide-react";
+import { Compass, PenTool, Layers, Search, Settings, Menu, X, Eye, Wand2, LogIn, LogOut, User, Bookmark } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { ActiveJobsIndicator } from "./active-jobs-indicator";
@@ -176,6 +176,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       </p>
                       <p className="text-xs text-muted-foreground">{user.email}</p>
                     </div>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link href="/saved" className="flex items-center gap-2 cursor-pointer" data-testid="saved-styles-link">
+                        <Bookmark size={14} />
+                        My Saved Styles
+                      </Link>
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
                       <a href="/api/logout" className="flex items-center gap-2 cursor-pointer" data-testid="logout-button">
