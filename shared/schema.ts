@@ -153,13 +153,22 @@ export interface UiConceptAssets {
   history: UiConceptEntry[];
 }
 
+// Style spec for usage guidelines and notes
+export interface StyleSpec {
+  usageGuidelines: string;
+  designNotes: string;
+  updatedAt: string;
+}
+
 // Styles table for persisting visual styles
 export const styles = pgTable("styles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   description: text("description").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at"),
   shareCode: varchar("share_code").unique(),
+  styleSpec: jsonb("style_spec").$type<StyleSpec>(),
   referenceImages: jsonb("reference_images").$type<string[]>().default([]),
   previews: jsonb("previews").$type<{
     portrait: string;

@@ -1,8 +1,10 @@
 import { useRoute } from "wouter";
-import { fetchStyleById, type Style } from "@/lib/store";
+import { fetchStyleById, type Style, type StyleSpec } from "@/lib/store";
 import { Layout } from "@/components/layout";
 import { TokenViewer } from "@/components/token-viewer";
-import { ArrowLeft, Download, Loader2, ChevronDown, ChevronUp, Eye, Palette, MessageSquare, Share2, Check, Copy } from "lucide-react";
+import { ColorPaletteSwatches } from "@/components/color-palette-swatches";
+import { StyleSpecEditor } from "@/components/style-spec-editor";
+import { ArrowLeft, Download, Loader2, ChevronDown, ChevronUp, Eye, Palette, MessageSquare, Share2, Check, Copy, Droplets, FileEdit } from "lucide-react";
 import { Link } from "wouter";
 import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { AiMoodBoard } from "@/components/ai-mood-board";
@@ -319,7 +321,17 @@ export default function Inspect() {
           </div>
         </section>
 
-        {/* Section 2: Design Tokens */}
+        {/* Section 2: Color Palette */}
+        <section className="space-y-0">
+          <SectionHeader
+            icon={<Droplets size={20} />}
+            title="Color Palette"
+            description="Click any swatch to copy the hex code"
+          />
+          <ColorPaletteSwatches tokens={style.tokens} />
+        </section>
+
+        {/* Section 3: Design Tokens */}
         <section className="space-y-0">
           <SectionHeader
             icon={<Palette size={20} />}
@@ -364,7 +376,23 @@ export default function Inspect() {
           </div>
         </section>
 
-        {/* Section 3: Prompt Scaffolding */}
+        {/* Section 4: Style Spec */}
+        <section className="space-y-0">
+          <SectionHeader
+            icon={<FileEdit size={20} />}
+            title="Style Spec"
+            description="Usage guidelines, design notes, and version history"
+          />
+          <StyleSpecEditor
+            styleId={style.id}
+            styleSpec={style.styleSpec}
+            createdAt={style.createdAt}
+            updatedAt={style.updatedAt}
+            onUpdate={(spec) => setStyle({ ...style, styleSpec: spec })}
+          />
+        </section>
+
+        {/* Section 5: Prompt Scaffolding */}
         <section className="space-y-0 pb-8">
           <SectionHeader
             icon={<MessageSquare size={20} />}

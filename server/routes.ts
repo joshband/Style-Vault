@@ -290,6 +290,42 @@ export async function registerRoutes(
     }
   });
 
+  // Update style spec (usage guidelines and design notes)
+  app.patch("/api/styles/:id/spec", async (req, res) => {
+    try {
+      const styleId = req.params.id;
+      const { usageGuidelines, designNotes } = req.body;
+      
+      const style = await storage.getStyleById(styleId);
+      if (!style) {
+        return res.status(404).json({ error: "Style not found" });
+      }
+      
+      const spec = {
+        usageGuidelines: usageGuidelines || "",
+        designNotes: designNotes || "",
+        updatedAt: new Date().toISOString(),
+      };
+      
+      const updated = await storage.updateStyleSpec(styleId, spec);
+      if (!updated) {
+        return res.status(500).json({ error: "Failed to update style spec" });
+      }
+      
+      // Invalidate cache
+      cache.delete(CACHE_KEYS.STYLE_DETAIL(styleId));
+      cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating style spec:", error);
+      res.status(500).json({
+        error: "Failed to update style spec",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
   // Generate or get share code for a style
   app.post("/api/styles/:id/share", async (req, res) => {
     try {
