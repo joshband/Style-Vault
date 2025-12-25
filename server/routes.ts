@@ -657,12 +657,12 @@ export async function registerRoutes(
 
   // ========== BOOKMARK ROUTES ==========
 
-  // Get user's bookmarks (requires auth)
+  // Get user's bookmarked styles with full summaries (requires auth)
   app.get("/api/bookmarks", isAuthenticated, async (req, res) => {
     try {
       const userId = (req.user as any)?.claims?.sub;
-      const userBookmarks = await storage.getBookmarksByUser(userId);
-      res.json(userBookmarks);
+      const bookmarkedStyles = await storage.getBookmarkedStyleSummaries(userId);
+      res.json(bookmarkedStyles);
     } catch (error) {
       console.error("Error fetching bookmarks:", error);
       res.status(500).json({ error: "Failed to fetch bookmarks" });
