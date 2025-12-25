@@ -152,8 +152,18 @@ export async function registerRoutes(
       
       if (limit) {
         const result = await storage.getStyleSummariesPaginated(limit, cursor);
+        
+        const styleIds = result.items.map(s => s.id);
+        const imageIdsMap = await storage.getImageIdsByStyleIds(styleIds);
+        
+        const itemsWithImageIds = result.items.map(item => ({
+          ...item,
+          thumbnailPreview: null,
+          imageIds: imageIdsMap.get(item.id) || {},
+        }));
+        
         res.set('Cache-Control', 'public, max-age=10, stale-while-revalidate=30');
-        return res.json(result);
+        return res.json({ ...result, items: itemsWithImageIds });
       }
       
       let styles = cache.get<any[]>(CACHE_KEYS.STYLE_SUMMARIES);
@@ -208,12 +218,16 @@ export async function registerRoutes(
   // Get lightweight style summary (for fast initial load)
   app.get("/api/styles/:id/summary", async (req, res) => {
     try {
-      const summary = await storage.getStyleCoreSummary(req.params.id);
+      const styleId = req.params.id;
+      const summary = await storage.getStyleCoreSummary(styleId);
       if (!summary) {
         return res.status(404).json({ error: "Style not found" });
       }
+      
+      const imageIds = await storage.getImageIdsByStyleId(styleId);
+      
       res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
-      res.json(summary);
+      res.json({ ...summary, imageIds });
     } catch (error) {
       console.error("Error fetching style summary:", error);
       res.status(500).json({ error: "Failed to fetch style summary" });

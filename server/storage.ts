@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Style, type InsertStyle, type GeneratedImage, type InsertGeneratedImage, type MoodBoardAssets, type UiConceptAssets, type MetadataTags, type MetadataEnrichmentStatus, type Job, type InsertJob, type JobStatus, type JobType, type Batch, type InsertBatch, type StyleSpec, users, styles, generatedImages, jobs, batches } from "@shared/schema";
+import { type User, type InsertUser, type Style, type InsertStyle, type GeneratedImage, type InsertGeneratedImage, type MoodBoardAssets, type UiConceptAssets, type MetadataTags, type MetadataEnrichmentStatus, type Job, type InsertJob, type JobStatus, type JobType, type Batch, type InsertBatch, type StyleSpec, type ImageAssetType, users, styles, generatedImages, jobs, batches, imageAssets } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, or, inArray, sql } from "drizzle-orm";
 
@@ -11,6 +11,7 @@ export interface StyleSummary {
   moodBoardStatus: string;
   uiConceptsStatus: string;
   thumbnailPreview: string | null;
+  imageIds?: Record<string, string>;
 }
 
 export interface PaginatedStyleSummaries {
@@ -364,6 +365,38 @@ export class DatabaseStorage implements IStorage {
       .from(styles)
       .where(eq(styles.metadataEnrichmentStatus, status))
       .orderBy(desc(styles.createdAt));
+  }
+
+  async getImageIdsByStyleId(styleId: string): Promise<Record<string, string>> {
+    const assets = await db
+      .select({ id: imageAssets.id, type: imageAssets.type })
+      .from(imageAssets)
+      .where(eq(imageAssets.styleId, styleId));
+    
+    const result: Record<string, string> = {};
+    for (const asset of assets) {
+      result[asset.type] = asset.id;
+    }
+    return result;
+  }
+
+  async getImageIdsByStyleIds(styleIds: string[]): Promise<Map<string, Record<string, string>>> {
+    if (styleIds.length === 0) return new Map();
+    
+    const assets = await db
+      .select({ id: imageAssets.id, type: imageAssets.type, styleId: imageAssets.styleId })
+      .from(imageAssets)
+      .where(inArray(imageAssets.styleId, styleIds));
+    
+    const result = new Map<string, Record<string, string>>();
+    for (const asset of assets) {
+      if (!asset.styleId) continue;
+      if (!result.has(asset.styleId)) {
+        result.set(asset.styleId, {});
+      }
+      result.get(asset.styleId)![asset.type] = asset.id;
+    }
+    return result;
   }
 
   // Job operations for async task tracking

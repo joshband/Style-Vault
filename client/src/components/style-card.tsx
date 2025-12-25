@@ -15,6 +15,7 @@ interface StyleSummary {
   moodBoardStatus?: string;
   uiConceptsStatus?: string;
   thumbnailPreview?: string | null;
+  imageIds?: Record<string, string>;
   tokens?: any;
 }
 
@@ -124,9 +125,15 @@ const StyleCardComponent = memo(function StyleCard({ style, className, onDelete 
           >
             {/* Preview Image */}
             <div className="relative aspect-[16/10] bg-muted overflow-hidden">
-              {style.thumbnailPreview ? (
+              {(style.imageIds?.preview_landscape || style.imageIds?.reference || style.thumbnailPreview) ? (
                 <img 
-                  src={style.thumbnailPreview} 
+                  src={
+                    style.imageIds?.preview_landscape 
+                      ? `/api/images/${style.imageIds.preview_landscape}?size=thumb`
+                      : style.imageIds?.reference
+                      ? `/api/images/${style.imageIds.reference}?size=thumb`
+                      : style.thumbnailPreview!
+                  } 
                   alt={style.name}
                   className="absolute inset-0 w-full h-full object-cover"
                   draggable={false}
