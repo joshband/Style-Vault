@@ -11,12 +11,14 @@ import Inspect from "@/pages/Inspect";
 import Author from "@/pages/Author";
 import Generate from "@/pages/Generate";
 import BatchUpload from "@/pages/BatchUpload";
+import SharedStyle from "@/pages/SharedStyle";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Explore} />
       <Route path="/style/:id" component={Inspect} />
+      <Route path="/shared/:code" component={SharedStyle} />
       <Route path="/create" component={Author} />
       <Route path="/generate/:styleId" component={Generate} />
       <Route path="/batch" component={BatchUpload} />
