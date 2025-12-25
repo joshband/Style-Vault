@@ -149,6 +149,27 @@ export async function registerRoutes(
     }
   });
 
+  // Get all style summaries (simple list for remix/select UIs)
+  app.get("/api/styles/summaries", async (req, res) => {
+    try {
+      let styles = cache.get<any[]>(CACHE_KEYS.STYLE_SUMMARIES);
+      
+      if (!styles) {
+        styles = await storage.getStyleSummaries();
+        cache.set(CACHE_KEYS.STYLE_SUMMARIES, styles, 30 * 1000);
+      }
+      
+      res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
+      res.json(styles);
+    } catch (error) {
+      console.error("Error fetching style summaries:", error);
+      res.status(500).json({
+        error: "Failed to fetch styles",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
   // Get all styles (lightweight summaries for list view)
   app.get("/api/styles", async (req, res) => {
     try {
@@ -652,6 +673,90 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error getting image IDs:", error);
       res.status(500).json({ error: "Failed to get image IDs" });
+    }
+  });
+
+  // ========== REMIX ROUTES ==========
+
+  app.post("/api/styles/remix", async (req, res) => {
+    try {
+      const { remixStyles } = await import("./remix");
+      const { styleIds, weights, name } = req.body;
+      
+      if (!styleIds || !Array.isArray(styleIds) || styleIds.length < 2) {
+        return res.status(400).json({ error: "Please select at least 2 styles to remix" });
+      }
+      
+      const result = await remixStyles({ styleIds, weights, name });
+      res.json(result);
+    } catch (error) {
+      console.error("Remix error:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Failed to remix styles" 
+      });
+    }
+  });
+
+  app.post("/api/styles/remix/save", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any)?.claims?.sub;
+      const { name, description, tokens, promptScaffolding, sourceStyles } = req.body;
+      
+      const safePromptScaffolding = {
+        base: promptScaffolding?.base || "A blended visual style",
+        modifiers: Array.isArray(promptScaffolding?.modifiers) ? promptScaffolding.modifiers : [],
+        negative: typeof promptScaffolding?.negative === "string" ? promptScaffolding.negative : "",
+      };
+      
+      const safeTokens = tokens && typeof tokens === "object" ? tokens : {
+        color: {
+          primary: { $type: "color", $value: "#2A2A2A", $description: "Primary color" },
+          secondary: { $type: "color", $value: "#6B5B4D", $description: "Secondary color" },
+          accent: { $type: "color", $value: "#FF4D4D", $description: "Accent color" },
+        },
+      };
+      
+      const newStyle = await storage.createStyle({
+        name: name || "Remixed Style",
+        description: description || "A blended style combining multiple sources",
+        tokens: safeTokens,
+        promptScaffolding: safePromptScaffolding,
+        referenceImages: [],
+        previews: { portrait: "", landscape: "", stillLife: "" },
+        creatorId: userId,
+        metadataTags: {
+          mood: [],
+          colorFamily: [],
+          lighting: [],
+          texture: [],
+          era: [],
+          artPeriod: [],
+          historicalInfluences: [],
+          similarArtists: [],
+          medium: ["remix"],
+          subjects: [],
+          usageExamples: [],
+          narrativeTone: [],
+          sensoryPalette: [],
+          movementRhythm: [],
+          stylisticPrinciples: [],
+          signatureMotifs: [],
+          contrastDynamics: [],
+          psychologicalEffect: [],
+          culturalResonance: [],
+          audiencePerception: [],
+          keywords: ["remix", ...(Array.isArray(sourceStyles) ? sourceStyles.map((s: any) => s.name?.toLowerCase() || "") : [])],
+        },
+      });
+      
+      cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
+      
+      res.status(201).json(newStyle);
+    } catch (error) {
+      console.error("Save remix error:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Failed to save remixed style" 
+      });
     }
   });
 
