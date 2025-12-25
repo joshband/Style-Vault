@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { analyzeImageForStyle } from "./analysis";
-import { generateCanonicalPreviews } from "./preview-generation";
+import { generateCanonicalPreviews, validatePreviewImages } from "./preview-generation";
 import { generateStyledImage } from "./image-generation";
 import { generateAllMoodBoardAssets } from "./mood-board-generation";
 import { queueStyleForEnrichment, enrichPendingStyles, getTagsSummary } from "./metadata-enrichment";
@@ -202,6 +202,17 @@ export async function registerRoutes(
   app.post("/api/styles", async (req, res) => {
     try {
       const validatedData = insertStyleSchema.parse(req.body);
+      
+      // Validate preview images contain real data (not placeholders)
+      if (validatedData.previews) {
+        const previewValidation = validatePreviewImages(validatedData.previews as any);
+        if (!previewValidation.valid) {
+          console.warn(`Style "${validatedData.name}" created with no valid preview images (all placeholders)`);
+        } else if (previewValidation.invalidCount > 0) {
+          console.log(`Style "${validatedData.name}" created with ${previewValidation.validCount}/3 valid previews`);
+        }
+      }
+      
       const style = await storage.createStyle(validatedData);
       
       // Invalidate cache
@@ -379,13 +390,22 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Style name and description required" });
       }
 
-      const previews = await generateCanonicalPreviews({
+      const result = await generateCanonicalPreviews({
         styleName,
         styleDescription,
         referenceImageBase64,
       });
 
-      res.json({ previews });
+      // Return with status info so frontend knows if generation partially failed
+      res.json({ 
+        previews: {
+          portrait: result.portrait,
+          landscape: result.landscape,
+          stillLife: result.stillLife,
+        },
+        successCount: result.successCount,
+        allFailed: result.allFailed,
+      });
     } catch (error) {
       console.error("Error generating previews:", error);
       res.status(500).json({
@@ -436,12 +456,19 @@ export async function registerRoutes(
         "preview_generation",
         { styleName, styleDescription, referenceImageBase64 },
         async (input, onProgress) => {
-          return await generateCanonicalPreviews({
+          const result = await generateCanonicalPreviews({
             styleName: input.styleName,
             styleDescription: input.styleDescription,
             referenceImageBase64: input.referenceImageBase64,
             onProgress,
           });
+          
+          // Throw error if all previews failed - this marks the job as failed
+          if (result.allFailed) {
+            throw new Error("All preview generations failed. Please try again.");
+          }
+          
+          return result;
         },
         { maxRetries: 2, timeoutMs: 180000 }
       );
