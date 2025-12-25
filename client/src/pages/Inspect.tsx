@@ -1,5 +1,5 @@
 import { useRoute } from "wouter";
-import { fetchStyleById, type Style, type StyleSpec } from "@/lib/store";
+import { type StyleSpec } from "@/lib/store";
 import { Layout } from "@/components/layout";
 import { TokenViewer } from "@/components/token-viewer";
 import { ColorPaletteSwatches } from "@/components/color-palette-swatches";
@@ -9,6 +9,32 @@ import { Link } from "wouter";
 import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { AiMoodBoard } from "@/components/ai-mood-board";
 import { ActiveJobsIndicator } from "@/components/active-jobs-indicator";
+
+interface StyleSummary {
+  id: string;
+  name: string;
+  description: string;
+  createdAt: string;
+  tokens: any;
+  referenceImages: string[];
+  metadataTags: any;
+  promptScaffolding: any;
+  shareCode: string | null;
+  moodBoardStatus: string;
+  uiConceptsStatus: string;
+  styleSpec: StyleSpec | null;
+  updatedAt: string | null;
+}
+
+interface StyleAssets {
+  previews: {
+    landscape?: string;
+    portrait?: string;
+    stillLife?: string;
+  };
+  moodBoard: any;
+  uiConcepts: any;
+}
 
 interface SectionHeaderProps {
   icon: ReactNode;
@@ -30,11 +56,23 @@ function SectionHeader({ icon, title, description }: SectionHeaderProps) {
   );
 }
 
+function PreviewSkeleton({ aspect }: { aspect: string }) {
+  return (
+    <div className={`${aspect} bg-muted rounded-lg overflow-hidden border border-border animate-pulse`}>
+      <div className="w-full h-full flex items-center justify-center">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground/30" />
+      </div>
+    </div>
+  );
+}
+
 export default function Inspect() {
   const [, params] = useRoute("/style/:id");
   const id = params?.id;
-  const [style, setStyle] = useState<Style | null>(null);
+  const [summary, setSummary] = useState<StyleSummary | null>(null);
+  const [assets, setAssets] = useState<StyleAssets | null>(null);
   const [loading, setLoading] = useState(true);
+  const [assetsLoading, setAssetsLoading] = useState(true);
   const [tokensExpanded, setTokensExpanded] = useState(false);
   const [shareCode, setShareCode] = useState<string | null>(null);
   const [shareLoading, setShareLoading] = useState(false);
@@ -64,31 +102,38 @@ export default function Inspect() {
     setTimeout(() => setCopied(false), 2000);
   }, [shareCode]);
 
-  const refetchStyle = () => {
-    if (id) {
-      fetchStyleById(id).then((newStyle) => {
-        if (newStyle) setStyle(newStyle);
-      });
-    }
-  };
-
   useEffect(() => {
-    if (id) {
-      fetchStyleById(id)
-        .then((fetchedStyle) => {
-          setStyle(fetchedStyle);
-          if (fetchedStyle?.shareCode) {
-            setShareCode(fetchedStyle.shareCode);
-          }
-        })
-        .finally(() => setLoading(false));
-    }
+    if (!id) return;
+    
+    fetch(`/api/styles/${id}/summary`)
+      .then(res => res.ok ? res.json() : null)
+      .then((data: StyleSummary | null) => {
+        setSummary(data);
+        if (data?.shareCode) {
+          setShareCode(data.shareCode);
+        }
+      })
+      .finally(() => setLoading(false));
+    
+    fetch(`/api/styles/${id}/assets`)
+      .then(res => res.ok ? res.json() : null)
+      .then((data: StyleAssets | null) => {
+        setAssets(data);
+      })
+      .finally(() => setAssetsLoading(false));
   }, [id]);
 
-  // Refetch style data periodically when assets are generating
-  // Uses memoized status values to ensure effect responds to state changes
-  const moodBoardStatus = style?.moodBoard?.status;
-  const uiConceptsStatus = style?.uiConcepts?.status;
+  const refetchAssets = useCallback(() => {
+    if (!id) return;
+    fetch(`/api/styles/${id}/assets`)
+      .then(res => res.ok ? res.json() : null)
+      .then((data: StyleAssets | null) => {
+        if (data) setAssets(data);
+      });
+  }, [id]);
+
+  const moodBoardStatus = assets?.moodBoard?.status || summary?.moodBoardStatus;
+  const uiConceptsStatus = assets?.uiConcepts?.status || summary?.uiConceptsStatus;
   
   useEffect(() => {
     if (!id) return;
@@ -100,24 +145,30 @@ export default function Inspect() {
       uiConceptsStatus === "pending";
     
     if (isGenerating) {
-      const interval = setInterval(refetchStyle, 2000);
+      const interval = setInterval(refetchAssets, 2000);
       return () => clearInterval(interval);
     }
-  }, [id, moodBoardStatus, uiConceptsStatus]);
+  }, [id, moodBoardStatus, uiConceptsStatus, refetchAssets]);
 
   const handleDownloadTokens = () => {
-    if (!style) return;
-    const tokensJson = JSON.stringify(style.tokens, null, 2);
+    if (!summary) return;
+    const tokensJson = JSON.stringify(summary.tokens, null, 2);
     const blob = new Blob([tokensJson], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${style.name.toLowerCase().replace(/\s+/g, "-")}-tokens.json`;
+    a.download = `${summary.name.toLowerCase().replace(/\s+/g, "-")}-tokens.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
+
+  const handleSpecUpdate = useCallback((newSpec: StyleSpec) => {
+    if (summary) {
+      setSummary({ ...summary, styleSpec: newSpec, updatedAt: new Date().toISOString() });
+    }
+  }, [summary]);
 
   if (loading) {
     return (
@@ -129,7 +180,7 @@ export default function Inspect() {
     );
   }
 
-  if (!style) {
+  if (!summary) {
     return (
       <Layout>
         <div className="flex flex-col items-center justify-center h-[50vh]">
@@ -139,6 +190,8 @@ export default function Inspect() {
       </Layout>
     );
   }
+
+  const previews = assets?.previews || {};
 
   return (
     <Layout>
@@ -150,14 +203,13 @@ export default function Inspect() {
           </Link>
           
           <div className="space-y-2">
-            <h1 className="text-3xl md:text-4xl font-serif font-medium text-foreground">{style.name}</h1>
+            <h1 className="text-3xl md:text-4xl font-serif font-medium text-foreground">{summary.name}</h1>
             <p className="text-muted-foreground text-lg font-light leading-relaxed max-w-2xl">
-              {style.description}
+              {summary.description}
             </p>
           </div>
           
-          {/* Reference Image - displayed prominently below description */}
-          {style.referenceImages && style.referenceImages.length > 0 && (
+          {summary.referenceImages && summary.referenceImages.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 Source Reference
@@ -165,16 +217,16 @@ export default function Inspect() {
               <div className="max-w-md">
                 <div className="rounded-lg overflow-hidden border border-border bg-muted/30">
                   <img 
-                    src={style.referenceImages[0]} 
+                    src={summary.referenceImages[0]} 
                     alt="Source reference" 
                     className="w-full h-auto object-contain"
                     loading="lazy"
                     data-testid="img-reference-main"
                   />
                 </div>
-                {style.referenceImages.length > 1 && (
+                {summary.referenceImages.length > 1 && (
                   <div className="flex gap-2 mt-2">
-                    {style.referenceImages.slice(1).map((img, i) => (
+                    {summary.referenceImages.slice(1).map((img, i) => (
                       <div key={i} className="w-16 h-16 rounded-lg overflow-hidden border border-border">
                         <img src={img} alt={`Reference ${i + 2}`} className="w-full h-full object-cover" loading="lazy" />
                       </div>
@@ -187,8 +239,8 @@ export default function Inspect() {
           
           <div className="flex items-center justify-between pt-2">
             <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              <time dateTime={style.createdAt}>
-                Created {new Date(style.createdAt).toLocaleDateString(undefined, { 
+              <time dateTime={summary.createdAt}>
+                Created {new Date(summary.createdAt).toLocaleDateString(undefined, { 
                   month: 'long', 
                   day: 'numeric', 
                   year: 'numeric' 
@@ -249,75 +301,93 @@ export default function Inspect() {
               Canonical Previews
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="col-span-1 sm:col-span-2 aspect-video bg-muted rounded-lg overflow-hidden border border-border relative group">
-                {style.previews.landscape ? (
-                  <>
-                    <img 
-                      src={style.previews.landscape} 
-                      alt="Landscape preview" 
-                      className="absolute inset-0 w-full h-full object-cover"
-                      loading="lazy"
-                    />
-                    <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 text-white text-xs font-mono rounded">
-                      Landscape
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                    No landscape preview
+              {assetsLoading ? (
+                <>
+                  <PreviewSkeleton aspect="col-span-1 sm:col-span-2 aspect-video" />
+                  <PreviewSkeleton aspect="aspect-[3/4]" />
+                  <PreviewSkeleton aspect="aspect-square" />
+                </>
+              ) : (
+                <>
+                  <div className="col-span-1 sm:col-span-2 aspect-video bg-muted rounded-lg overflow-hidden border border-border relative group">
+                    {previews.landscape ? (
+                      <>
+                        <img 
+                          src={previews.landscape} 
+                          alt="Landscape preview" 
+                          className="absolute inset-0 w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                        <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 text-white text-xs font-mono rounded">
+                          Landscape
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                        No landscape preview
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-              <div className="aspect-[3/4] bg-muted rounded-lg overflow-hidden border border-border relative">
-                {style.previews.portrait ? (
-                  <>
-                    <img 
-                      src={style.previews.portrait} 
-                      alt="Portrait preview" 
-                      className="absolute inset-0 w-full h-full object-cover"
-                      loading="lazy"
-                    />
-                    <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 text-white text-xs font-mono rounded">
-                      Portrait
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                    No portrait preview
+                  <div className="aspect-[3/4] bg-muted rounded-lg overflow-hidden border border-border relative">
+                    {previews.portrait ? (
+                      <>
+                        <img 
+                          src={previews.portrait} 
+                          alt="Portrait preview" 
+                          className="absolute inset-0 w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                        <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 text-white text-xs font-mono rounded">
+                          Portrait
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                        No portrait preview
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-              <div className="aspect-square bg-muted rounded-lg overflow-hidden border border-border relative">
-                {style.previews.stillLife ? (
-                  <>
-                    <img 
-                      src={style.previews.stillLife} 
-                      alt="Still life preview" 
-                      className="absolute inset-0 w-full h-full object-cover"
-                      loading="lazy"
-                    />
-                    <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 text-white text-xs font-mono rounded">
-                      Still Life
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                    No still life preview
+                  <div className="aspect-square bg-muted rounded-lg overflow-hidden border border-border relative">
+                    {previews.stillLife ? (
+                      <>
+                        <img 
+                          src={previews.stillLife} 
+                          alt="Still life preview" 
+                          className="absolute inset-0 w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                        <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 text-white text-xs font-mono rounded">
+                          Still Life
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                        No still life preview
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                </>
+              )}
             </div>
           </div>
 
-
           {/* Mood Board & UI Concepts */}
           <div className="pt-6">
-            <AiMoodBoard
-              styleId={style.id}
-              styleName={style.name}
-              moodBoard={style.moodBoard}
-              uiConcepts={style.uiConcepts}
-            />
+            {assetsLoading ? (
+              <div className="flex items-center justify-center py-12 bg-muted/30 rounded-lg border border-border">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span className="text-sm">Loading mood board...</span>
+                </div>
+              </div>
+            ) : (
+              <AiMoodBoard
+                styleId={summary.id}
+                styleName={summary.name}
+                moodBoard={assets?.moodBoard}
+                uiConcepts={assets?.uiConcepts}
+              />
+            )}
           </div>
         </section>
 
@@ -328,7 +398,7 @@ export default function Inspect() {
             title="Color Palette"
             description="Click any swatch to copy the hex code"
           />
-          <ColorPaletteSwatches tokens={style.tokens} />
+          <ColorPaletteSwatches tokens={summary.tokens} />
         </section>
 
         {/* Section 3: Design Tokens */}
@@ -368,82 +438,71 @@ export default function Inspect() {
               </button>
               {tokensExpanded && (
                 <div className="p-4 pt-0 border-t border-border animate-in fade-in duration-200">
-                  <TokenViewer tokens={style.tokens} />
+                  <TokenViewer tokens={summary.tokens} />
                 </div>
               )}
             </div>
-
           </div>
         </section>
 
-        {/* Section 4: Style Spec */}
+        {/* Section 4: Prompt Scaffolding */}
         <section className="space-y-0">
-          <SectionHeader
-            icon={<FileEdit size={20} />}
-            title="Style Spec"
-            description="Usage guidelines, design notes, and version history"
-          />
-          <StyleSpecEditor
-            styleId={style.id}
-            styleSpec={style.styleSpec}
-            createdAt={style.createdAt}
-            updatedAt={style.updatedAt}
-            onUpdate={(spec) => setStyle({ ...style, styleSpec: spec })}
-          />
-        </section>
-
-        {/* Section 5: Prompt Scaffolding */}
-        <section className="space-y-0 pb-8">
           <SectionHeader
             icon={<MessageSquare size={20} />}
             title="Prompt Scaffolding"
-            description="How to describe this style to an AI image generator"
+            description="Ready-to-use prompts for applying this style in AI tools"
           />
-
+          
           <div className="space-y-6">
-            {/* Base Prompt */}
-            <div className="space-y-2">
-              <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Base Prompt
-              </label>
-              <div className="p-4 bg-muted/50 rounded-lg border border-border">
-                <p className="text-sm font-mono leading-relaxed text-foreground whitespace-pre-wrap">
-                  {style.promptScaffolding.base}
-                </p>
-              </div>
-            </div>
-
-            {/* Style Modifiers */}
-            <div className="space-y-2">
-              <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Style Modifiers
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {style.promptScaffolding.modifiers.map((mod, i) => (
-                  <span 
-                    key={i} 
-                    className="text-sm px-3 py-1.5 bg-primary/10 text-primary rounded-full font-mono"
-                  >
-                    {mod}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Negative Prompt */}
-            <div className="space-y-2">
-              <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Negative Prompt
-              </label>
-              <div className="p-4 bg-destructive/5 rounded-lg border border-destructive/20">
-                <p className="text-sm font-mono leading-relaxed text-destructive whitespace-pre-wrap">
-                  {style.promptScaffolding.negative}
-                </p>
-              </div>
-            </div>
+            {summary.promptScaffolding && (
+              <>
+                <div className="space-y-2">
+                  <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Base Prompt</h3>
+                  <div className="p-4 bg-muted/50 rounded-lg border border-border">
+                    <p className="text-sm font-mono text-foreground whitespace-pre-wrap">{summary.promptScaffolding.base}</p>
+                  </div>
+                </div>
+                
+                {summary.promptScaffolding.modifiers && summary.promptScaffolding.modifiers.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Style Modifiers</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {summary.promptScaffolding.modifiers.map((mod: string, i: number) => (
+                        <span key={i} className="px-2 py-1 bg-muted/70 text-xs rounded-md font-mono text-muted-foreground">
+                          {mod}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {summary.promptScaffolding.negative && (
+                  <div className="space-y-2">
+                    <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Negative Prompt</h3>
+                    <div className="p-4 bg-red-500/5 rounded-lg border border-red-500/20">
+                      <p className="text-sm font-mono text-muted-foreground whitespace-pre-wrap">{summary.promptScaffolding.negative}</p>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </section>
 
+        {/* Section 5: Style Specification */}
+        <section className="space-y-0">
+          <SectionHeader
+            icon={<FileEdit size={20} />}
+            title="Style Specification"
+            description="Usage guidelines and design notes for this style"
+          />
+          <StyleSpecEditor 
+            styleId={summary.id} 
+            styleSpec={summary.styleSpec} 
+            updatedAt={summary.updatedAt}
+            onUpdate={handleSpecUpdate}
+          />
+        </section>
       </div>
     </Layout>
   );
