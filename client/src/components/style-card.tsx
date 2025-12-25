@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import { Trash2, AlertCircle, Palette } from "lucide-react";
 import { Link } from "wouter";
-import { useEffect, useState, useCallback } from "react";
+import { memo, useEffect, useState, useCallback } from "react";
 import { trackStyleView } from "@/lib/suggestions";
 import { motion, AnimatePresence } from "framer-motion";
 import { queryClient } from "@/lib/queryClient";
@@ -24,7 +24,7 @@ interface StyleCardProps {
   onDelete?: (id: string) => void;
 }
 
-export function StyleCard({ style, className, onDelete }: StyleCardProps) {
+const StyleCardComponent = memo(function StyleCard({ style, className, onDelete }: StyleCardProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragX, setDragX] = useState(0);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -44,19 +44,36 @@ export function StyleCard({ style, className, onDelete }: StyleCardProps) {
     });
   }, [style.id]);
 
-  const handleDragEnd = (info: any) => {
+  const handleDragEnd = useCallback((info: any) => {
     if (info.offset.x < -100 || info.velocity.x < -500) {
       setShowConfirmDialog(true);
       setDragX(0);
     } else {
       setDragX(0);
     }
-  };
+  }, []);
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = useCallback(() => {
     onDelete?.(style.id);
     setShowConfirmDialog(false);
-  };
+  }, [onDelete, style.id]);
+
+  const handleCancelDelete = useCallback(() => {
+    setShowConfirmDialog(false);
+  }, []);
+
+  const handleDragStart = useCallback(() => {
+    setIsDragging(true);
+  }, []);
+
+  const handleDrag = useCallback((_: any, info: any) => {
+    setDragX(info.offset.x);
+  }, []);
+
+  const handleDragEndWrapper = useCallback((_: any, info: any) => {
+    setIsDragging(false);
+    handleDragEnd(info);
+  }, [handleDragEnd]);
 
   return (
     <>
@@ -64,14 +81,9 @@ export function StyleCard({ style, className, onDelete }: StyleCardProps) {
         drag="x"
         dragElastic={0.2}
         dragConstraints={{ left: -120, right: 0 }}
-        onDragStart={() => setIsDragging(true)}
-        onDragEnd={(_, info) => {
-          setIsDragging(false);
-          handleDragEnd(info);
-        }}
-        onDrag={(_, info) => {
-          setDragX(info.offset.x);
-        }}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEndWrapper}
+        onDrag={handleDrag}
         className={cn("relative", className)}
       >
         {/* Swipe delete indicator */}
@@ -118,6 +130,9 @@ export function StyleCard({ style, className, onDelete }: StyleCardProps) {
                   className="absolute inset-0 w-full h-full object-cover"
                   draggable={false}
                   loading="lazy"
+                  decoding="async"
+                  width={400}
+                  height={250}
                 />
               ) : (
                 <div className="flex-1 h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted/50">
@@ -159,7 +174,7 @@ export function StyleCard({ style, className, onDelete }: StyleCardProps) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-            onClick={() => setShowConfirmDialog(false)}
+            onClick={handleCancelDelete}
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
@@ -182,7 +197,7 @@ export function StyleCard({ style, className, onDelete }: StyleCardProps) {
 
               <div className="flex gap-3 mt-6">
                 <button
-                  onClick={() => setShowConfirmDialog(false)}
+                  onClick={handleCancelDelete}
                   className="flex-1 px-4 py-2 text-sm font-medium border border-border rounded-lg hover:bg-muted transition-colors text-foreground"
                   data-testid="button-cancel-delete"
                 >
@@ -203,4 +218,6 @@ export function StyleCard({ style, className, onDelete }: StyleCardProps) {
       </AnimatePresence>
     </>
   );
-}
+});
+
+export { StyleCardComponent as StyleCard };
