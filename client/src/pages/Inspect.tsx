@@ -2,7 +2,7 @@ import { useRoute } from "wouter";
 import { fetchStyleById, type Style } from "@/lib/store";
 import { Layout } from "@/components/layout";
 import { TokenViewer } from "@/components/token-viewer";
-import { ArrowLeft, Download, Loader2, ChevronDown, ChevronUp, Eye, Palette, MessageSquare } from "lucide-react";
+import { ArrowLeft, Download, Loader2, ChevronDown, ChevronUp, Eye, Palette, MessageSquare, Share2, Check, Copy } from "lucide-react";
 import { Link } from "wouter";
 import { useState, useEffect, type ReactNode } from "react";
 import { AiMoodBoard } from "@/components/ai-mood-board";
