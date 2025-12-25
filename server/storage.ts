@@ -1,4 +1,4 @@
-import { type Style, type InsertStyle, type GeneratedImage, type InsertGeneratedImage, type MoodBoardAssets, type UiConceptAssets, type MetadataTags, type MetadataEnrichmentStatus, type Job, type InsertJob, type JobStatus, type JobType, type Batch, type InsertBatch, type StyleSpec, type ImageAssetType, styles, generatedImages, jobs, batches, imageAssets } from "@shared/schema";
+import { type Style, type InsertStyle, type GeneratedImage, type InsertGeneratedImage, type MoodBoardAssets, type UiConceptAssets, type MetadataTags, type MetadataEnrichmentStatus, type Job, type InsertJob, type JobStatus, type JobType, type Batch, type InsertBatch, type StyleSpec, type ImageAssetType, type Bookmark, type InsertBookmark, type Rating, type InsertRating, styles, generatedImages, jobs, batches, imageAssets, bookmarks, ratings } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, or, inArray, sql } from "drizzle-orm";
 
@@ -69,6 +69,20 @@ export interface IStorage {
 
   // Style spec operations
   updateStyleSpec(id: string, spec: StyleSpec): Promise<Style | undefined>;
+
+  // Bookmark operations
+  getBookmarksByUser(userId: string): Promise<Bookmark[]>;
+  getBookmark(userId: string, styleId: string): Promise<Bookmark | undefined>;
+  createBookmark(bookmark: InsertBookmark): Promise<Bookmark>;
+  deleteBookmark(userId: string, styleId: string): Promise<void>;
+  isStyleBookmarked(userId: string, styleId: string): Promise<boolean>;
+
+  // Rating operations
+  getRatingsByStyle(styleId: string): Promise<Rating[]>;
+  getRating(userId: string, styleId: string): Promise<Rating | undefined>;
+  createOrUpdateRating(rating: InsertRating): Promise<Rating>;
+  deleteRating(userId: string, styleId: string): Promise<void>;
+  getStyleAverageRating(styleId: string): Promise<{ average: number; count: number }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -615,6 +629,84 @@ export class DatabaseStorage implements IStorage {
       .where(eq(styles.id, id))
       .returning();
     return updated;
+  }
+
+  // Bookmark operations
+  async getBookmarksByUser(userId: string): Promise<Bookmark[]> {
+    return db.select().from(bookmarks).where(eq(bookmarks.userId, userId)).orderBy(desc(bookmarks.createdAt));
+  }
+
+  async getBookmark(userId: string, styleId: string): Promise<Bookmark | undefined> {
+    const [bookmark] = await db
+      .select()
+      .from(bookmarks)
+      .where(and(eq(bookmarks.userId, userId), eq(bookmarks.styleId, styleId)));
+    return bookmark;
+  }
+
+  async createBookmark(bookmark: InsertBookmark): Promise<Bookmark> {
+    const [created] = await db.insert(bookmarks).values(bookmark).returning();
+    return created;
+  }
+
+  async deleteBookmark(userId: string, styleId: string): Promise<void> {
+    await db.delete(bookmarks).where(
+      and(eq(bookmarks.userId, userId), eq(bookmarks.styleId, styleId))
+    );
+  }
+
+  async isStyleBookmarked(userId: string, styleId: string): Promise<boolean> {
+    const bookmark = await this.getBookmark(userId, styleId);
+    return !!bookmark;
+  }
+
+  // Rating operations
+  async getRatingsByStyle(styleId: string): Promise<Rating[]> {
+    return db.select().from(ratings).where(eq(ratings.styleId, styleId)).orderBy(desc(ratings.createdAt));
+  }
+
+  async getRating(userId: string, styleId: string): Promise<Rating | undefined> {
+    const [rating] = await db
+      .select()
+      .from(ratings)
+      .where(and(eq(ratings.userId, userId), eq(ratings.styleId, styleId)));
+    return rating;
+  }
+
+  async createOrUpdateRating(rating: InsertRating): Promise<Rating> {
+    const existing = await this.getRating(rating.userId, rating.styleId);
+    if (existing) {
+      const [updated] = await db
+        .update(ratings)
+        .set({ 
+          rating: rating.rating, 
+          review: rating.review,
+          updatedAt: new Date(),
+        })
+        .where(eq(ratings.id, existing.id))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(ratings).values(rating).returning();
+    return created;
+  }
+
+  async deleteRating(userId: string, styleId: string): Promise<void> {
+    await db.delete(ratings).where(
+      and(eq(ratings.userId, userId), eq(ratings.styleId, styleId))
+    );
+  }
+
+  async getStyleAverageRating(styleId: string): Promise<{ average: number; count: number }> {
+    const styleRatings = await this.getRatingsByStyle(styleId);
+    if (styleRatings.length === 0) {
+      return { average: 0, count: 0 };
+    }
+    const sum = styleRatings.reduce((acc, r) => acc + r.rating, 0);
+    return { 
+      average: Math.round((sum / styleRatings.length) * 10) / 10, 
+      count: styleRatings.length 
+    };
   }
 }
 
