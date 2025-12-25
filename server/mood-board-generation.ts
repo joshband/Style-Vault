@@ -17,12 +17,15 @@ interface TokenSummary {
   mood: { tone: string; saturation: string; contrast: string };
 }
 
+type ProgressCallback = (progress: number, message: string) => Promise<void>;
+
 interface MoodBoardRequest {
   styleName: string;
   styleDescription: string;
   tokens: Record<string, any>;
   metadataTags: MetadataTags;
   referenceImageBase64?: string;
+  onProgress?: ProgressCallback;
 }
 
 function extractTokenSummary(tokens: Record<string, any>): TokenSummary {
@@ -259,28 +262,58 @@ async function generateSingleUiConcept(
 }
 
 export async function generateUiConcepts(
-  request: MoodBoardRequest
+  request: MoodBoardRequest,
+  onProgress?: ProgressCallback
 ): Promise<UiConceptAssets> {
-  const [audioPlugin, dashboard] = await Promise.all([
-    generateSingleUiConcept(request, "audioPlugin"),
-    generateSingleUiConcept(request, "dashboard"),
-  ]);
+  if (onProgress) {
+    await onProgress(55, "Generating audio plugin UI concept...");
+    const audioPlugin = await generateSingleUiConcept(request, "audioPlugin");
+    
+    await onProgress(75, "Generating dashboard UI concept...");
+    const dashboard = await generateSingleUiConcept(request, "dashboard");
+    
+    return {
+      audioPlugin: audioPlugin || undefined,
+      dashboard: dashboard || undefined,
+      status: audioPlugin || dashboard ? "complete" : "failed",
+      history: [],
+    };
+  } else {
+    const [audioPlugin, dashboard] = await Promise.all([
+      generateSingleUiConcept(request, "audioPlugin"),
+      generateSingleUiConcept(request, "dashboard"),
+    ]);
 
-  return {
-    audioPlugin: audioPlugin || undefined,
-    dashboard: dashboard || undefined,
-    status: audioPlugin || dashboard ? "complete" : "failed",
-    history: [],
-  };
+    return {
+      audioPlugin: audioPlugin || undefined,
+      dashboard: dashboard || undefined,
+      status: audioPlugin || dashboard ? "complete" : "failed",
+      history: [],
+    };
+  }
 }
 
 export async function generateAllMoodBoardAssets(
   request: MoodBoardRequest
 ): Promise<{ moodBoard: MoodBoardAssets; uiConcepts: UiConceptAssets }> {
-  const [moodBoard, uiConcepts] = await Promise.all([
-    generateMoodBoardCollage(request),
-    generateUiConcepts(request),
-  ]);
+  const { onProgress } = request;
+  
+  if (onProgress) {
+    await onProgress(5, "Preparing style tokens...");
+    await onProgress(10, "Generating mood board collage...");
+    const moodBoard = await generateMoodBoardCollage(request);
+    
+    await onProgress(40, "Mood board complete. Generating UI concepts...");
+    const uiConcepts = await generateUiConcepts(request, onProgress);
+    
+    await onProgress(95, "Finalizing assets...");
+    return { moodBoard, uiConcepts };
+  } else {
+    const [moodBoard, uiConcepts] = await Promise.all([
+      generateMoodBoardCollage(request),
+      generateUiConcepts(request),
+    ]);
 
-  return { moodBoard, uiConcepts };
+    return { moodBoard, uiConcepts };
+  }
 }
