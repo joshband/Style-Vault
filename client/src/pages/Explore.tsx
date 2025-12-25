@@ -2,35 +2,12 @@ import { deleteStyleApi, type Style } from "@/lib/store";
 import { StyleCard } from "@/components/style-card";
 import { StyleCardSkeleton } from "@/components/style-card-skeleton";
 import { Layout } from "@/components/layout";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { RefreshCw, PenTool, Loader2 } from "lucide-react";
-import { useCallback, useRef, useEffect, useMemo, useState } from "react";
+import { useCallback, useRef, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { useVirtualizer } from "@tanstack/react-virtual";
-
-function useColumnCount() {
-  const [columnCount, setColumnCount] = useState(3);
-  
-  useEffect(() => {
-    const updateColumnCount = () => {
-      if (window.innerWidth < 640) {
-        setColumnCount(1);
-      } else if (window.innerWidth < 1024) {
-        setColumnCount(2);
-      } else {
-        setColumnCount(3);
-      }
-    };
-    
-    updateColumnCount();
-    window.addEventListener("resize", updateColumnCount);
-    return () => window.removeEventListener("resize", updateColumnCount);
-  }, []);
-  
-  return columnCount;
-}
 
 interface PaginatedResponse {
   items: Style[];
@@ -43,7 +20,8 @@ const PAGE_SIZE = 12;
 
 export default function Explore() {
   const queryClient = useQueryClient();
-  const parentRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   
   const {
     data,
@@ -80,7 +58,7 @@ export default function Explore() {
 
   const deleteMutation = useMutation({
     mutationFn: deleteStyleApi,
-    onSuccess: (_, deletedId) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/styles"] });
     },
   });
@@ -91,34 +69,21 @@ export default function Explore() {
 
   const handleRetry = useCallback(() => refetch(), [refetch]);
 
-  const columnCount = useColumnCount();
-  const rowCount = Math.ceil(allStyles.length / columnCount);
-
-  const rowVirtualizer = useVirtualizer({
-    count: rowCount + (hasNextPage ? 1 : 0),
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => 420,
-    overscan: 2,
-  });
-
   useEffect(() => {
-    const [lastItem] = [...rowVirtualizer.getVirtualItems()].reverse();
-    if (!lastItem) return;
+    if (!sentinelRef.current || !containerRef.current) return;
     
-    if (
-      lastItem.index >= rowCount - 1 &&
-      hasNextPage &&
-      !isFetchingNextPage
-    ) {
-      fetchNextPage();
-    }
-  }, [
-    hasNextPage,
-    fetchNextPage,
-    isFetchingNextPage,
-    rowVirtualizer.getVirtualItems(),
-    rowCount,
-  ]);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { root: null, rootMargin: "300px" }
+    );
+    
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [hasNextPage, fetchNextPage, isFetchingNextPage]);
 
   if (isLoading) {
     return (
@@ -144,7 +109,7 @@ export default function Explore() {
 
   return (
     <Layout>
-      <div className="flex flex-col gap-6 md:gap-8 h-full">
+      <div ref={containerRef} className="flex flex-col gap-6 md:gap-8">
         <div className="border-b border-border pb-4 md:pb-6 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="space-y-1">
@@ -206,76 +171,40 @@ export default function Explore() {
         )}
 
         {!isError && allStyles.length > 0 && (
-          <div
-            ref={parentRef}
-            className="flex-1 overflow-auto -mx-4 px-4"
-            style={{ contain: "strict" }}
-          >
-            <div
-              style={{
-                height: `${rowVirtualizer.getTotalSize()}px`,
-                width: "100%",
-                position: "relative",
-              }}
-            >
-              {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                const isLoaderRow = virtualRow.index >= rowCount;
-                const startIndex = virtualRow.index * columnCount;
-                const rowStyles = allStyles.slice(startIndex, startIndex + columnCount);
-
-                if (isLoaderRow) {
-                  return (
-                    <div
-                      key="loader"
-                      style={{
-                        position: "absolute",
-                        top: 0,
-                        left: 0,
-                        width: "100%",
-                        height: `${virtualRow.size}px`,
-                        transform: `translateY(${virtualRow.start}px)`,
-                      }}
-                      className="flex items-center justify-center py-8"
-                    >
-                      {isFetchingNextPage && (
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Loader2 className="w-5 h-5 animate-spin" />
-                          <span className="text-sm">Loading more styles...</span>
-                        </div>
-                      )}
-                    </div>
-                  );
-                }
-
-                return (
-                  <div
-                    key={virtualRow.index}
-                    style={{
-                      position: "absolute",
-                      top: 0,
-                      left: 0,
-                      width: "100%",
-                      height: `${virtualRow.size}px`,
-                      transform: `translateY(${virtualRow.start}px)`,
-                    }}
+          <>
+            <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+              <AnimatePresence mode="popLayout">
+                {allStyles.map((style, index) => (
+                  <motion.div
+                    key={style.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.3, delay: Math.min(index * 0.03, 0.3), ease: "easeOut" }}
                   >
-                    <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 pb-6">
-                      {rowStyles.map((style, idx) => (
-                        <motion.div
-                          key={style.id}
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.3, delay: idx * 0.05, ease: "easeOut" }}
-                        >
-                          <StyleCard style={style} onDelete={handleStyleDelete} />
-                        </motion.div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
+                    <StyleCard style={style} onDelete={handleStyleDelete} />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
-          </div>
+            
+            <div ref={sentinelRef} className="h-4" aria-hidden="true" />
+            
+            {isFetchingNextPage && (
+              <div className="flex items-center justify-center py-8">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span className="text-sm">Loading more styles...</span>
+                </div>
+              </div>
+            )}
+            
+            {!hasNextPage && allStyles.length > PAGE_SIZE && (
+              <div className="text-center py-4 text-muted-foreground text-sm">
+                All styles loaded
+              </div>
+            )}
+          </>
         )}
       </div>
     </Layout>
