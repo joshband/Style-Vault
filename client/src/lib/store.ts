@@ -84,6 +84,7 @@ export interface Style {
   name: string;
   description: string;
   createdAt: string;
+  shareCode?: string | null;
   
   // Images
   referenceImages: string[];

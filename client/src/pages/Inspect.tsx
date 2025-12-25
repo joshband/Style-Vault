@@ -73,7 +73,12 @@ export default function Inspect() {
   useEffect(() => {
     if (id) {
       fetchStyleById(id)
-        .then(setStyle)
+        .then((fetchedStyle) => {
+          setStyle(fetchedStyle);
+          if (fetchedStyle?.shareCode) {
+            setShareCode(fetchedStyle.shareCode);
+          }
+        })
         .finally(() => setLoading(false));
     }
   }, [id]);
