@@ -4,11 +4,12 @@ import { Layout } from "@/components/layout";
 import { TokenViewer } from "@/components/token-viewer";
 import { ColorPaletteSwatches } from "@/components/color-palette-swatches";
 import { StyleSpecEditor } from "@/components/style-spec-editor";
-import { ArrowLeft, Download, Loader2, ChevronDown, ChevronUp, Eye, Palette, MessageSquare, Share2, Check, Copy, Droplets, FileEdit } from "lucide-react";
+import { ArrowLeft, Download, Loader2, ChevronDown, ChevronUp, Eye, Palette, MessageSquare, Share2, Check, Copy, Droplets, FileEdit, Bookmark, Star } from "lucide-react";
 import { Link } from "wouter";
 import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { AiMoodBoard } from "@/components/ai-mood-board";
 import { ActiveJobsIndicator } from "@/components/active-jobs-indicator";
+import { useAuth } from "@/hooks/use-auth";
 
 interface StyleSummary {
   id: string;
@@ -70,6 +71,7 @@ function PreviewSkeleton({ aspect }: { aspect: string }) {
 export default function Inspect() {
   const [, params] = useRoute("/style/:id");
   const id = params?.id;
+  const { user, isAuthenticated } = useAuth();
   const [summary, setSummary] = useState<StyleSummary | null>(null);
   const [assets, setAssets] = useState<StyleAssets | null>(null);
   const [loading, setLoading] = useState(true);
@@ -78,6 +80,17 @@ export default function Inspect() {
   const [shareCode, setShareCode] = useState<string | null>(null);
   const [shareLoading, setShareLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  
+  // Bookmark state
+  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [bookmarkLoading, setBookmarkLoading] = useState(false);
+  
+  // Rating state
+  const [userRating, setUserRating] = useState<number>(0);
+  const [userReview, setUserReview] = useState<string>("");
+  const [avgRating, setAvgRating] = useState<{ average: number; count: number }>({ average: 0, count: 0 });
+  const [ratingLoading, setRatingLoading] = useState(false);
+  const [hoveredStar, setHoveredStar] = useState<number>(0);
 
   const handleShare = useCallback(async () => {
     if (!id) return;
@@ -102,6 +115,98 @@ export default function Inspect() {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }, [shareCode]);
+
+  const handleToggleBookmark = useCallback(async () => {
+    if (!id || !isAuthenticated) return;
+    setBookmarkLoading(true);
+    try {
+      if (isBookmarked) {
+        await fetch(`/api/styles/${id}/bookmark`, { method: "DELETE" });
+        setIsBookmarked(false);
+      } else {
+        await fetch(`/api/styles/${id}/bookmark`, { method: "POST" });
+        setIsBookmarked(true);
+      }
+    } catch (error) {
+      console.error("Failed to toggle bookmark:", error);
+    } finally {
+      setBookmarkLoading(false);
+    }
+  }, [id, isAuthenticated, isBookmarked]);
+
+  const handleSubmitRating = useCallback(async (rating: number) => {
+    if (!id || !isAuthenticated) return;
+    setRatingLoading(true);
+    try {
+      const res = await fetch(`/api/styles/${id}/rating`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rating, review: userReview }),
+      });
+      if (res.ok) {
+        setUserRating(rating);
+        const ratingsRes = await fetch(`/api/styles/${id}/ratings`);
+        if (ratingsRes.ok) {
+          const data = await ratingsRes.json();
+          setAvgRating({ average: data.average, count: data.count });
+        }
+      }
+    } catch (error) {
+      console.error("Failed to submit rating:", error);
+    } finally {
+      setRatingLoading(false);
+    }
+  }, [id, isAuthenticated, userReview]);
+
+  // Load bookmark and rating status
+  useEffect(() => {
+    if (!id || !isAuthenticated) return;
+    
+    const loadUserData = async () => {
+      try {
+        const [bookmarkRes, ratingRes] = await Promise.all([
+          fetch(`/api/styles/${id}/bookmark`),
+          fetch(`/api/styles/${id}/my-rating`),
+        ]);
+        
+        if (bookmarkRes.ok) {
+          const data = await bookmarkRes.json();
+          setIsBookmarked(data.isBookmarked);
+        }
+        
+        if (ratingRes.ok) {
+          const data = await ratingRes.json();
+          if (data) {
+            setUserRating(data.rating);
+            setUserReview(data.review || "");
+          }
+        }
+      } catch (error) {
+        console.error("Failed to load user data:", error);
+      }
+    };
+    
+    loadUserData();
+  }, [id, isAuthenticated]);
+
+  // Load average rating (public)
+  useEffect(() => {
+    if (!id) return;
+    
+    const loadRatings = async () => {
+      try {
+        const res = await fetch(`/api/styles/${id}/ratings`);
+        if (res.ok) {
+          const data = await res.json();
+          setAvgRating({ average: data.average, count: data.count });
+        }
+      } catch (error) {
+        console.error("Failed to load ratings:", error);
+      }
+    };
+    
+    loadRatings();
+  }, [id]);
 
   useEffect(() => {
     if (!id) return;
@@ -249,6 +354,28 @@ export default function Inspect() {
             </div>
             
             <div className="flex items-center gap-2">
+              {/* Bookmark button */}
+              {isAuthenticated && (
+                <button
+                  onClick={handleToggleBookmark}
+                  disabled={bookmarkLoading}
+                  className={`inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors disabled:opacity-50 ${
+                    isBookmarked 
+                      ? "border-yellow-500 bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20" 
+                      : "border-border bg-muted/50 hover:bg-muted"
+                  }`}
+                  data-testid="button-bookmark-style"
+                >
+                  {bookmarkLoading ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Bookmark size={14} className={isBookmarked ? "fill-current" : ""} />
+                  )}
+                  <span>{isBookmarked ? "Saved" : "Save"}</span>
+                </button>
+              )}
+              
+              {/* Share button */}
               {shareCode ? (
                 <button
                   onClick={handleCopyLink}
@@ -282,6 +409,44 @@ export default function Inspect() {
                   <span>Share</span>
                 </button>
               )}
+            </div>
+          </div>
+          
+          {/* Rating Section */}
+          <div className="flex items-center gap-4 pt-2 border-t border-border mt-4">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Rating:</span>
+              <div className="flex items-center gap-0.5">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    onClick={() => isAuthenticated && handleSubmitRating(star)}
+                    onMouseEnter={() => isAuthenticated && setHoveredStar(star)}
+                    onMouseLeave={() => setHoveredStar(0)}
+                    disabled={ratingLoading || !isAuthenticated}
+                    className={`p-0.5 transition-colors disabled:cursor-default ${
+                      isAuthenticated ? "cursor-pointer hover:scale-110" : ""
+                    }`}
+                    data-testid={`button-rate-${star}`}
+                    title={isAuthenticated ? `Rate ${star} star${star > 1 ? 's' : ''}` : "Sign in to rate"}
+                  >
+                    <Star 
+                      size={18} 
+                      className={`transition-colors ${
+                        star <= (hoveredStar || userRating)
+                          ? "fill-yellow-400 text-yellow-400"
+                          : "text-muted-foreground/40"
+                      }`}
+                    />
+                  </button>
+                ))}
+              </div>
+              {avgRating.count > 0 && (
+                <span className="text-xs text-muted-foreground ml-2">
+                  {avgRating.average.toFixed(1)} ({avgRating.count} {avgRating.count === 1 ? 'rating' : 'ratings'})
+                </span>
+              )}
+              {ratingLoading && <Loader2 size={14} className="animate-spin ml-2" />}
             </div>
           </div>
         </div>

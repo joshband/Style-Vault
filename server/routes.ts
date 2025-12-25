@@ -13,7 +13,7 @@ import { sql } from "drizzle-orm";
 import { cache, CACHE_KEYS } from "./cache";
 import type { MetadataTags } from "@shared/schema";
 import { getJobProgress, startJobInBackground } from "./job-runner";
-import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
+import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 
 function getDefaultMetadataTags(): MetadataTags {
   return {
@@ -652,6 +652,126 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error getting image IDs:", error);
       res.status(500).json({ error: "Failed to get image IDs" });
+    }
+  });
+
+  // ========== BOOKMARK ROUTES ==========
+
+  // Get user's bookmarks (requires auth)
+  app.get("/api/bookmarks", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any)?.claims?.sub;
+      const userBookmarks = await storage.getBookmarksByUser(userId);
+      res.json(userBookmarks);
+    } catch (error) {
+      console.error("Error fetching bookmarks:", error);
+      res.status(500).json({ error: "Failed to fetch bookmarks" });
+    }
+  });
+
+  // Check if style is bookmarked (requires auth)
+  app.get("/api/styles/:id/bookmark", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any)?.claims?.sub;
+      const isBookmarked = await storage.isStyleBookmarked(userId, req.params.id);
+      res.json({ isBookmarked });
+    } catch (error) {
+      console.error("Error checking bookmark:", error);
+      res.status(500).json({ error: "Failed to check bookmark" });
+    }
+  });
+
+  // Add bookmark (requires auth)
+  app.post("/api/styles/:id/bookmark", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any)?.claims?.sub;
+      const styleId = req.params.id;
+      
+      const existing = await storage.getBookmark(userId, styleId);
+      if (existing) {
+        return res.json(existing);
+      }
+      
+      const bookmark = await storage.createBookmark({ userId, styleId });
+      res.status(201).json(bookmark);
+    } catch (error) {
+      console.error("Error creating bookmark:", error);
+      res.status(500).json({ error: "Failed to create bookmark" });
+    }
+  });
+
+  // Remove bookmark (requires auth)
+  app.delete("/api/styles/:id/bookmark", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any)?.claims?.sub;
+      await storage.deleteBookmark(userId, req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error removing bookmark:", error);
+      res.status(500).json({ error: "Failed to remove bookmark" });
+    }
+  });
+
+  // ========== RATING ROUTES ==========
+
+  // Get ratings for a style (public)
+  app.get("/api/styles/:id/ratings", async (req, res) => {
+    try {
+      const styleRatings = await storage.getRatingsByStyle(req.params.id);
+      const { average, count } = await storage.getStyleAverageRating(req.params.id);
+      res.json({ ratings: styleRatings, average, count });
+    } catch (error) {
+      console.error("Error fetching ratings:", error);
+      res.status(500).json({ error: "Failed to fetch ratings" });
+    }
+  });
+
+  // Get user's rating for a style (requires auth)
+  app.get("/api/styles/:id/my-rating", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any)?.claims?.sub;
+      const rating = await storage.getRating(userId, req.params.id);
+      res.json(rating || null);
+    } catch (error) {
+      console.error("Error fetching user rating:", error);
+      res.status(500).json({ error: "Failed to fetch rating" });
+    }
+  });
+
+  // Add or update rating (requires auth)
+  app.post("/api/styles/:id/rating", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any)?.claims?.sub;
+      const styleId = req.params.id;
+      const { rating, review } = req.body;
+      
+      if (!rating || rating < 1 || rating > 5) {
+        return res.status(400).json({ error: "Rating must be between 1 and 5" });
+      }
+      
+      const savedRating = await storage.createOrUpdateRating({
+        userId,
+        styleId,
+        rating,
+        review: review || null,
+      });
+      
+      res.json(savedRating);
+    } catch (error) {
+      console.error("Error saving rating:", error);
+      res.status(500).json({ error: "Failed to save rating" });
+    }
+  });
+
+  // Delete rating (requires auth)
+  app.delete("/api/styles/:id/rating", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any)?.claims?.sub;
+      await storage.deleteRating(userId, req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting rating:", error);
+      res.status(500).json({ error: "Failed to delete rating" });
     }
   });
 
