@@ -1,8 +1,8 @@
-# Style Explorer
+# Design Token Style Explorer
 
 ## Overview
 
-Style Explorer is a style intelligence application for managing visual styles as first-class, standards-based artifacts. Unlike typical image generators, this application treats styles as reusable, inspectable, and comparable objects composed of reference images, canonical preview images, W3C DTCG design tokens, and AI prompt scaffolding derived from those tokens.
+Design Token Style Explorer is a style intelligence application for managing visual styles as first-class, standards-based artifacts. Unlike typical image generators, this application treats styles as reusable, inspectable, and comparable objects composed of reference images, canonical preview images, W3C DTCG design tokens, and AI prompt scaffolding derived from those tokens.
 
 The core philosophy is that **tokens are the source of truth** - every style must have a comprehensive W3C DTCG 2025.10 design-token JSON, and image generation is merely a consumer of styles, not their definition.
 
