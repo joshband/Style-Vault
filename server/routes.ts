@@ -290,6 +290,79 @@ export async function registerRoutes(
     }
   });
 
+  // Generate or get share code for a style
+  app.post("/api/styles/:id/share", async (req, res) => {
+    try {
+      const styleId = req.params.id;
+      const style = await storage.getStyleById(styleId);
+      
+      if (!style) {
+        return res.status(404).json({ error: "Style not found" });
+      }
+      
+      // If already has a share code, return it
+      if (style.shareCode) {
+        return res.json({ shareCode: style.shareCode });
+      }
+      
+      // Generate a short, memorable share code (6 alphanumeric chars)
+      const generateShareCode = () => {
+        const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // No I,O,0,1 to avoid confusion
+        let code = "";
+        for (let i = 0; i < 6; i++) {
+          code += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return code;
+      };
+      
+      // Try to generate a unique code (retry up to 5 times)
+      let shareCode = generateShareCode();
+      let attempts = 0;
+      while (attempts < 5) {
+        const existing = await storage.getStyleByShareCode(shareCode);
+        if (!existing) break;
+        shareCode = generateShareCode();
+        attempts++;
+      }
+      
+      const updated = await storage.updateStyleShareCode(styleId, shareCode);
+      if (!updated) {
+        return res.status(500).json({ error: "Failed to generate share code" });
+      }
+      
+      // Invalidate cache
+      cache.delete(CACHE_KEYS.STYLE_DETAIL(styleId));
+      
+      res.json({ shareCode });
+    } catch (error) {
+      console.error("Error generating share code:", error);
+      res.status(500).json({
+        error: "Failed to generate share code",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // Get style by share code (public endpoint)
+  app.get("/api/shared/:code", async (req, res) => {
+    try {
+      const shareCode = req.params.code.toUpperCase();
+      const style = await storage.getStyleByShareCode(shareCode);
+      
+      if (!style) {
+        return res.status(404).json({ error: "Style not found" });
+      }
+      
+      res.json(style);
+    } catch (error) {
+      console.error("Error fetching shared style:", error);
+      res.status(500).json({
+        error: "Failed to fetch style",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
   // Analyze image and generate style name + description using AI
   app.post("/api/analyze-image", async (req, res) => {
     try {

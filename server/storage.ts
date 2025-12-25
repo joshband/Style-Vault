@@ -23,9 +23,11 @@ export interface IStorage {
   getStyles(): Promise<Style[]>;
   getStyleSummaries(): Promise<StyleSummary[]>;
   getStyleById(id: string): Promise<Style | undefined>;
+  getStyleByShareCode(shareCode: string): Promise<Style | undefined>;
   createStyle(style: InsertStyle): Promise<Style>;
   deleteStyle(id: string): Promise<void>;
   updateStyleMoodBoard(id: string, moodBoard: MoodBoardAssets, uiConcepts: UiConceptAssets): Promise<Style | undefined>;
+  updateStyleShareCode(id: string, shareCode: string): Promise<Style | undefined>;
   
   // Generated images operations (admin only)
   getGeneratedImages(): Promise<GeneratedImage[]>;
@@ -109,6 +111,11 @@ export class DatabaseStorage implements IStorage {
     return style;
   }
 
+  async getStyleByShareCode(shareCode: string): Promise<Style | undefined> {
+    const [style] = await db.select().from(styles).where(eq(styles.shareCode, shareCode));
+    return style;
+  }
+
   async createStyle(insertStyle: InsertStyle): Promise<Style> {
     const [style] = await db.insert(styles).values(insertStyle).returning();
     return style;
@@ -122,6 +129,15 @@ export class DatabaseStorage implements IStorage {
     const [updated] = await db
       .update(styles)
       .set({ moodBoard, uiConcepts })
+      .where(eq(styles.id, id))
+      .returning();
+    return updated;
+  }
+
+  async updateStyleShareCode(id: string, shareCode: string): Promise<Style | undefined> {
+    const [updated] = await db
+      .update(styles)
+      .set({ shareCode })
       .where(eq(styles.id, id))
       .returning();
     return updated;
