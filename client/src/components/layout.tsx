@@ -2,6 +2,7 @@ import { Link, useLocation } from "wouter";
 import { Compass, PenTool, Layers, Search, Settings, Menu, X, Eye, Wand2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
+import { ActiveJobsIndicator } from "./active-jobs-indicator";
 
 type AppMode = "explore" | "inspect" | "author" | "generate";
 
@@ -137,6 +138,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 className="bg-transparent border-none outline-none text-xs sm:text-sm w-full placeholder:text-muted-foreground/60"
               />
             </div>
+            
+            <ActiveJobsIndicator className="ml-auto" />
          </header>
 
          <div className="flex-1 p-4 sm:p-6 md:p-8 max-w-7xl mx-auto w-full overflow-auto">
