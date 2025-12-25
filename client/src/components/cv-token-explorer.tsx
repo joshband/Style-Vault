@@ -504,6 +504,8 @@ export function CVTokenExplorer({ referenceImage, styleName }: CVTokenExplorerPr
   const [error, setError] = useState<string | null>(null);
   const [cvEnabled, setCvEnabled] = useState<boolean | null>(null);
   const [walkthroughEnabled, setWalkthroughEnabled] = useState(false);
+  const [processingTime, setProcessingTime] = useState<number | null>(null);
+  const [includeDebugVisuals, setIncludeDebugVisuals] = useState(false);
 
   const checkStatus = async () => {
     try {
@@ -523,6 +525,8 @@ export function CVTokenExplorer({ referenceImage, styleName }: CVTokenExplorerPr
       return;
     }
 
+    const startTime = performance.now();
+    
     if (withWalkthrough) {
       setWalkthroughLoading(true);
     } else {
@@ -555,6 +559,7 @@ export function CVTokenExplorer({ referenceImage, styleName }: CVTokenExplorerPr
 
       const data = await res.json();
       setTokens(data.rawTokens);
+      setProcessingTime(performance.now() - startTime);
       if (data.debug) {
         setDebug(data.debug);
         setWalkthroughEnabled(true);
@@ -583,21 +588,35 @@ export function CVTokenExplorer({ referenceImage, styleName }: CVTokenExplorerPr
   if (!tokens && !loading) {
     return (
       <div className="flex flex-col items-center justify-center py-8 text-center space-y-4">
-        <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-          <Eye className="text-primary" size={24} />
+        <div className="w-16 h-16 rounded-full bg-amber-500/10 flex items-center justify-center">
+          <Eye className="text-amber-600" size={24} />
         </div>
         <div className="space-y-2">
           <h3 className="text-sm font-medium">CV Token Extraction</h3>
           <p className="text-xs text-muted-foreground max-w-xs">
-            Analyze the reference image to extract design tokens using computer vision. 
-            This is fast, deterministic, and runs entirely on CPU.
+            Analyze the reference image using classical computer vision algorithms. 
+            Runs on CPU in ~100-500ms.
           </p>
         </div>
+        
+        {/* Debug visualizations toggle */}
+        <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
+          <input
+            type="checkbox"
+            checked={includeDebugVisuals}
+            onChange={(e) => setIncludeDebugVisuals(e.target.checked)}
+            className="w-4 h-4 rounded border-border"
+            data-testid="checkbox-include-debug"
+          />
+          <span>Include debug visualizations</span>
+          <span className="text-[10px] text-muted-foreground">(+5-15s)</span>
+        </label>
+        
         <button
-          onClick={() => extractTokens(false)}
+          onClick={() => extractTokens(includeDebugVisuals)}
           disabled={loading}
           data-testid="button-extract-cv-tokens"
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+          className="px-4 py-2 bg-amber-600 text-white rounded-md text-sm font-medium hover:bg-amber-700 transition-colors disabled:opacity-50"
         >
           {loading ? (
             <span className="flex items-center gap-2">
@@ -605,7 +624,7 @@ export function CVTokenExplorer({ referenceImage, styleName }: CVTokenExplorerPr
               Analyzing...
             </span>
           ) : (
-            'Extract Tokens'
+            'Run CV Analysis'
           )}
         </button>
         {error && (
@@ -641,31 +660,44 @@ export function CVTokenExplorer({ referenceImage, styleName }: CVTokenExplorerPr
 
   if (!tokens) return null;
 
+  const formatTime = (ms: number) => {
+    if (ms < 1000) return `${Math.round(ms)}ms`;
+    return `${(ms / 1000).toFixed(1)}s`;
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">
-          Extracted via {tokens.meta.method} • Confidence: {tokens.meta.confidence}
+      {/* Results header with processing stats */}
+      <div className="flex items-center justify-between flex-wrap gap-2 p-3 bg-muted/50 rounded-lg">
+        <div className="space-y-1">
+          <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">
+            {tokens.meta.method} • {tokens.meta.confidence} confidence
+          </div>
+          {processingTime && (
+            <div className="text-[10px] font-mono text-amber-600">
+              Processed in {formatTime(processingTime)}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-3">
           {!debug && !walkthroughLoading && (
             <button
               onClick={loadWalkthrough}
-              className="text-[10px] text-primary hover:underline flex items-center gap-1"
+              className="text-[10px] text-amber-600 hover:underline flex items-center gap-1"
               data-testid="button-load-walkthrough"
             >
               <Microscope size={12} />
-              Load Walkthrough
+              Load Debug Visuals
             </button>
           )}
           {walkthroughLoading && (
             <span className="text-[10px] text-muted-foreground flex items-center gap-1">
               <Loader2 size={12} className="animate-spin" />
-              Loading walkthrough...
+              Loading...
             </span>
           )}
           <button
-            onClick={() => extractTokens(false)}
+            onClick={() => extractTokens(includeDebugVisuals)}
             className="text-[10px] underline text-muted-foreground hover:text-foreground"
             data-testid="button-refresh-cv-tokens"
           >
