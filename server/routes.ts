@@ -965,6 +965,181 @@ export async function registerRoutes(
     }
   });
 
+  // ========== COLLECTION ROUTES ==========
+
+  // Get user's collections (requires auth)
+  app.get("/api/collections", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any)?.claims?.sub;
+      const userCollections = await storage.getCollectionsByUser(userId);
+      res.json(userCollections);
+    } catch (error) {
+      console.error("Error fetching collections:", error);
+      res.status(500).json({ error: "Failed to fetch collections" });
+    }
+  });
+
+  // Get user's created styles (requires auth)
+  app.get("/api/my-styles", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any)?.claims?.sub;
+      const createdStyles = await storage.getStylesByCreator(userId);
+      res.json(createdStyles);
+    } catch (error) {
+      console.error("Error fetching created styles:", error);
+      res.status(500).json({ error: "Failed to fetch created styles" });
+    }
+  });
+
+  // Create a new collection (requires auth)
+  app.post("/api/collections", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any)?.claims?.sub;
+      const { name, description } = req.body;
+      
+      if (!name || typeof name !== 'string' || name.trim().length === 0) {
+        return res.status(400).json({ error: "Collection name is required" });
+      }
+
+      const collection = await storage.createCollection({
+        userId,
+        name: name.trim(),
+        description: description?.trim() || null,
+      });
+      res.status(201).json(collection);
+    } catch (error) {
+      console.error("Error creating collection:", error);
+      res.status(500).json({ error: "Failed to create collection" });
+    }
+  });
+
+  // Get a specific collection (requires auth, must own)
+  app.get("/api/collections/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any)?.claims?.sub;
+      const collection = await storage.getCollectionById(req.params.id);
+      
+      if (!collection) {
+        return res.status(404).json({ error: "Collection not found" });
+      }
+      if (collection.userId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const styleSummaries = await storage.getCollectionStyleSummaries(collection.id);
+      res.json({ ...collection, styles: styleSummaries });
+    } catch (error) {
+      console.error("Error fetching collection:", error);
+      res.status(500).json({ error: "Failed to fetch collection" });
+    }
+  });
+
+  // Update a collection (requires auth, must own)
+  app.patch("/api/collections/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any)?.claims?.sub;
+      const collection = await storage.getCollectionById(req.params.id);
+      
+      if (!collection) {
+        return res.status(404).json({ error: "Collection not found" });
+      }
+      if (collection.userId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { name, description } = req.body;
+      const updates: any = {};
+      if (name !== undefined) updates.name = name.trim();
+      if (description !== undefined) updates.description = description?.trim() || null;
+
+      const updated = await storage.updateCollection(req.params.id, updates);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating collection:", error);
+      res.status(500).json({ error: "Failed to update collection" });
+    }
+  });
+
+  // Delete a collection (requires auth, must own)
+  app.delete("/api/collections/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any)?.claims?.sub;
+      const collection = await storage.getCollectionById(req.params.id);
+      
+      if (!collection) {
+        return res.status(404).json({ error: "Collection not found" });
+      }
+      if (collection.userId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      await storage.deleteCollection(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting collection:", error);
+      res.status(500).json({ error: "Failed to delete collection" });
+    }
+  });
+
+  // Add style to collection (requires auth, must own collection)
+  app.post("/api/collections/:id/styles/:styleId", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any)?.claims?.sub;
+      const collection = await storage.getCollectionById(req.params.id);
+      
+      if (!collection) {
+        return res.status(404).json({ error: "Collection not found" });
+      }
+      if (collection.userId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const style = await storage.getStyleById(req.params.styleId);
+      if (!style) {
+        return res.status(404).json({ error: "Style not found" });
+      }
+
+      const item = await storage.addStyleToCollection(req.params.id, req.params.styleId);
+      res.status(201).json(item);
+    } catch (error) {
+      console.error("Error adding style to collection:", error);
+      res.status(500).json({ error: "Failed to add style to collection" });
+    }
+  });
+
+  // Remove style from collection (requires auth, must own collection)
+  app.delete("/api/collections/:id/styles/:styleId", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any)?.claims?.sub;
+      const collection = await storage.getCollectionById(req.params.id);
+      
+      if (!collection) {
+        return res.status(404).json({ error: "Collection not found" });
+      }
+      if (collection.userId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      await storage.removeStyleFromCollection(req.params.id, req.params.styleId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error removing style from collection:", error);
+      res.status(500).json({ error: "Failed to remove style from collection" });
+    }
+  });
+
+  // Get collections containing a specific style (requires auth)
+  app.get("/api/styles/:id/collections", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any)?.claims?.sub;
+      const containingCollections = await storage.getCollectionsContainingStyle(userId, req.params.id);
+      res.json(containingCollections);
+    } catch (error) {
+      console.error("Error fetching style collections:", error);
+      res.status(500).json({ error: "Failed to fetch collections" });
+    }
+  });
+
   // Generate canonical preview images for a style
   app.post("/api/generate-previews", async (req, res) => {
     try {
