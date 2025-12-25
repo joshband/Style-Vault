@@ -235,11 +235,15 @@ export default function Inspect() {
           <div className="flex items-center justify-between pt-2">
             <div className="flex items-center gap-4 text-xs text-muted-foreground">
               <time dateTime={summary.createdAt}>
-                Created {new Date(summary.createdAt).toLocaleDateString(undefined, { 
-                  month: 'long', 
-                  day: 'numeric', 
-                  year: 'numeric' 
-                })}
+                Created {(() => {
+                  const date = new Date(summary.createdAt);
+                  const displayDate = isNaN(date.getTime()) ? new Date() : date;
+                  return displayDate.toLocaleDateString(undefined, { 
+                    month: 'long', 
+                    day: 'numeric', 
+                    year: 'numeric' 
+                  });
+                })()}
               </time>
               <ActiveJobsIndicator styleId={id} />
             </div>
@@ -502,7 +506,8 @@ export default function Inspect() {
           />
           <StyleSpecEditor 
             styleId={summary.id} 
-            styleSpec={summary.styleSpec} 
+            styleSpec={summary.styleSpec}
+            createdAt={summary.createdAt}
             updatedAt={summary.updatedAt}
             onUpdate={handleSpecUpdate}
           />

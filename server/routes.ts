@@ -623,6 +623,21 @@ export async function registerRoutes(
     }
   });
 
+  // Enrich all styles with usage guidelines and design notes
+  app.post("/api/admin/enrich-style-specs", async (req, res) => {
+    try {
+      const { enrichAllStyleSpecs } = await import("./metadata-enrichment");
+      const result = await enrichAllStyleSpecs();
+      res.json({
+        message: `Processed ${result.processed} styles, ${result.success} succeeded`,
+        ...result,
+      });
+    } catch (error) {
+      console.error("Style spec enrichment error:", error);
+      res.status(500).json({ error: "Style spec enrichment failed" });
+    }
+  });
+
   // Get image asset IDs for a style
   app.get("/api/styles/:id/image-ids", async (req, res) => {
     try {

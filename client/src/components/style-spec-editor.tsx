@@ -57,6 +57,16 @@ export function StyleSpecEditor({
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
+    if (isNaN(date.getTime())) {
+      const today = new Date();
+      return today.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    }
     return date.toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
