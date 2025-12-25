@@ -654,9 +654,15 @@ export class DatabaseStorage implements IStorage {
       .where(eq(bookmarks.userId, userId))
       .orderBy(desc(bookmarks.createdAt));
 
-    return bookmarkedStyles.map((style) => ({
-      ...style,
-      thumbnailUrl: style.moodBoard?.thumbnailUrl || style.previews?.landscape || null,
+    return bookmarkedStyles.map((s) => ({
+      id: s.id,
+      name: s.name,
+      description: s.description,
+      createdAt: s.createdAt,
+      metadataTags: s.metadataTags,
+      moodBoardStatus: (s.moodBoard as any)?.status || "pending",
+      uiConceptsStatus: (s.uiConcepts as any)?.status || "pending",
+      thumbnailPreview: (s.previews as any)?.landscape || (s.previews as any)?.portrait || null,
     }));
   }
 

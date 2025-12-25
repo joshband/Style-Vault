@@ -10,13 +10,10 @@ interface StyleSummary {
   name: string;
   description: string | null;
   createdAt: string;
-  thumbnailUrl: string | null;
-  moodBoard?: {
-    thumbnailUrl?: string;
-  } | null;
-  previews?: {
-    landscape?: string;
-  } | null;
+  metadataTags?: any;
+  moodBoardStatus?: string;
+  uiConceptsStatus?: string;
+  thumbnailPreview?: string | null;
 }
 
 export default function SavedStyles() {
@@ -123,7 +120,10 @@ export default function SavedStyles() {
                   name: style.name,
                   description: style.description || "",
                   createdAt: style.createdAt,
-                  thumbnailPreview: style.thumbnailUrl || style.moodBoard?.thumbnailUrl || style.previews?.landscape || null,
+                  metadataTags: style.metadataTags,
+                  moodBoardStatus: style.moodBoardStatus,
+                  uiConceptsStatus: style.uiConceptsStatus,
+                  thumbnailPreview: style.thumbnailPreview,
                 }}
               />
             ))}
