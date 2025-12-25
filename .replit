@@ -46,4 +46,4 @@ integrations = ["javascript_gemini_ai_integrations:2.0.0", "javascript_log_in_wi
 [userenv]
 
 [userenv.shared]
-CV_EXTRACTION_ENABLED = "false"
+CV_EXTRACTION_ENABLED = "true"
