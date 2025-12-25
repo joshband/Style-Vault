@@ -12,7 +12,7 @@ import { db } from "./db";
 import { sql } from "drizzle-orm";
 import { cache, CACHE_KEYS } from "./cache";
 import type { MetadataTags } from "@shared/schema";
-import { getJobProgress, createAndRunJob } from "./job-runner";
+import { getJobProgress, startJobInBackground } from "./job-runner";
 
 function getDefaultMetadataTags(): MetadataTags {
   return {
@@ -404,7 +404,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Image data required" });
       }
 
-      const { job } = await createAndRunJob(
+      const job = await startJobInBackground(
         "style_analysis",
         { imageBase64 },
         async (input, onProgress) => {
@@ -432,7 +432,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Style name and description required" });
       }
 
-      const { job } = await createAndRunJob(
+      const job = await startJobInBackground(
         "preview_generation",
         { styleName, styleDescription, referenceImageBase64 },
         async (input, onProgress) => {
