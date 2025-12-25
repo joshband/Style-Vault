@@ -300,13 +300,50 @@ export async function generateAllMoodBoardAssets(
   
   if (onProgress) {
     await onProgress(5, "Preparing style tokens...");
-    await onProgress(10, "Generating mood board collage...");
-    const moodBoard = await generateMoodBoardCollage(request);
+    await onProgress(8, "Starting parallel asset generation: mood board, audio plugin, dashboard...");
     
-    await onProgress(40, "Mood board complete. Generating UI concepts...");
-    const uiConcepts = await generateUiConcepts(request, onProgress);
+    // Track completion for progress updates
+    let completedCount = 0;
+    const totalTasks = 3;
+    
+    const updateProgress = async (taskName: string) => {
+      completedCount++;
+      // Progress goes from 10 to 90 as tasks complete (10, 37, 63, 90)
+      const progress = 10 + Math.floor((completedCount / totalTasks) * 80);
+      await onProgress(progress, `Generated ${taskName} (${completedCount}/${totalTasks})`);
+    };
+    
+    // Run all three image generations in parallel for ~3x speed improvement
+    const [moodBoard, audioPlugin, dashboard] = await Promise.all([
+      (async () => {
+        await onProgress(12, "Generating mood board collage...");
+        const result = await generateMoodBoardCollage(request);
+        await updateProgress("mood board collage");
+        return result;
+      })(),
+      (async () => {
+        await onProgress(14, "Generating audio plugin UI...");
+        const result = await generateSingleUiConcept(request, "audioPlugin");
+        await updateProgress("audio plugin UI");
+        return result;
+      })(),
+      (async () => {
+        await onProgress(16, "Generating dashboard UI...");
+        const result = await generateSingleUiConcept(request, "dashboard");
+        await updateProgress("dashboard UI");
+        return result;
+      })(),
+    ]);
     
     await onProgress(95, "Finalizing assets...");
+    
+    const uiConcepts: UiConceptAssets = {
+      audioPlugin: audioPlugin || undefined,
+      dashboard: dashboard || undefined,
+      status: audioPlugin || dashboard ? "complete" : "failed",
+      history: [],
+    };
+    
     return { moodBoard, uiConcepts };
   } else {
     const [moodBoard, uiConcepts] = await Promise.all([

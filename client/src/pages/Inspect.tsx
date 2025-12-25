@@ -37,6 +37,14 @@ export default function Inspect() {
   const [tokensExpanded, setTokensExpanded] = useState(false);
   const [explorerExpanded, setExplorerExpanded] = useState(false);
 
+  const refetchStyle = () => {
+    if (id) {
+      fetchStyleById(id).then((newStyle) => {
+        if (newStyle) setStyle(newStyle);
+      });
+    }
+  };
+
   useEffect(() => {
     if (id) {
       fetchStyleById(id)
@@ -44,6 +52,26 @@ export default function Inspect() {
         .finally(() => setLoading(false));
     }
   }, [id]);
+
+  // Refetch style data periodically when assets are generating
+  // Uses memoized status values to ensure effect responds to state changes
+  const moodBoardStatus = style?.moodBoard?.status;
+  const uiConceptsStatus = style?.uiConcepts?.status;
+  
+  useEffect(() => {
+    if (!id) return;
+    
+    const isGenerating = 
+      moodBoardStatus === "generating" || 
+      moodBoardStatus === "pending" ||
+      uiConceptsStatus === "generating" ||
+      uiConceptsStatus === "pending";
+    
+    if (isGenerating) {
+      const interval = setInterval(refetchStyle, 2000);
+      return () => clearInterval(interval);
+    }
+  }, [id, moodBoardStatus, uiConceptsStatus]);
 
   const handleDownloadTokens = () => {
     if (!style) return;
@@ -95,6 +123,35 @@ export default function Inspect() {
               {style.description}
             </p>
           </div>
+          
+          {/* Reference Image - displayed prominently below description */}
+          {style.referenceImages && style.referenceImages.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Source Reference
+              </h3>
+              <div className="max-w-md">
+                <div className="rounded-lg overflow-hidden border border-border bg-muted/30">
+                  <img 
+                    src={style.referenceImages[0]} 
+                    alt="Source reference" 
+                    className="w-full h-auto object-contain"
+                    loading="lazy"
+                    data-testid="img-reference-main"
+                  />
+                </div>
+                {style.referenceImages.length > 1 && (
+                  <div className="flex gap-2 mt-2">
+                    {style.referenceImages.slice(1).map((img, i) => (
+                      <div key={i} className="w-16 h-16 rounded-lg overflow-hidden border border-border">
+                        <img src={img} alt={`Reference ${i + 2}`} className="w-full h-full object-cover" loading="lazy" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
           
           <div className="flex items-center gap-4 text-xs text-muted-foreground pt-2">
             <time dateTime={style.createdAt}>
@@ -182,21 +239,6 @@ export default function Inspect() {
             </div>
           </div>
 
-          {/* Reference Images */}
-          {style.referenceImages && style.referenceImages.length > 0 && (
-            <div className="space-y-4 pt-6">
-              <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Reference Sources
-              </h3>
-              <div className="flex gap-2 flex-wrap">
-                {style.referenceImages.map((img, i) => (
-                  <div key={i} className="w-20 h-20 rounded-lg overflow-hidden border border-border">
-                    <img src={img} alt={`Reference ${i + 1}`} className="w-full h-full object-cover" loading="lazy" />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Mood Board & UI Concepts */}
           <div className="pt-6">
