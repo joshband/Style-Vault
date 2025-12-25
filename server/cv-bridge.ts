@@ -238,9 +238,56 @@ export async function extractTokensWithWalkthrough(imageBase64: string): Promise
 }
 
 /**
+ * Validate and normalize a single OKLCH color token
+ * Returns normalized values with bounds checking
+ * Note: OKLCH chroma can go up to ~0.5 for very saturated colors
+ */
+function normalizeOklchColor(color: CVColorToken): CVColorToken {
+  return {
+    space: color.space || 'oklch',
+    l: Math.max(0, Math.min(1, color.l || 0)),
+    c: Math.max(0, Math.min(0.5, color.c || 0)),
+    h: color.h != null && !isNaN(color.h) ? ((color.h % 360) + 360) % 360 : 0,
+  };
+}
+
+/**
+ * Validate extracted tokens and log any issues
+ * Returns true if tokens are valid enough to use
+ */
+export function validateExtractedTokens(tokens: CVExtractedTokens): { valid: boolean; warnings: string[] } {
+  const warnings: string[] = [];
+  
+  if (!tokens.color || tokens.color.length === 0) {
+    warnings.push("No colors extracted");
+  } else if (tokens.color.length < 3) {
+    warnings.push(`Only ${tokens.color.length} colors extracted, palette may be limited`);
+  }
+  
+  if (!tokens.spacing || tokens.spacing.length === 0) {
+    warnings.push("No spacing values detected");
+  }
+  
+  const valid = tokens.color && tokens.color.length > 0;
+  
+  if (warnings.length > 0) {
+    console.log('[CV Validation] Warnings:', warnings.join('; '));
+  }
+  
+  return { valid, warnings };
+}
+
+/**
  * Convert CV-extracted tokens to W3C DTCG format
+ * Includes validation and normalization
  */
 export function convertToDTCG(cvTokens: CVExtractedTokens): Record<string, any> {
+  const validation = validateExtractedTokens(cvTokens);
+  if (!validation.valid) {
+    console.warn('[CV Bridge] Token validation failed:', validation.warnings);
+    throw new Error(`CV token extraction failed: ${validation.warnings.join('; ')}`);
+  }
+  
   const dtcg: Record<string, any> = {
     $schema: "https://design-tokens.github.io/community-group/format/",
     color: {
@@ -253,16 +300,20 @@ export function convertToDTCG(cvTokens: CVExtractedTokens): Record<string, any> 
   };
 
   const colorNames = ['primary', 'secondary', 'tertiary', 'accent', 'background', 'surface', 'muted', 'subtle'];
-  cvTokens.color.forEach((color, index) => {
+  const colors = cvTokens.color || [];
+  colors.forEach((color, index) => {
     const name = colorNames[index] || `color-${index + 1}`;
+    const normalized = normalizeOklchColor(color);
     dtcg.color.palette[name] = {
       $type: "color",
-      $value: `oklch(${color.l} ${color.c} ${color.h})`,
+      $value: `oklch(${normalized.l.toFixed(3)} ${normalized.c.toFixed(3)} ${normalized.h.toFixed(1)})`,
       $description: `Extracted via CV analysis (${cvTokens.meta.method})`,
     };
   });
 
-  cvTokens.spacing.forEach((value, index) => {
+  const validSpacing = cvTokens.spacing.filter(s => s > 0 && s <= 500);
+  const uniqueSpacing = Array.from(new Set(validSpacing)).sort((a, b) => a - b);
+  uniqueSpacing.forEach((value) => {
     dtcg.spacing[`space-${value}`] = {
       $type: "dimension",
       $value: `${value}px`,
@@ -270,7 +321,9 @@ export function convertToDTCG(cvTokens: CVExtractedTokens): Record<string, any> 
     };
   });
 
-  cvTokens.borderRadius.forEach((value, index) => {
+  const validRadius = cvTokens.borderRadius.filter(r => r >= 0 && r <= 200);
+  const uniqueRadius = Array.from(new Set(validRadius)).sort((a, b) => a - b);
+  uniqueRadius.forEach((value) => {
     dtcg.borderRadius[`radius-${value}`] = {
       $type: "dimension",
       $value: `${value}px`,
@@ -278,15 +331,19 @@ export function convertToDTCG(cvTokens: CVExtractedTokens): Record<string, any> 
     };
   });
 
+  const elevationLevel = Math.max(0, Math.min(3, cvTokens.elevation.elevation || 0));
+  const shadowStrength = Math.max(0, Math.min(1, cvTokens.elevation.shadowStrength || 0));
   dtcg.elevation = {
     level: {
       $type: "number",
-      $value: cvTokens.elevation.elevation,
-      $description: `Shadow strength: ${cvTokens.elevation.shadowStrength}`,
+      $value: elevationLevel,
+      $description: `Shadow strength: ${shadowStrength.toFixed(2)}`,
     },
   };
 
-  cvTokens.strokeWidth.forEach((value) => {
+  const validStroke = cvTokens.strokeWidth.filter(s => s > 0 && s <= 20);
+  const uniqueStroke = Array.from(new Set(validStroke)).sort((a, b) => a - b);
+  uniqueStroke.forEach((value) => {
     dtcg.strokeWidth[`stroke-${value}`] = {
       $type: "dimension",
       $value: `${value}px`,
