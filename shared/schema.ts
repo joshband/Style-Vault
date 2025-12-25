@@ -289,3 +289,38 @@ export const insertRatingSchema = createInsertSchema(ratings).omit({
 
 export type InsertRating = z.infer<typeof insertRatingSchema>;
 export type Rating = typeof ratings.$inferSelect;
+
+// Collections table - user-created folders for organizing styles
+export const collections = pgTable("collections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  coverImageId: varchar("cover_image_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at"),
+});
+
+export const insertCollectionSchema = createInsertSchema(collections).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertCollection = z.infer<typeof insertCollectionSchema>;
+export type Collection = typeof collections.$inferSelect;
+
+// Collection items - many-to-many relationship between collections and styles
+export const collectionItems = pgTable("collection_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  collectionId: varchar("collection_id").notNull(),
+  styleId: varchar("style_id").notNull(),
+  addedAt: timestamp("added_at").defaultNow().notNull(),
+});
+
+export const insertCollectionItemSchema = createInsertSchema(collectionItems).omit({
+  id: true,
+  addedAt: true,
+});
+
+export type InsertCollectionItem = z.infer<typeof insertCollectionItemSchema>;
+export type CollectionItem = typeof collectionItems.$inferSelect;
