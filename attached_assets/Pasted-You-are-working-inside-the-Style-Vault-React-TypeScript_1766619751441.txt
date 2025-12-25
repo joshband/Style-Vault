@@ -1,0 +1,74 @@
+You are working inside the Style Vault React + TypeScript application.
+
+Your task is to improve the Style Explorer page UX while preserving downstream prompt fidelity.
+
+PRIMARY GOAL
+Transform the Explorer into a visual-first browsing experience that treats styles as visual artifacts, not data records.
+
+HARD CONSTRAINTS (DO NOT VIOLATE)
+- Do NOT add filters, search, or new APIs
+- Do NOT expose tokens, metadata tags, CV analysis, or technical language
+- Do NOT change backend schemas or responses
+
+STYLE EXPLORER CARD REQUIREMENTS
+Each style card must display ONLY:
+- Preview image (primary visual anchor)
+- Style name
+- One-line aesthetic summary written in natural language
+- Creation date
+
+Explicitly remove:
+- Metadata tags
+- Token counts
+- Analysis indicators
+- Any technical or system-facing terminology
+
+The Explorer page must feel like a visual gallery, not a database.
+
+EMPTY STATE
+Add an empty state with explanatory copy that answers:
+“What is a style?”
+
+Example intent (do not copy verbatim):
+A style is a reusable visual language capturing color, mood, and form — not just an image or a prompt.
+
+LOADING STATE
+Implement skeleton loading that is isomorphic to the final card layout:
+- Same image aspect ratio
+- Same title line
+- Same summary line
+- Same date position
+
+No placeholder chips, tags, or fake metadata.
+
+HOVER AFFORDANCE
+Add a subtle, non-intrusive hover affordance that signals “click to inspect”:
+- Light elevation or scale (1–2%)
+- Soft shadow or motion
+- No buttons, icons, overlays, or text labels
+
+If the card looks interactive, you have gone too far.
+
+METADATA HANDLING (CRITICAL)
+Metadata tags must NOT be shown in Explorer.
+
+Instead:
+- Metadata continues to exist in the data model
+- Metadata must influence prompt generation automatically downstream
+- Metadata should surface only in:
+  1. Style Inspection (as explanatory “Visual DNA”)
+  2. Generation (as optional, click-to-emphasize prompt language)
+
+Explorer is for recognition.
+Generation is for language.
+Inspection is for understanding.
+
+DO NOT add new UI for metadata in Explorer.
+
+SUCCESS CRITERIA
+- Explorer feels calm, visual, and fast
+- Users choose styles by looking, not reading
+- Prompt fidelity is preserved through invisible metadata influence
+- No cognitive overload during browsing
+
+Deliver clean, readable React code with minimal diff surface.
