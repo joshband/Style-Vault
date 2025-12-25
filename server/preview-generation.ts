@@ -23,6 +23,48 @@ interface PreviewImage {
   stillLife: string;
 }
 
+// Validate that an image string is a real base64 data URI (not SVG placeholder)
+export function isValidImageDataUri(dataUri: string | null | undefined): boolean {
+  if (!dataUri || typeof dataUri !== "string") return false;
+  
+  // Check for SVG placeholder (our fallback format)
+  if (dataUri.startsWith("data:image/svg+xml")) return false;
+  
+  // Check for valid base64 image data URI pattern
+  const validImagePattern = /^data:image\/(png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+/]+=*$/;
+  if (!validImagePattern.test(dataUri)) return false;
+  
+  // Verify minimum base64 payload length (empty images are invalid)
+  const base64Part = dataUri.split(",")[1];
+  if (!base64Part || base64Part.length < 100) return false;
+  
+  return true;
+}
+
+// Check if preview images are valid (not placeholders)
+export function validatePreviewImages(previews: PreviewImage): {
+  valid: boolean;
+  validCount: number;
+  invalidCount: number;
+  details: { portrait: boolean; landscape: boolean; stillLife: boolean };
+} {
+  const details = {
+    portrait: isValidImageDataUri(previews.portrait),
+    landscape: isValidImageDataUri(previews.landscape),
+    stillLife: isValidImageDataUri(previews.stillLife),
+  };
+  
+  const validCount = Object.values(details).filter(Boolean).length;
+  const invalidCount = 3 - validCount;
+  
+  return {
+    valid: validCount > 0,
+    validCount,
+    invalidCount,
+    details,
+  };
+}
+
 // Fixed canonical subjects for consistent cross-style comparison
 const CANONICAL_SUBJECTS = {
   portrait: "an artist standing in their sunlit atelier studio, wearing a paint-stained apron, holding a palette and brush, with an easel and canvas visible behind them",
@@ -120,31 +162,49 @@ The image should clearly demonstrate this style's ${characteristics[type]}. Keep
   }
 }
 
+export interface PreviewGenerationResult extends PreviewImage {
+  allFailed: boolean;
+  successCount: number;
+}
+
 export async function generateCanonicalPreviews(
   request: PreviewGenerationRequest
-): Promise<PreviewImage> {
+): Promise<PreviewGenerationResult> {
   const { styleName, styleDescription, onProgress } = request;
 
-  const result: PreviewImage = {
+  const result: PreviewGenerationResult = {
     portrait: generateStyledPlaceholder(384, 512, styleName, "portrait"),
     landscape: generateStyledPlaceholder(512, 384, styleName, "landscape"),
     stillLife: generateStyledPlaceholder(384, 384, styleName, "stillLife"),
+    allFailed: true,
+    successCount: 0,
   };
+
+  let successCount = 0;
 
   try {
     // If progress callback provided, generate sequentially with updates
     if (onProgress) {
       await onProgress(5, "Generating portrait preview...");
       const portraitImage = await generateSinglePreview(styleName, styleDescription, "portrait");
-      if (portraitImage) result.portrait = portraitImage;
+      if (portraitImage) {
+        result.portrait = portraitImage;
+        successCount++;
+      }
       
       await onProgress(35, "Generating landscape preview...");
       const landscapeImage = await generateSinglePreview(styleName, styleDescription, "landscape");
-      if (landscapeImage) result.landscape = landscapeImage;
+      if (landscapeImage) {
+        result.landscape = landscapeImage;
+        successCount++;
+      }
       
       await onProgress(65, "Generating still-life preview...");
       const stillLifeImage = await generateSinglePreview(styleName, styleDescription, "stillLife");
-      if (stillLifeImage) result.stillLife = stillLifeImage;
+      if (stillLifeImage) {
+        result.stillLife = stillLifeImage;
+        successCount++;
+      }
       
       await onProgress(95, "Finalizing previews...");
     } else {
@@ -155,12 +215,31 @@ export async function generateCanonicalPreviews(
         generateSinglePreview(styleName, styleDescription, "stillLife"),
       ]);
 
-      if (portraitImage) result.portrait = portraitImage;
-      if (landscapeImage) result.landscape = landscapeImage;
-      if (stillLifeImage) result.stillLife = stillLifeImage;
+      if (portraitImage) {
+        result.portrait = portraitImage;
+        successCount++;
+      }
+      if (landscapeImage) {
+        result.landscape = landscapeImage;
+        successCount++;
+      }
+      if (stillLifeImage) {
+        result.stillLife = stillLifeImage;
+        successCount++;
+      }
     }
   } catch (error) {
     console.error("Error in preview generation:", error instanceof Error ? error.message : String(error));
+  }
+
+  result.successCount = successCount;
+  result.allFailed = successCount === 0;
+  
+  // Log the result
+  if (result.allFailed) {
+    console.warn(`All preview generations failed for style "${styleName}"`);
+  } else if (successCount < 3) {
+    console.log(`Preview generation partial success for "${styleName}": ${successCount}/3 images generated`);
   }
 
   return result;
