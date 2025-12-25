@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
-import { Compass, PenTool, Layers, Search, Settings, Menu, X, Eye, Wand2, LogIn, LogOut, User, Bookmark, Sparkles } from "lucide-react";
+import { Compass, PenTool, Search, Settings, Menu, X, Eye, Wand2, LogIn, LogOut, User, Bookmark, Sparkles } from "lucide-react";
+import logoUrl from "@/assets/logo.png";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { ActiveJobsIndicator } from "./active-jobs-indicator";
@@ -70,12 +71,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
       )}>
         <div>
           <div className="mb-8 px-2 flex items-center gap-2 justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-foreground text-background flex items-center justify-center rounded-sm flex-shrink-0">
-                <Layers size={18} />
-              </div>
-              <span className="font-serif font-bold text-lg tracking-tight hidden sm:inline">Visual DNA</span>
-            </div>
+            <Link href="/" className="flex items-center gap-2">
+              <img src={logoUrl} alt="Visual DNA Studio" className="h-10 w-auto" />
+            </Link>
             <button 
               onClick={() => setSidebarOpen(false)}
               className="md:hidden text-muted-foreground hover:text-foreground"
