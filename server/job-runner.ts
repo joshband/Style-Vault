@@ -43,6 +43,31 @@ export async function createAndRunJob<TInput extends Record<string, any>, TOutpu
   return runJobWithRetries(job.id, executor, { maxRetries, timeoutMs, retryDelayMs });
 }
 
+export async function startJobInBackground<TInput extends Record<string, any>, TOutput>(
+  type: JobType,
+  input: TInput,
+  executor: JobExecutor<TInput, TOutput>,
+  config: JobConfig = {},
+  styleId?: string
+): Promise<Job> {
+  const { maxRetries, timeoutMs, retryDelayMs } = { ...DEFAULT_CONFIG, ...config };
+
+  const job = await storage.createJob({
+    type,
+    input,
+    status: "queued",
+    progress: 0,
+    maxRetries,
+    styleId: styleId ?? null,
+  } as any);
+
+  // Fire-and-forget: start job execution without awaiting
+  runJobWithRetries(job.id, executor, { maxRetries, timeoutMs, retryDelayMs })
+    .catch(err => console.error(`Background job ${job.id} failed:`, err));
+
+  return job;
+}
+
 export async function runJobWithRetries<TInput extends Record<string, any>, TOutput>(
   jobId: string,
   executor: JobExecutor<TInput, TOutput>,
