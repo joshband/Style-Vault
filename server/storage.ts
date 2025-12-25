@@ -1,6 +1,6 @@
 import { type User, type InsertUser, type Style, type InsertStyle, type GeneratedImage, type InsertGeneratedImage, type MoodBoardAssets, type UiConceptAssets, type MetadataTags, type MetadataEnrichmentStatus, type Job, type InsertJob, type JobStatus, type JobType, type Batch, type InsertBatch, users, styles, generatedImages, jobs, batches } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, or, inArray } from "drizzle-orm";
+import { eq, desc, and, or, inArray, sql } from "drizzle-orm";
 
 export interface StyleSummary {
   id: string;
@@ -55,6 +55,12 @@ export interface IStorage {
   getBatchById(id: string): Promise<Batch | undefined>;
   updateBatchProgress(id: string, completedItems: number, failedItems: number): Promise<Batch | undefined>;
   updateBatchStatus(id: string, status: JobStatus): Promise<Batch | undefined>;
+
+  // Background processing helpers
+  getStylesWithUuidNames(): Promise<Style[]>;
+  getStylesNeedingAssets(): Promise<Style[]>;
+  updateStyleName(id: string, name: string): Promise<Style | undefined>;
+  hasActiveJobForStyle(styleId: string, jobTypes: JobType[]): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -371,6 +377,74 @@ export class DatabaseStorage implements IStorage {
       .where(eq(batches.id, id))
       .returning();
     return updated;
+  }
+
+  // Background processing helpers
+  async getStylesWithUuidNames(): Promise<Style[]> {
+    // Find styles where name matches UUID pattern (8-4-4-4-12 hex format)
+    // or starts with common UUID prefixes like the style ID
+    const allStyles = await db.select().from(styles);
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    
+    return allStyles.filter(style => {
+      // Check if name matches UUID pattern
+      if (uuidPattern.test(style.name)) return true;
+      // Check if name equals the ID (common fallback case)
+      if (style.name === style.id) return true;
+      // Check if name starts with "Style from " followed by hex (truncated ID)
+      if (/^Style from [0-9a-f]{8}$/i.test(style.name)) return true;
+      return false;
+    });
+  }
+
+  async getStylesNeedingAssets(): Promise<Style[]> {
+    const allStyles = await db.select().from(styles);
+    
+    return allStyles.filter(style => {
+      const moodBoard = style.moodBoard as MoodBoardAssets | null;
+      const uiConcepts = style.uiConcepts as UiConceptAssets | null;
+      
+      // Needs mood board if no moodBoard, or status is not complete, or no collage
+      const needsMoodBoard = !moodBoard || 
+        moodBoard.status !== "complete" || 
+        !moodBoard.collage;
+      
+      // Count UI concepts
+      let uiConceptCount = 0;
+      if (uiConcepts?.audioPlugin) uiConceptCount++;
+      if (uiConcepts?.dashboard) uiConceptCount++;
+      if (uiConcepts?.componentLibrary) uiConceptCount++;
+      
+      // Needs UI concepts if status is not complete or has fewer than 2 concepts
+      const needsUiConcepts = !uiConcepts || 
+        uiConcepts.status !== "complete" || 
+        uiConceptCount < 2;
+      
+      return needsMoodBoard || needsUiConcepts;
+    });
+  }
+
+  async updateStyleName(id: string, name: string): Promise<Style | undefined> {
+    const [updated] = await db
+      .update(styles)
+      .set({ name })
+      .where(eq(styles.id, id))
+      .returning();
+    return updated;
+  }
+
+  async hasActiveJobForStyle(styleId: string, jobTypes: JobType[]): Promise<boolean> {
+    const activeJobs = await db
+      .select()
+      .from(jobs)
+      .where(
+        and(
+          eq(jobs.styleId, styleId),
+          inArray(jobs.type, jobTypes),
+          inArray(jobs.status, ["queued", "running"])
+        )
+      );
+    return activeJobs.length > 0;
   }
 }
 
