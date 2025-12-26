@@ -1250,7 +1250,7 @@ export async function registerRoutes(
   // Generate canonical preview images for a style
   app.post("/api/generate-previews", async (req, res) => {
     try {
-      const { styleName, styleDescription, referenceImageBase64 } = req.body;
+      const { styleName, styleDescription, referenceImageBase64, tokens } = req.body;
 
       if (!styleName || !styleDescription) {
         return res.status(400).json({ error: "Style name and description required" });
@@ -1260,6 +1260,7 @@ export async function registerRoutes(
         styleName,
         styleDescription,
         referenceImageBase64,
+        tokens,
       });
 
       // Return with status info so frontend knows if generation partially failed
@@ -1312,7 +1313,7 @@ export async function registerRoutes(
   // Job-based preview generation with progress tracking
   app.post("/api/jobs/generate-previews", async (req, res) => {
     try {
-      const { styleName, styleDescription, referenceImageBase64 } = req.body;
+      const { styleName, styleDescription, referenceImageBase64, tokens } = req.body;
 
       if (!styleName || !styleDescription) {
         return res.status(400).json({ error: "Style name and description required" });
@@ -1320,12 +1321,13 @@ export async function registerRoutes(
 
       const job = await startJobInBackground(
         "preview_generation",
-        { styleName, styleDescription, referenceImageBase64 },
+        { styleName, styleDescription, referenceImageBase64, tokens },
         async (input, onProgress) => {
           const result = await generateCanonicalPreviews({
             styleName: input.styleName,
             styleDescription: input.styleDescription,
             referenceImageBase64: input.referenceImageBase64,
+            tokens: input.tokens,
             onProgress,
           });
           
@@ -1831,11 +1833,12 @@ async function processBatchInBackground(batchId: string) {
           progressMessage: "Generating previews...",
         });
 
-        // Generate previews using analysis results
+        // Generate previews using analysis results (note: tokens not yet available for batch uploads)
         const previews = await generateCanonicalPreviews({
           styleName: analysis.styleName,
           styleDescription: analysis.description,
           referenceImageBase64: input.imageBase64,
+          tokens: DEFAULT_TOKENS, // Use default tokens - CV extraction will update later
         });
 
         await storage.updateJobStatus(job.id, "running", {

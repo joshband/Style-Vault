@@ -14,7 +14,25 @@ interface PreviewGenerationRequest {
   styleName: string;
   styleDescription: string;
   referenceImageBase64?: string;
+  tokens?: Record<string, any>;
   onProgress?: ProgressCallback;
+}
+
+// Extract color palette from tokens for prompt inclusion
+function extractColorPalette(tokens?: Record<string, any>): string[] {
+  if (!tokens || !tokens.color) return [];
+  
+  const colors: string[] = [];
+  for (const [name, token] of Object.entries(tokens.color)) {
+    if (token && typeof token === "object" && "$value" in token) {
+      const value = String((token as any).$value);
+      // Only include valid hex colors
+      if (value.startsWith("#") && (value.length === 7 || value.length === 4)) {
+        colors.push(`${name}: ${value}`);
+      }
+    }
+  }
+  return colors.slice(0, 8); // Limit to 8 most important colors
 }
 
 interface PreviewImage {
@@ -117,7 +135,8 @@ function generateStyledPlaceholder(
 async function generateSinglePreview(
   styleName: string,
   styleDescription: string,
-  type: "portrait" | "landscape" | "stillLife"
+  type: "portrait" | "landscape" | "stillLife",
+  colorPalette: string[] = []
 ): Promise<string | null> {
   const aspectRatios = {
     portrait: "3:4 vertical",
@@ -131,6 +150,11 @@ async function generateSinglePreview(
     stillLife: "color palette, material textures, lighting approach, and overall mood",
   };
 
+  // Build color directive if we have colors
+  const colorDirective = colorPalette.length > 0
+    ? `\n\nCRITICAL - USE THESE EXACT COLORS from the design tokens:\n${colorPalette.map(c => `- ${c}`).join("\n")}\n\nThe image MUST prominently feature these specific hex colors. Do NOT substitute with similar colors.`
+    : "";
+
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-image",
@@ -143,7 +167,7 @@ async function generateSinglePreview(
 
 Subject: ${CANONICAL_SUBJECTS[type]}
 
-Apply these style characteristics to the rendering: ${styleDescription}
+Apply these style characteristics to the rendering: ${styleDescription}${colorDirective}
 
 The image should clearly demonstrate this style's ${characteristics[type]}. Keep the image compact and optimized.`,
             },
@@ -170,7 +194,13 @@ export interface PreviewGenerationResult extends PreviewImage {
 export async function generateCanonicalPreviews(
   request: PreviewGenerationRequest
 ): Promise<PreviewGenerationResult> {
-  const { styleName, styleDescription, onProgress } = request;
+  const { styleName, styleDescription, tokens, onProgress } = request;
+
+  // Extract color palette from tokens for inclusion in prompts
+  const colorPalette = extractColorPalette(tokens);
+  if (colorPalette.length > 0) {
+    console.log(`Preview generation for "${styleName}" using ${colorPalette.length} colors:`, colorPalette.join(", "));
+  }
 
   const result: PreviewGenerationResult = {
     portrait: generateStyledPlaceholder(384, 512, styleName, "portrait"),
@@ -186,21 +216,21 @@ export async function generateCanonicalPreviews(
     // If progress callback provided, generate sequentially with updates
     if (onProgress) {
       await onProgress(5, "Generating portrait preview...");
-      const portraitImage = await generateSinglePreview(styleName, styleDescription, "portrait");
+      const portraitImage = await generateSinglePreview(styleName, styleDescription, "portrait", colorPalette);
       if (portraitImage) {
         result.portrait = portraitImage;
         successCount++;
       }
       
       await onProgress(35, "Generating landscape preview...");
-      const landscapeImage = await generateSinglePreview(styleName, styleDescription, "landscape");
+      const landscapeImage = await generateSinglePreview(styleName, styleDescription, "landscape", colorPalette);
       if (landscapeImage) {
         result.landscape = landscapeImage;
         successCount++;
       }
       
       await onProgress(65, "Generating still-life preview...");
-      const stillLifeImage = await generateSinglePreview(styleName, styleDescription, "stillLife");
+      const stillLifeImage = await generateSinglePreview(styleName, styleDescription, "stillLife", colorPalette);
       if (stillLifeImage) {
         result.stillLife = stillLifeImage;
         successCount++;
@@ -210,9 +240,9 @@ export async function generateCanonicalPreviews(
     } else {
       // Generate all 3 previews in parallel for ~3x speedup (no progress tracking)
       const [portraitImage, landscapeImage, stillLifeImage] = await Promise.all([
-        generateSinglePreview(styleName, styleDescription, "portrait"),
-        generateSinglePreview(styleName, styleDescription, "landscape"),
-        generateSinglePreview(styleName, styleDescription, "stillLife"),
+        generateSinglePreview(styleName, styleDescription, "portrait", colorPalette),
+        generateSinglePreview(styleName, styleDescription, "landscape", colorPalette),
+        generateSinglePreview(styleName, styleDescription, "stillLife", colorPalette),
       ]);
 
       if (portraitImage) {
