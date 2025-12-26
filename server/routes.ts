@@ -330,15 +330,18 @@ export async function registerRoutes(
   app.get("/api/styles/:id/summary", async (req, res) => {
     try {
       const styleId = req.params.id;
-      const summary = await storage.getStyleCoreSummary(styleId);
+      const [summary, imageIds, neighbors] = await Promise.all([
+        storage.getStyleCoreSummary(styleId),
+        storage.getImageIdsByStyleId(styleId),
+        storage.getStyleNeighbors(styleId),
+      ]);
+      
       if (!summary) {
         return res.status(404).json({ error: "Style not found" });
       }
       
-      const imageIds = await storage.getImageIdsByStyleId(styleId);
-      
       res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
-      res.json({ ...summary, imageIds });
+      res.json({ ...summary, imageIds, neighbors });
     } catch (error) {
       console.error("Error fetching style summary:", error);
       res.status(500).json({ error: "Failed to fetch style summary" });

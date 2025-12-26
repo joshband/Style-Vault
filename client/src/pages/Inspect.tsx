@@ -1,14 +1,14 @@
-import { useRoute } from "wouter";
+import { useRoute, useLocation } from "wouter";
 import { type StyleSpec } from "@/lib/store";
 import { Layout } from "@/components/layout";
 import { TokenViewer } from "@/components/token-viewer";
 import { ColorPaletteSwatches } from "@/components/color-palette-swatches";
 import { StyleSpecEditor } from "@/components/style-spec-editor";
-import { ArrowLeft, Download, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Share2, Check, Copy, Bookmark, Star, User, FolderPlus, Folder, Plus, FileCode, FileJson, Paintbrush, History, RotateCcw, Save, Sparkles, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Download, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Share2, Check, Copy, Bookmark, Star, User, FolderPlus, Folder, Plus, FileCode, FileJson, Paintbrush, History, RotateCcw, Save, Sparkles, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { AiMoodBoard } from "@/components/ai-mood-board";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -30,6 +30,7 @@ interface StyleSummary {
   creatorId?: string | null;
   creatorName?: string | null;
   isPublic?: boolean;
+  neighbors?: { prevId: string | null; nextId: string | null };
 }
 
 interface StyleAssets {
@@ -76,8 +77,10 @@ function PreviewSkeleton({ aspect }: { aspect: string }) {
 
 export default function Inspect() {
   const [, params] = useRoute("/style/:id");
+  const [, navigate] = useLocation();
   const id = params?.id;
   const { user, isAuthenticated } = useAuth();
+  const containerRef = useRef<HTMLDivElement>(null);
   const [summary, setSummary] = useState<StyleSummary | null>(null);
   const [assets, setAssets] = useState<StyleAssets | null>(null);
   const [loading, setLoading] = useState(true);
@@ -810,12 +813,38 @@ export default ${safeName};`;
 
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto space-y-8 md:space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        {/* Header */}
+      <div ref={containerRef} className="max-w-4xl mx-auto space-y-8 md:space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        {/* Header with Navigation */}
         <div className="space-y-4">
-          <Link href="/" className="inline-flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors uppercase tracking-wider font-mono w-fit">
-            <ArrowLeft size={12} /> Back to Vault
-          </Link>
+          <div className="flex items-center justify-between">
+            <Link href="/" className="inline-flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors uppercase tracking-wider font-mono">
+              <ArrowLeft size={12} /> Back to Vault
+            </Link>
+            
+            {/* Style Navigation */}
+            {summary?.neighbors && (summary.neighbors.prevId || summary.neighbors.nextId) && (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => summary.neighbors?.prevId && navigate(`/style/${summary.neighbors.prevId}`)}
+                  disabled={!summary.neighbors.prevId}
+                  className="p-2 rounded-lg border border-border hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  data-testid="button-prev-style"
+                  title="Previous style"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <button
+                  onClick={() => summary.neighbors?.nextId && navigate(`/style/${summary.neighbors.nextId}`)}
+                  disabled={!summary.neighbors.nextId}
+                  className="p-2 rounded-lg border border-border hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  data-testid="button-next-style"
+                  title="Next style"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            )}
+          </div>
           
           <div className="space-y-2">
             <div className="flex items-start justify-between gap-4">
@@ -1161,10 +1190,10 @@ export default ${safeName};`;
           <ColorPaletteSwatches tokens={summary.tokens} />
         </section>
 
-        {/* Visual Vocabulary */}
+        {/* Design Tokens */}
         <section className="space-y-0">
           <SectionHeader
-            title="Visual Vocabulary"
+            title="Design Tokens"
           />
 
           <div className="space-y-4">
