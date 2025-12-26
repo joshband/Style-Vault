@@ -8,16 +8,79 @@ const ai = new GoogleGenAI({
   },
 });
 
+type ProgressCallback = (progress: number, message: string) => Promise<void>;
+
 interface PreviewGenerationRequest {
   styleName: string;
   styleDescription: string;
   referenceImageBase64?: string;
+  tokens?: Record<string, any>;
+  onProgress?: ProgressCallback;
+}
+
+// Extract color palette from tokens for prompt inclusion
+function extractColorPalette(tokens?: Record<string, any>): string[] {
+  if (!tokens || !tokens.color) return [];
+  
+  const colors: string[] = [];
+  for (const [name, token] of Object.entries(tokens.color)) {
+    if (token && typeof token === "object" && "$value" in token) {
+      const value = String((token as any).$value);
+      // Only include valid hex colors
+      if (value.startsWith("#") && (value.length === 7 || value.length === 4)) {
+        colors.push(`${name}: ${value}`);
+      }
+    }
+  }
+  return colors.slice(0, 8); // Limit to 8 most important colors
 }
 
 interface PreviewImage {
   portrait: string;
   landscape: string;
   stillLife: string;
+}
+
+// Validate that an image string is a real base64 data URI (not SVG placeholder)
+export function isValidImageDataUri(dataUri: string | null | undefined): boolean {
+  if (!dataUri || typeof dataUri !== "string") return false;
+  
+  // Check for SVG placeholder (our fallback format)
+  if (dataUri.startsWith("data:image/svg+xml")) return false;
+  
+  // Check for valid base64 image data URI pattern
+  const validImagePattern = /^data:image\/(png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+/]+=*$/;
+  if (!validImagePattern.test(dataUri)) return false;
+  
+  // Verify minimum base64 payload length (empty images are invalid)
+  const base64Part = dataUri.split(",")[1];
+  if (!base64Part || base64Part.length < 100) return false;
+  
+  return true;
+}
+
+// Check if preview images are valid (not placeholders)
+export function validatePreviewImages(previews: PreviewImage): {
+  valid: boolean;
+  validCount: number;
+  invalidCount: number;
+  details: { portrait: boolean; landscape: boolean; stillLife: boolean };
+} {
+  const details = {
+    portrait: isValidImageDataUri(previews.portrait),
+    landscape: isValidImageDataUri(previews.landscape),
+    stillLife: isValidImageDataUri(previews.stillLife),
+  };
+  
+  const validCount = Object.values(details).filter(Boolean).length;
+  const invalidCount = 3 - validCount;
+  
+  return {
+    valid: validCount > 0,
+    validCount,
+    invalidCount,
+    details,
+  };
 }
 
 // Fixed canonical subjects for consistent cross-style comparison
@@ -72,19 +135,33 @@ function generateStyledPlaceholder(
 async function generateSinglePreview(
   styleName: string,
   styleDescription: string,
-  type: "portrait" | "landscape" | "stillLife"
+  type: "portrait" | "landscape" | "stillLife",
+  colorPalette: string[] = []
 ): Promise<string | null> {
   const aspectRatios = {
     portrait: "3:4 vertical",
     landscape: "16:9 horizontal",
     stillLife: "1:1 square",
   };
-  
-  const characteristics = {
-    portrait: "color palette, lighting approach, texture treatment, and overall mood",
-    landscape: "color palette, atmospheric treatment, spatial depth, and overall mood",
-    stillLife: "color palette, material textures, lighting approach, and overall mood",
-  };
+
+  // Build token-weighted prompt
+  const hasTokenColors = colorPalette.length > 0;
+  const tokenSection = hasTokenColors
+    ? `================================================================================
+PRIMARY DIRECTIVE: DESIGN TOKENS (HIGHEST PRIORITY)
+================================================================================
+The following colors were extracted from the source image as Design Tokens. These are AUTHORITATIVE specifications:
+
+MANDATORY COLOR PALETTE - Use ONLY these exact hex values:
+${colorPalette.map(c => `  ${c} (EXACT - no substitution)`).join("\n")}
+
+ALL major color areas in the image MUST use these exact hex values. Do NOT substitute with similar colors.
+
+================================================================================
+SECONDARY: SEMANTIC CONTEXT (Use to Inform Technique)
+================================================================================
+`
+    : "";
 
   try {
     const response = await ai.models.generateContent({
@@ -94,13 +171,16 @@ async function generateSinglePreview(
           role: "user",
           parts: [
             {
-              text: `Generate a ${type} image (${aspectRatios[type]} aspect ratio) rendered in the "${styleName}" visual style.
+              text: `Generate a ${type} image (${aspectRatios[type]} aspect ratio) for the "${styleName}" style.
 
+${tokenSection}Style Description: ${styleDescription}
+
+================================================================================
+SUBJECT & COMPOSITION
+================================================================================
 Subject: ${CANONICAL_SUBJECTS[type]}
 
-Apply these style characteristics to the rendering: ${styleDescription}
-
-The image should clearly demonstrate this style's ${characteristics[type]}. Keep the image compact and optimized.`,
+Render this subject using${hasTokenColors ? " the Design Token colors above and" : ""} the style's visual characteristics. The image should demonstrate the style's color palette, lighting, texture, and mood.`,
             },
           ],
         },
@@ -117,30 +197,90 @@ The image should clearly demonstrate this style's ${characteristics[type]}. Keep
   }
 }
 
+export interface PreviewGenerationResult extends PreviewImage {
+  allFailed: boolean;
+  successCount: number;
+}
+
 export async function generateCanonicalPreviews(
   request: PreviewGenerationRequest
-): Promise<PreviewImage> {
-  const { styleName, styleDescription } = request;
+): Promise<PreviewGenerationResult> {
+  const { styleName, styleDescription, tokens, onProgress } = request;
 
-  const result: PreviewImage = {
+  // Extract color palette from tokens for inclusion in prompts
+  const colorPalette = extractColorPalette(tokens);
+  if (colorPalette.length > 0) {
+    console.log(`Preview generation for "${styleName}" using ${colorPalette.length} colors:`, colorPalette.join(", "));
+  }
+
+  const result: PreviewGenerationResult = {
     portrait: generateStyledPlaceholder(384, 512, styleName, "portrait"),
     landscape: generateStyledPlaceholder(512, 384, styleName, "landscape"),
     stillLife: generateStyledPlaceholder(384, 384, styleName, "stillLife"),
+    allFailed: true,
+    successCount: 0,
   };
 
-  try {
-    // Generate all 3 previews in parallel for ~3x speedup
-    const [portraitImage, landscapeImage, stillLifeImage] = await Promise.all([
-      generateSinglePreview(styleName, styleDescription, "portrait"),
-      generateSinglePreview(styleName, styleDescription, "landscape"),
-      generateSinglePreview(styleName, styleDescription, "stillLife"),
-    ]);
+  let successCount = 0;
 
-    if (portraitImage) result.portrait = portraitImage;
-    if (landscapeImage) result.landscape = landscapeImage;
-    if (stillLifeImage) result.stillLife = stillLifeImage;
+  try {
+    // If progress callback provided, generate sequentially with updates
+    if (onProgress) {
+      await onProgress(5, "Generating portrait preview...");
+      const portraitImage = await generateSinglePreview(styleName, styleDescription, "portrait", colorPalette);
+      if (portraitImage) {
+        result.portrait = portraitImage;
+        successCount++;
+      }
+      
+      await onProgress(35, "Generating landscape preview...");
+      const landscapeImage = await generateSinglePreview(styleName, styleDescription, "landscape", colorPalette);
+      if (landscapeImage) {
+        result.landscape = landscapeImage;
+        successCount++;
+      }
+      
+      await onProgress(65, "Generating still-life preview...");
+      const stillLifeImage = await generateSinglePreview(styleName, styleDescription, "stillLife", colorPalette);
+      if (stillLifeImage) {
+        result.stillLife = stillLifeImage;
+        successCount++;
+      }
+      
+      await onProgress(95, "Finalizing previews...");
+    } else {
+      // Generate all 3 previews in parallel for ~3x speedup (no progress tracking)
+      const [portraitImage, landscapeImage, stillLifeImage] = await Promise.all([
+        generateSinglePreview(styleName, styleDescription, "portrait", colorPalette),
+        generateSinglePreview(styleName, styleDescription, "landscape", colorPalette),
+        generateSinglePreview(styleName, styleDescription, "stillLife", colorPalette),
+      ]);
+
+      if (portraitImage) {
+        result.portrait = portraitImage;
+        successCount++;
+      }
+      if (landscapeImage) {
+        result.landscape = landscapeImage;
+        successCount++;
+      }
+      if (stillLifeImage) {
+        result.stillLife = stillLifeImage;
+        successCount++;
+      }
+    }
   } catch (error) {
     console.error("Error in preview generation:", error instanceof Error ? error.message : String(error));
+  }
+
+  result.successCount = successCount;
+  result.allFailed = successCount === 0;
+  
+  // Log the result
+  if (result.allFailed) {
+    console.warn(`All preview generations failed for style "${styleName}"`);
+  } else if (successCount < 3) {
+    console.log(`Preview generation partial success for "${styleName}": ${successCount}/3 images generated`);
   }
 
   return result;

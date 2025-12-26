@@ -1,6 +1,7 @@
-import { type User, type InsertUser, type Style, type InsertStyle, type GeneratedImage, type InsertGeneratedImage, type MoodBoardAssets, type UiConceptAssets, type MetadataTags, type MetadataEnrichmentStatus, type Job, type InsertJob, type JobStatus, type JobType, users, styles, generatedImages, jobs } from "@shared/schema";
+import { type Style, type InsertStyle, type GeneratedImage, type InsertGeneratedImage, type MoodBoardAssets, type UiConceptAssets, type MetadataTags, type MetadataEnrichmentStatus, type Job, type InsertJob, type JobStatus, type JobType, type Batch, type InsertBatch, type StyleSpec, type ImageAssetType, type Bookmark, type InsertBookmark, type Rating, type InsertRating, type Collection, type InsertCollection, type CollectionItem, type InsertCollectionItem, type StyleVersion, type InsertStyleVersion, type VersionChangeType, styles, generatedImages, jobs, batches, imageAssets, bookmarks, ratings, collections, collectionItems, styleVersions } from "@shared/schema";
+import { users } from "@shared/models/auth";
 import { db } from "./db";
-import { eq, desc, and, or, inArray } from "drizzle-orm";
+import { eq, desc, and, or, inArray, sql } from "drizzle-orm";
 
 export interface StyleSummary {
   id: string;
@@ -11,21 +12,31 @@ export interface StyleSummary {
   moodBoardStatus: string;
   uiConceptsStatus: string;
   thumbnailPreview: string | null;
+  imageIds?: Record<string, string>;
+  creatorId?: string | null;
+  creatorName?: string | null;
+  isPublic?: boolean;
+}
+
+export interface PaginatedStyleSummaries {
+  items: StyleSummary[];
+  total: number;
+  hasMore: boolean;
+  nextCursor: string | null;
 }
 
 export interface IStorage {
-  // User operations
-  getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
-  
   // Style operations
   getStyles(): Promise<Style[]>;
   getStyleSummaries(): Promise<StyleSummary[]>;
+  getStyleSummariesPaginated(limit: number, cursor?: string): Promise<PaginatedStyleSummaries>;
+  getStyleCount(): Promise<number>;
   getStyleById(id: string): Promise<Style | undefined>;
+  getStyleByShareCode(shareCode: string): Promise<Style | undefined>;
   createStyle(style: InsertStyle): Promise<Style>;
   deleteStyle(id: string): Promise<void>;
   updateStyleMoodBoard(id: string, moodBoard: MoodBoardAssets, uiConcepts: UiConceptAssets): Promise<Style | undefined>;
+  updateStyleShareCode(id: string, shareCode: string): Promise<Style | undefined>;
   
   // Generated images operations (admin only)
   getGeneratedImages(): Promise<GeneratedImage[]>;
@@ -36,6 +47,7 @@ export interface IStorage {
   createJob(job: InsertJob): Promise<Job>;
   getJobById(id: string): Promise<Job | undefined>;
   getJobsByStyleId(styleId: string): Promise<Job[]>;
+  getJobsByBatchId(batchId: string): Promise<Job[]>;
   getActiveJobs(): Promise<Job[]>;
   getRecentJobs(limit?: number): Promise<Job[]>;
   updateJobStatus(id: string, status: JobStatus, updates?: {
@@ -46,25 +58,65 @@ export interface IStorage {
   }): Promise<Job | undefined>;
   incrementJobRetry(id: string): Promise<Job | undefined>;
   cleanupOldJobs(olderThanDays?: number): Promise<number>;
+
+  // Batch operations
+  createBatch(batch: InsertBatch): Promise<Batch>;
+  getBatchById(id: string): Promise<Batch | undefined>;
+  updateBatchProgress(id: string, completedItems: number, failedItems: number): Promise<Batch | undefined>;
+  updateBatchStatus(id: string, status: JobStatus): Promise<Batch | undefined>;
+
+  // Background processing helpers
+  getStylesWithUuidNames(): Promise<Style[]>;
+  getStylesNeedingAssets(): Promise<Style[]>;
+  updateStyleName(id: string, name: string): Promise<Style | undefined>;
+  hasActiveJobForStyle(styleId: string, jobTypes: JobType[]): Promise<boolean>;
+
+  // Style spec operations
+  updateStyleSpec(id: string, spec: StyleSpec): Promise<Style | undefined>;
+
+  // Style visibility and creator operations
+  getStylesByCreator(creatorId: string): Promise<StyleSummary[]>;
+  getPublicStyleSummaries(): Promise<StyleSummary[]>;
+  updateStyleVisibility(id: string, isPublic: boolean): Promise<Style | undefined>;
+  getCreatorInfo(userId: string): Promise<{ id: string; name: string } | undefined>;
+
+  // Bookmark operations
+  getBookmarksByUser(userId: string): Promise<Bookmark[]>;
+  getBookmarkedStyleSummaries(userId: string): Promise<StyleSummary[]>;
+  getBookmark(userId: string, styleId: string): Promise<Bookmark | undefined>;
+  createBookmark(bookmark: InsertBookmark): Promise<Bookmark>;
+  deleteBookmark(userId: string, styleId: string): Promise<void>;
+  isStyleBookmarked(userId: string, styleId: string): Promise<boolean>;
+
+  // Rating operations
+  getRatingsByStyle(styleId: string): Promise<Rating[]>;
+  getRating(userId: string, styleId: string): Promise<Rating | undefined>;
+  createOrUpdateRating(rating: InsertRating): Promise<Rating>;
+  deleteRating(userId: string, styleId: string): Promise<void>;
+  getStyleAverageRating(styleId: string): Promise<{ average: number; count: number }>;
+
+  // Collection operations
+  getCollectionsByUser(userId: string): Promise<Collection[]>;
+  getCollectionById(id: string): Promise<Collection | undefined>;
+  createCollection(collection: InsertCollection): Promise<Collection>;
+  updateCollection(id: string, updates: Partial<InsertCollection>): Promise<Collection | undefined>;
+  deleteCollection(id: string): Promise<void>;
+  getCollectionItems(collectionId: string): Promise<CollectionItem[]>;
+  getCollectionStyleSummaries(collectionId: string): Promise<StyleSummary[]>;
+  addStyleToCollection(collectionId: string, styleId: string): Promise<CollectionItem>;
+  removeStyleFromCollection(collectionId: string, styleId: string): Promise<void>;
+  isStyleInCollection(collectionId: string, styleId: string): Promise<boolean>;
+  getCollectionsContainingStyle(userId: string, styleId: string): Promise<Collection[]>;
+
+  // Style version operations
+  getStyleVersions(styleId: string): Promise<StyleVersion[]>;
+  getStyleVersionById(versionId: string): Promise<StyleVersion | undefined>;
+  createStyleVersion(version: InsertStyleVersion): Promise<StyleVersion>;
+  getLatestVersionNumber(styleId: string): Promise<number>;
+  revertToVersion(styleId: string, versionId: string): Promise<Style | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
-  // User operations
-  async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
-  }
-
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
-    return user;
-  }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const [user] = await db.insert(users).values(insertUser).returning();
-    return user;
-  }
-
   // Style operations
   async getStyles(): Promise<Style[]> {
     return db.select().from(styles).orderBy(desc(styles.createdAt));
@@ -81,8 +133,13 @@ export class DatabaseStorage implements IStorage {
         moodBoard: styles.moodBoard,
         uiConcepts: styles.uiConcepts,
         previews: styles.previews,
+        creatorId: styles.creatorId,
+        isPublic: styles.isPublic,
+        creatorFirstName: users.firstName,
+        creatorLastName: users.lastName,
       })
       .from(styles)
+      .leftJoin(users, eq(styles.creatorId, users.id))
       .orderBy(desc(styles.createdAt));
     
     return allStyles.map(s => ({
@@ -94,11 +151,177 @@ export class DatabaseStorage implements IStorage {
       moodBoardStatus: (s.moodBoard as any)?.status || "pending",
       uiConceptsStatus: (s.uiConcepts as any)?.status || "pending",
       thumbnailPreview: (s.previews as any)?.landscape || (s.previews as any)?.portrait || null,
+      creatorId: s.creatorId,
+      creatorName: s.creatorFirstName && s.creatorLastName 
+        ? `${s.creatorFirstName} ${s.creatorLastName}` 
+        : s.creatorFirstName || null,
+      isPublic: s.isPublic,
     }));
+  }
+
+  async getStyleSummariesPaginated(limit: number, cursor?: string): Promise<PaginatedStyleSummaries> {
+    const queryLimit = Math.min(limit, 50);
+    
+    const selectFields = {
+      id: styles.id,
+      name: styles.name,
+      description: styles.description,
+      createdAt: styles.createdAt,
+      referenceImages: styles.referenceImages,
+      creatorId: styles.creatorId,
+      isPublic: styles.isPublic,
+      creatorFirstName: users.firstName,
+      creatorLastName: users.lastName,
+    };
+    
+    let results;
+    if (cursor) {
+      const cursorDate = new Date(cursor);
+      results = await db
+        .select(selectFields)
+        .from(styles)
+        .leftJoin(users, eq(styles.creatorId, users.id))
+        .where(sql`${styles.createdAt} < ${cursorDate}`)
+        .orderBy(desc(styles.createdAt))
+        .limit(queryLimit + 1);
+    } else {
+      results = await db
+        .select(selectFields)
+        .from(styles)
+        .leftJoin(users, eq(styles.creatorId, users.id))
+        .orderBy(desc(styles.createdAt))
+        .limit(queryLimit + 1);
+    }
+    
+    const hasMore = results.length > queryLimit;
+    const items = hasMore ? results.slice(0, queryLimit) : results;
+    
+    const total = await this.getStyleCount();
+    const nextCursor = hasMore && items.length > 0 
+      ? items[items.length - 1].createdAt.toISOString() 
+      : null;
+    
+    return {
+      items: items.map(s => {
+        const refImages = s.referenceImages as string[] | null;
+        const thumbnail = refImages && refImages.length > 0 ? refImages[0] : null;
+        return {
+          id: s.id,
+          name: s.name,
+          description: s.description,
+          createdAt: s.createdAt,
+          metadataTags: null,
+          moodBoardStatus: "complete",
+          uiConceptsStatus: "complete",
+          thumbnailPreview: thumbnail,
+          creatorId: s.creatorId,
+          creatorName: s.creatorFirstName && s.creatorLastName 
+            ? `${s.creatorFirstName} ${s.creatorLastName}` 
+            : s.creatorFirstName || null,
+          isPublic: s.isPublic,
+        };
+      }),
+      total,
+      hasMore,
+      nextCursor,
+    };
+  }
+
+  async getStyleCount(): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)::int` }).from(styles);
+    return result[0]?.count ?? 0;
   }
 
   async getStyleById(id: string): Promise<Style | undefined> {
     const [style] = await db.select().from(styles).where(eq(styles.id, id));
+    return style;
+  }
+
+  async getStyleCoreSummary(id: string): Promise<{
+    id: string;
+    name: string;
+    description: string;
+    createdAt: Date;
+    tokens: any;
+    referenceImages: string[];
+    metadataTags: any;
+    promptScaffolding: any;
+    shareCode: string | null;
+    moodBoardStatus: string;
+    uiConceptsStatus: string;
+    styleSpec: any;
+    updatedAt: Date | null;
+    creatorId: string | null;
+    creatorName: string | null;
+    isPublic: boolean;
+  } | undefined> {
+    const [result] = await db
+      .select({
+        id: styles.id,
+        name: styles.name,
+        description: styles.description,
+        createdAt: styles.createdAt,
+        tokens: styles.tokens,
+        referenceImages: styles.referenceImages,
+        metadataTags: styles.metadataTags,
+        promptScaffolding: styles.promptScaffolding,
+        shareCode: styles.shareCode,
+        moodBoard: styles.moodBoard,
+        uiConcepts: styles.uiConcepts,
+        styleSpec: styles.styleSpec,
+        updatedAt: styles.updatedAt,
+        creatorId: styles.creatorId,
+        isPublic: styles.isPublic,
+        creatorFirstName: users.firstName,
+        creatorLastName: users.lastName,
+      })
+      .from(styles)
+      .leftJoin(users, eq(styles.creatorId, users.id))
+      .where(eq(styles.id, id));
+    
+    if (!result) return undefined;
+    
+    return {
+      id: result.id,
+      name: result.name,
+      description: result.description,
+      createdAt: result.createdAt,
+      tokens: result.tokens,
+      referenceImages: result.referenceImages as string[],
+      metadataTags: result.metadataTags,
+      promptScaffolding: result.promptScaffolding,
+      shareCode: result.shareCode,
+      moodBoardStatus: (result.moodBoard as any)?.status || "pending",
+      uiConceptsStatus: (result.uiConcepts as any)?.status || "pending",
+      styleSpec: result.styleSpec,
+      updatedAt: result.updatedAt,
+      creatorId: result.creatorId,
+      creatorName: result.creatorFirstName && result.creatorLastName 
+        ? `${result.creatorFirstName} ${result.creatorLastName}` 
+        : result.creatorFirstName || null,
+      isPublic: result.isPublic,
+    };
+  }
+
+  async getStyleAssets(id: string): Promise<{
+    previews: any;
+    moodBoard: any;
+    uiConcepts: any;
+  } | undefined> {
+    const [result] = await db
+      .select({
+        previews: styles.previews,
+        moodBoard: styles.moodBoard,
+        uiConcepts: styles.uiConcepts,
+      })
+      .from(styles)
+      .where(eq(styles.id, id));
+    
+    return result;
+  }
+
+  async getStyleByShareCode(shareCode: string): Promise<Style | undefined> {
+    const [style] = await db.select().from(styles).where(eq(styles.shareCode, shareCode));
     return style;
   }
 
@@ -115,6 +338,15 @@ export class DatabaseStorage implements IStorage {
     const [updated] = await db
       .update(styles)
       .set({ moodBoard, uiConcepts })
+      .where(eq(styles.id, id))
+      .returning();
+    return updated;
+  }
+
+  async updateStyleShareCode(id: string, shareCode: string): Promise<Style | undefined> {
+    const [updated] = await db
+      .update(styles)
+      .set({ shareCode })
       .where(eq(styles.id, id))
       .returning();
     return updated;
@@ -191,6 +423,38 @@ export class DatabaseStorage implements IStorage {
       .from(styles)
       .where(eq(styles.metadataEnrichmentStatus, status))
       .orderBy(desc(styles.createdAt));
+  }
+
+  async getImageIdsByStyleId(styleId: string): Promise<Record<string, string>> {
+    const assets = await db
+      .select({ id: imageAssets.id, type: imageAssets.type })
+      .from(imageAssets)
+      .where(eq(imageAssets.styleId, styleId));
+    
+    const result: Record<string, string> = {};
+    for (const asset of assets) {
+      result[asset.type] = asset.id;
+    }
+    return result;
+  }
+
+  async getImageIdsByStyleIds(styleIds: string[]): Promise<Map<string, Record<string, string>>> {
+    if (styleIds.length === 0) return new Map();
+    
+    const assets = await db
+      .select({ id: imageAssets.id, type: imageAssets.type, styleId: imageAssets.styleId })
+      .from(imageAssets)
+      .where(inArray(imageAssets.styleId, styleIds));
+    
+    const result = new Map<string, Record<string, string>>();
+    for (const asset of assets) {
+      if (!asset.styleId) continue;
+      if (!result.has(asset.styleId)) {
+        result.set(asset.styleId, {});
+      }
+      result.get(asset.styleId)![asset.type] = asset.id;
+    }
+    return result;
   }
 
   // Job operations for async task tracking
@@ -295,6 +559,509 @@ export class DatabaseStorage implements IStorage {
         )
       );
     return 0; // Drizzle doesn't easily return affected row count
+  }
+
+  async getJobsByBatchId(batchId: string): Promise<Job[]> {
+    return db
+      .select()
+      .from(jobs)
+      .where(eq(jobs.batchId, batchId))
+      .orderBy(desc(jobs.createdAt));
+  }
+
+  // Batch operations
+  async createBatch(insertBatch: InsertBatch): Promise<Batch> {
+    const [batch] = await db.insert(batches).values(insertBatch).returning();
+    return batch;
+  }
+
+  async getBatchById(id: string): Promise<Batch | undefined> {
+    const [batch] = await db.select().from(batches).where(eq(batches.id, id));
+    return batch;
+  }
+
+  async updateBatchProgress(id: string, completedItems: number, failedItems: number): Promise<Batch | undefined> {
+    const batch = await this.getBatchById(id);
+    if (!batch) return undefined;
+
+    const isComplete = (completedItems + failedItems) >= batch.totalItems;
+    const status = isComplete 
+      ? (failedItems === batch.totalItems ? "failed" : "succeeded")
+      : "running";
+
+    const [updated] = await db
+      .update(batches)
+      .set({ 
+        completedItems, 
+        failedItems,
+        status,
+        completedAt: isComplete ? new Date() : null,
+      })
+      .where(eq(batches.id, id))
+      .returning();
+    return updated;
+  }
+
+  async updateBatchStatus(id: string, status: JobStatus): Promise<Batch | undefined> {
+    const [updated] = await db
+      .update(batches)
+      .set({ 
+        status,
+        completedAt: (status === "succeeded" || status === "failed" || status === "canceled") ? new Date() : null,
+      })
+      .where(eq(batches.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Background processing helpers
+  async getStylesWithUuidNames(): Promise<Style[]> {
+    // Find styles where name matches UUID pattern, camera filenames, or other placeholder patterns
+    const allStyles = await db.select().from(styles);
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const cameraPattern = /^(IMG|DSC|DCIM|PXL|Screenshot)[_-]?\d{3,}/i;
+    
+    return allStyles.filter(style => {
+      // Check if name matches UUID pattern
+      if (uuidPattern.test(style.name)) return true;
+      // Check if name equals the ID (common fallback case)
+      if (style.name === style.id) return true;
+      // Check if name starts with "Style from " followed by hex (truncated ID)
+      if (/^Style from [0-9a-f]{8}$/i.test(style.name)) return true;
+      // Check if name looks like a camera filename (IMG_0367, DSC0001, PXL_20231225, etc.)
+      if (cameraPattern.test(style.name)) return true;
+      return false;
+    });
+  }
+
+  async getStylesNeedingAssets(): Promise<Style[]> {
+    const allStyles = await db.select().from(styles);
+    
+    return allStyles.filter(style => {
+      const moodBoard = style.moodBoard as MoodBoardAssets | null;
+      const uiConcepts = style.uiConcepts as UiConceptAssets | null;
+      
+      // Needs mood board if no moodBoard, or status is not complete, or no collage
+      const needsMoodBoard = !moodBoard || 
+        moodBoard.status !== "complete" || 
+        !moodBoard.collage;
+      
+      // Count UI concepts
+      let uiConceptCount = 0;
+      if (uiConcepts?.audioPlugin) uiConceptCount++;
+      if (uiConcepts?.dashboard) uiConceptCount++;
+      if (uiConcepts?.componentLibrary) uiConceptCount++;
+      
+      // Needs UI concepts if status is not complete or has fewer than 2 concepts
+      const needsUiConcepts = !uiConcepts || 
+        uiConcepts.status !== "complete" || 
+        uiConceptCount < 2;
+      
+      return needsMoodBoard || needsUiConcepts;
+    });
+  }
+
+  async updateStyleName(id: string, name: string): Promise<Style | undefined> {
+    const [updated] = await db
+      .update(styles)
+      .set({ name })
+      .where(eq(styles.id, id))
+      .returning();
+    return updated;
+  }
+
+  async hasActiveJobForStyle(styleId: string, jobTypes: JobType[]): Promise<boolean> {
+    const activeJobs = await db
+      .select()
+      .from(jobs)
+      .where(
+        and(
+          eq(jobs.styleId, styleId),
+          inArray(jobs.type, jobTypes),
+          inArray(jobs.status, ["queued", "running"])
+        )
+      );
+    return activeJobs.length > 0;
+  }
+
+  async updateStyleSpec(id: string, spec: StyleSpec): Promise<Style | undefined> {
+    const [updated] = await db
+      .update(styles)
+      .set({ 
+        styleSpec: spec,
+        updatedAt: new Date(),
+      })
+      .where(eq(styles.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Style visibility and creator operations
+  async getStylesByCreator(creatorId: string): Promise<StyleSummary[]> {
+    const creatorStyles = await db
+      .select({
+        id: styles.id,
+        name: styles.name,
+        description: styles.description,
+        createdAt: styles.createdAt,
+        metadataTags: styles.metadataTags,
+        moodBoard: styles.moodBoard,
+        uiConcepts: styles.uiConcepts,
+        previews: styles.previews,
+        creatorId: styles.creatorId,
+        isPublic: styles.isPublic,
+        creatorFirstName: users.firstName,
+        creatorLastName: users.lastName,
+      })
+      .from(styles)
+      .leftJoin(users, eq(styles.creatorId, users.id))
+      .where(eq(styles.creatorId, creatorId))
+      .orderBy(desc(styles.createdAt));
+    
+    return creatorStyles.map(s => ({
+      id: s.id,
+      name: s.name,
+      description: s.description,
+      createdAt: s.createdAt,
+      metadataTags: s.metadataTags,
+      moodBoardStatus: (s.moodBoard as any)?.status || "pending",
+      uiConceptsStatus: (s.uiConcepts as any)?.status || "pending",
+      thumbnailPreview: (s.previews as any)?.landscape || (s.previews as any)?.portrait || null,
+      creatorId: s.creatorId,
+      creatorName: s.creatorFirstName && s.creatorLastName 
+        ? `${s.creatorFirstName} ${s.creatorLastName}` 
+        : s.creatorFirstName || null,
+      isPublic: s.isPublic,
+    }));
+  }
+
+  async getPublicStyleSummaries(): Promise<StyleSummary[]> {
+    const publicStyles = await db
+      .select({
+        id: styles.id,
+        name: styles.name,
+        description: styles.description,
+        createdAt: styles.createdAt,
+        metadataTags: styles.metadataTags,
+        moodBoard: styles.moodBoard,
+        uiConcepts: styles.uiConcepts,
+        previews: styles.previews,
+        creatorId: styles.creatorId,
+        isPublic: styles.isPublic,
+        creatorFirstName: users.firstName,
+        creatorLastName: users.lastName,
+      })
+      .from(styles)
+      .leftJoin(users, eq(styles.creatorId, users.id))
+      .where(eq(styles.isPublic, true))
+      .orderBy(desc(styles.createdAt));
+    
+    return publicStyles.map(s => ({
+      id: s.id,
+      name: s.name,
+      description: s.description,
+      createdAt: s.createdAt,
+      metadataTags: s.metadataTags,
+      moodBoardStatus: (s.moodBoard as any)?.status || "pending",
+      uiConceptsStatus: (s.uiConcepts as any)?.status || "pending",
+      thumbnailPreview: (s.previews as any)?.landscape || (s.previews as any)?.portrait || null,
+      creatorId: s.creatorId,
+      creatorName: s.creatorFirstName && s.creatorLastName 
+        ? `${s.creatorFirstName} ${s.creatorLastName}` 
+        : s.creatorFirstName || null,
+      isPublic: s.isPublic,
+    }));
+  }
+
+  async updateStyleVisibility(id: string, isPublic: boolean): Promise<Style | undefined> {
+    const [updated] = await db
+      .update(styles)
+      .set({ 
+        isPublic,
+        updatedAt: new Date(),
+      })
+      .where(eq(styles.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getCreatorInfo(userId: string): Promise<{ id: string; name: string } | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, userId));
+    if (!user) return undefined;
+    return {
+      id: user.id,
+      name: user.firstName && user.lastName 
+        ? `${user.firstName} ${user.lastName}` 
+        : user.firstName || user.email || "Unknown",
+    };
+  }
+
+  // Bookmark operations
+  async getBookmarksByUser(userId: string): Promise<Bookmark[]> {
+    return db.select().from(bookmarks).where(eq(bookmarks.userId, userId)).orderBy(desc(bookmarks.createdAt));
+  }
+
+  async getBookmarkedStyleSummaries(userId: string): Promise<StyleSummary[]> {
+    const bookmarkedStyles = await db
+      .select({
+        id: styles.id,
+        name: styles.name,
+        description: styles.description,
+        createdAt: styles.createdAt,
+        metadataTags: styles.metadataTags,
+        moodBoard: styles.moodBoard,
+        uiConcepts: styles.uiConcepts,
+        previews: styles.previews,
+        creatorId: styles.creatorId,
+        isPublic: styles.isPublic,
+        creatorFirstName: users.firstName,
+        creatorLastName: users.lastName,
+      })
+      .from(bookmarks)
+      .innerJoin(styles, eq(bookmarks.styleId, styles.id))
+      .leftJoin(users, eq(styles.creatorId, users.id))
+      .where(eq(bookmarks.userId, userId))
+      .orderBy(desc(bookmarks.createdAt));
+
+    return bookmarkedStyles.map((s) => ({
+      id: s.id,
+      name: s.name,
+      description: s.description,
+      createdAt: s.createdAt,
+      metadataTags: s.metadataTags,
+      moodBoardStatus: (s.moodBoard as any)?.status || "pending",
+      uiConceptsStatus: (s.uiConcepts as any)?.status || "pending",
+      thumbnailPreview: (s.previews as any)?.landscape || (s.previews as any)?.portrait || null,
+      creatorId: s.creatorId,
+      creatorName: s.creatorFirstName && s.creatorLastName 
+        ? `${s.creatorFirstName} ${s.creatorLastName}` 
+        : s.creatorFirstName || null,
+      isPublic: s.isPublic,
+    }));
+  }
+
+  async getBookmark(userId: string, styleId: string): Promise<Bookmark | undefined> {
+    const [bookmark] = await db
+      .select()
+      .from(bookmarks)
+      .where(and(eq(bookmarks.userId, userId), eq(bookmarks.styleId, styleId)));
+    return bookmark;
+  }
+
+  async createBookmark(bookmark: InsertBookmark): Promise<Bookmark> {
+    const [created] = await db.insert(bookmarks).values(bookmark).returning();
+    return created;
+  }
+
+  async deleteBookmark(userId: string, styleId: string): Promise<void> {
+    await db.delete(bookmarks).where(
+      and(eq(bookmarks.userId, userId), eq(bookmarks.styleId, styleId))
+    );
+  }
+
+  async isStyleBookmarked(userId: string, styleId: string): Promise<boolean> {
+    const bookmark = await this.getBookmark(userId, styleId);
+    return !!bookmark;
+  }
+
+  // Rating operations
+  async getRatingsByStyle(styleId: string): Promise<Rating[]> {
+    return db.select().from(ratings).where(eq(ratings.styleId, styleId)).orderBy(desc(ratings.createdAt));
+  }
+
+  async getRating(userId: string, styleId: string): Promise<Rating | undefined> {
+    const [rating] = await db
+      .select()
+      .from(ratings)
+      .where(and(eq(ratings.userId, userId), eq(ratings.styleId, styleId)));
+    return rating;
+  }
+
+  async createOrUpdateRating(rating: InsertRating): Promise<Rating> {
+    const existing = await this.getRating(rating.userId, rating.styleId);
+    if (existing) {
+      const [updated] = await db
+        .update(ratings)
+        .set({ 
+          rating: rating.rating, 
+          review: rating.review,
+          updatedAt: new Date(),
+        })
+        .where(eq(ratings.id, existing.id))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(ratings).values(rating).returning();
+    return created;
+  }
+
+  async deleteRating(userId: string, styleId: string): Promise<void> {
+    await db.delete(ratings).where(
+      and(eq(ratings.userId, userId), eq(ratings.styleId, styleId))
+    );
+  }
+
+  async getStyleAverageRating(styleId: string): Promise<{ average: number; count: number }> {
+    const styleRatings = await this.getRatingsByStyle(styleId);
+    if (styleRatings.length === 0) {
+      return { average: 0, count: 0 };
+    }
+    const sum = styleRatings.reduce((acc, r) => acc + r.rating, 0);
+    return { 
+      average: Math.round((sum / styleRatings.length) * 10) / 10, 
+      count: styleRatings.length 
+    };
+  }
+
+  // Collection operations
+  async getCollectionsByUser(userId: string): Promise<Collection[]> {
+    return db.select().from(collections).where(eq(collections.userId, userId)).orderBy(desc(collections.createdAt));
+  }
+
+  async getCollectionById(id: string): Promise<Collection | undefined> {
+    const [collection] = await db.select().from(collections).where(eq(collections.id, id));
+    return collection;
+  }
+
+  async createCollection(collection: InsertCollection): Promise<Collection> {
+    const [created] = await db.insert(collections).values(collection).returning();
+    return created;
+  }
+
+  async updateCollection(id: string, updates: Partial<InsertCollection>): Promise<Collection | undefined> {
+    const [updated] = await db
+      .update(collections)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(collections.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteCollection(id: string): Promise<void> {
+    await db.delete(collectionItems).where(eq(collectionItems.collectionId, id));
+    await db.delete(collections).where(eq(collections.id, id));
+  }
+
+  async getCollectionItems(collectionId: string): Promise<CollectionItem[]> {
+    return db.select().from(collectionItems).where(eq(collectionItems.collectionId, collectionId)).orderBy(desc(collectionItems.addedAt));
+  }
+
+  async getCollectionStyleSummaries(collectionId: string): Promise<StyleSummary[]> {
+    const items = await this.getCollectionItems(collectionId);
+    if (items.length === 0) return [];
+    
+    const styleIds = items.map(i => i.styleId);
+    const collectionStyles = await db
+      .select({
+        id: styles.id,
+        name: styles.name,
+        description: styles.description,
+        createdAt: styles.createdAt,
+        metadataTags: styles.metadataTags,
+        moodBoard: styles.moodBoard,
+        uiConcepts: styles.uiConcepts,
+        previews: styles.previews,
+        creatorId: styles.creatorId,
+        isPublic: styles.isPublic,
+        creatorFirstName: users.firstName,
+        creatorLastName: users.lastName,
+      })
+      .from(styles)
+      .leftJoin(users, eq(styles.creatorId, users.id))
+      .where(inArray(styles.id, styleIds));
+    
+    return collectionStyles.map(s => ({
+      id: s.id,
+      name: s.name,
+      description: s.description,
+      createdAt: s.createdAt,
+      metadataTags: s.metadataTags,
+      moodBoardStatus: (s.moodBoard as MoodBoardAssets)?.status || "pending",
+      uiConceptsStatus: (s.uiConcepts as UiConceptAssets)?.status || "pending",
+      thumbnailPreview: (s.previews as any)?.landscape || null,
+      creatorId: s.creatorId,
+      creatorName: s.creatorFirstName && s.creatorLastName 
+        ? `${s.creatorFirstName} ${s.creatorLastName}` 
+        : s.creatorFirstName || null,
+      isPublic: s.isPublic,
+    }));
+  }
+
+  async addStyleToCollection(collectionId: string, styleId: string): Promise<CollectionItem> {
+    const existing = await this.isStyleInCollection(collectionId, styleId);
+    if (existing) {
+      const [item] = await db.select().from(collectionItems)
+        .where(and(eq(collectionItems.collectionId, collectionId), eq(collectionItems.styleId, styleId)));
+      return item;
+    }
+    const [created] = await db.insert(collectionItems).values({ collectionId, styleId }).returning();
+    return created;
+  }
+
+  async removeStyleFromCollection(collectionId: string, styleId: string): Promise<void> {
+    await db.delete(collectionItems).where(
+      and(eq(collectionItems.collectionId, collectionId), eq(collectionItems.styleId, styleId))
+    );
+  }
+
+  async isStyleInCollection(collectionId: string, styleId: string): Promise<boolean> {
+    const [item] = await db.select().from(collectionItems)
+      .where(and(eq(collectionItems.collectionId, collectionId), eq(collectionItems.styleId, styleId)));
+    return !!item;
+  }
+
+  async getCollectionsContainingStyle(userId: string, styleId: string): Promise<Collection[]> {
+    const userCollections = await this.getCollectionsByUser(userId);
+    const result: Collection[] = [];
+    for (const collection of userCollections) {
+      if (await this.isStyleInCollection(collection.id, styleId)) {
+        result.push(collection);
+      }
+    }
+    return result;
+  }
+
+  // Style version operations
+  async getStyleVersions(styleId: string): Promise<StyleVersion[]> {
+    return db.select().from(styleVersions)
+      .where(eq(styleVersions.styleId, styleId))
+      .orderBy(desc(styleVersions.versionNumber));
+  }
+
+  async getStyleVersionById(versionId: string): Promise<StyleVersion | undefined> {
+    const [version] = await db.select().from(styleVersions).where(eq(styleVersions.id, versionId));
+    return version;
+  }
+
+  async createStyleVersion(version: InsertStyleVersion): Promise<StyleVersion> {
+    const [created] = await db.insert(styleVersions).values(version).returning();
+    return created;
+  }
+
+  async getLatestVersionNumber(styleId: string): Promise<number> {
+    const [result] = await db.select({ max: sql<number>`COALESCE(MAX(${styleVersions.versionNumber}), 0)` })
+      .from(styleVersions)
+      .where(eq(styleVersions.styleId, styleId));
+    return result?.max ?? 0;
+  }
+
+  async revertToVersion(styleId: string, versionId: string): Promise<Style | undefined> {
+    const version = await this.getStyleVersionById(versionId);
+    if (!version || version.styleId !== styleId) {
+      return undefined;
+    }
+
+    const [updated] = await db.update(styles)
+      .set({
+        tokens: version.tokens,
+        promptScaffolding: version.promptScaffolding || { base: "", modifiers: [], negative: "" },
+        metadataTags: version.metadataTags,
+        updatedAt: new Date(),
+      })
+      .where(eq(styles.id, styleId))
+      .returning();
+    
+    return updated;
   }
 }
 
