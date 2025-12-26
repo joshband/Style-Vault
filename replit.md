@@ -48,6 +48,16 @@ Preferred communication style: Simple, everyday language.
 - **Capabilities**: Extracts colors (OKLCH), spacing, border radius, grid, elevation, stroke width. Includes advanced color analysis (harmony, WCAG contrast, temperature) and multi-cue depth estimation.
 - **Algorithm Walkthrough**: Opt-in feature to visualize intermediate CV processing steps for educational purposes.
 
+### Typography Recommendation Engine
+- **Endpoint**: `POST /api/style/typography` - accepts image, returns font recommendations.
+- **Technology**: Python CV for signal extraction + TypeScript for intent mapping and scoring.
+- **Modular Design**:
+  - `server/typography/styleSignals.ts` - Extracts contrast, edge sharpness, geometric bias, density, symmetry, material hints via Python CV.
+  - `server/typography/typographyIntent.ts` - Deterministic mapping from signals to typography intent (serifness, weightBias, widthBias, formality, eraBias, humanist, decorative, legibility).
+  - `server/typography/fontCatalog.ts` - Curated ~30 Google Fonts with hand-scored metadata across all intent dimensions.
+  - `server/typography/recommendFonts.ts` - Weighted similarity scoring, returns top 3 ranked fonts + heading/body pairing.
+- **Key Design**: Works on images with zero text (suggestion engine, not detector). No ML - all mappings are deterministic and explainable.
+
 ### Design Token System
 - **Standard**: W3C DTCG 2025.10 format.
 - **Structure**: Hierarchical JSON with `$type`, `$value`, and `$description`.
