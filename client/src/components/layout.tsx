@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Compass, PenTool, Search, Settings, Menu, X, Eye, Wand2, LogIn, LogOut, User, Bookmark, Sparkles } from "lucide-react";
+import { Compass, PenTool, Search, Menu, X, Eye, Wand2, LogIn, LogOut, User, Bookmark, Sparkles } from "lucide-react";
 import logoUrl from "@/assets/logo.png";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -121,12 +121,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </nav>
         </div>
 
-        <div className="space-y-1 pt-4 border-t border-sidebar-border hidden sm:block">
-          <button className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-muted-foreground rounded-md hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors text-left">
-            <Settings size={18} />
-            Settings
-          </button>
-          <div className="px-3 py-2 text-xs text-muted-foreground/60 font-mono mt-4">
+        <div className="pt-4 border-t border-sidebar-border hidden sm:block">
+          <div className="px-3 py-2 text-xs text-muted-foreground/60 font-mono">
             v1.0.0-alpha
           </div>
         </div>
