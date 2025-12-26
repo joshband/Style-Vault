@@ -111,9 +111,9 @@ export function AiMoodBoard({
     return (
       <div className={cn("flex flex-col items-center justify-center p-12 space-y-6", className)} data-testid="mood-board-failed">
         <div className="text-center space-y-2">
-          <h3 className="text-lg font-semibold">Generation Failed</h3>
+          <h3 className="text-lg font-semibold">Exploration Failed</h3>
           <p className="text-sm text-muted-foreground">
-            Unable to generate assets. You can try regenerating.
+            Couldn't create explorations this time. Try again?
           </p>
         </div>
         <Button
@@ -133,9 +133,9 @@ export function AiMoodBoard({
     return (
       <div className={cn("flex flex-col items-center justify-center p-12 space-y-6", className)} data-testid="mood-board-empty">
         <div className="text-center space-y-2">
-          <h3 className="text-lg font-semibold">No Assets Available</h3>
+          <h3 className="text-lg font-semibold">No Explorations Yet</h3>
           <p className="text-sm text-muted-foreground">
-            Style assets are still being generated or were not created.
+            Create some visual expressions of this style.
           </p>
         </div>
         <Button
@@ -144,7 +144,7 @@ export function AiMoodBoard({
           data-testid="button-generate-mood-board"
         >
           <RefreshCw className={cn("w-4 h-4 mr-2", mutation.isPending && "animate-spin")} />
-          Generate Assets
+          Create Explorations
         </Button>
       </div>
     );
@@ -163,7 +163,7 @@ export function AiMoodBoard({
   return (
     <div className={cn("space-y-6", className)}>
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Generated Assets</h2>
+        <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Style Expressions</h2>
         <Button
           variant="outline"
           size="sm"
@@ -180,7 +180,7 @@ export function AiMoodBoard({
       {(hasCollage || collageLoading) && (
         <div className="space-y-2">
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
-            Mood Board
+            Mood Exploration
             <InfoTooltip testId="tooltip-mood-board">{FEATURE_EXPLANATIONS.moodBoard}</InfoTooltip>
           </h3>
           {hasCollage ? (
@@ -194,7 +194,7 @@ export function AiMoodBoard({
               <DownloadButton src={moodBoard?.collage || ""} filename={`${styleName}-mood-board.png`} />
             </div>
           ) : (
-            <LoadingPlaceholder label="Generating mood board..." />
+            <LoadingPlaceholder label="Exploring mood..." />
           )}
         </div>
       )}
@@ -203,8 +203,8 @@ export function AiMoodBoard({
       {(hasSoftwareApp || softwareAppLoading) && (
         <div className="space-y-2">
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
-            Software App UI
-            <InfoTooltip testId="tooltip-software-app">A web application interface mockup showcasing how this style applies to modern software UI.</InfoTooltip>
+            App Interface
+            <InfoTooltip testId="tooltip-software-app">One way this style might express itself in a software interface.</InfoTooltip>
           </h3>
           {hasSoftwareApp ? (
             <div className="relative group rounded-lg overflow-hidden border border-border" data-testid="img-container-software-app">
@@ -217,7 +217,7 @@ export function AiMoodBoard({
               <DownloadButton src={uiConcepts?.softwareApp || ""} filename={`${styleName}-software-app.png`} />
             </div>
           ) : (
-            <LoadingPlaceholder label="Generating software app UI..." />
+            <LoadingPlaceholder label="Sketching interface..." />
           )}
         </div>
       )}
@@ -226,7 +226,7 @@ export function AiMoodBoard({
       {(hasAudioPlugin || hasDashboard || audioPluginLoading || dashboardLoading) && (
         <div className="space-y-2">
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
-            UI Concepts
+            Interface Sketches
             <InfoTooltip testId="tooltip-ui-concepts">{FEATURE_EXPLANATIONS.uiConcepts}</InfoTooltip>
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -245,7 +245,7 @@ export function AiMoodBoard({
                 </div>
               </div>
             ) : audioPluginLoading ? (
-              <LoadingPlaceholder label="Generating audio plugin..." />
+              <LoadingPlaceholder label="Sketching audio UI..." />
             ) : null}
             
             {/* Dashboard - show image or loading */}
@@ -263,7 +263,7 @@ export function AiMoodBoard({
                 </div>
               </div>
             ) : dashboardLoading ? (
-              <LoadingPlaceholder label="Generating dashboard..." />
+              <LoadingPlaceholder label="Sketching dashboard..." />
             ) : null}
           </div>
         </div>
