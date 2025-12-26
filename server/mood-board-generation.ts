@@ -329,6 +329,13 @@ export async function generateSingleUiConcept(
   const summary = extractTokenSummary(request.tokens);
   const prompt = buildUiConceptPrompt(request, summary, conceptType);
   
+  // Define aspect ratios for each concept type
+  const aspectRatios: Record<string, string> = {
+    softwareApp: "16:9",   // Landscape for gallery thumbnails (matches 16:10 display)
+    audioPlugin: "16:9",   // Landscape format
+    dashboard: "16:9",     // Landscape format
+  };
+  
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-image",
@@ -340,6 +347,10 @@ export async function generateSingleUiConcept(
       ],
       config: {
         responseModalities: ["image", "text"],
+        // @ts-ignore - imageConfig is a valid parameter for image generation
+        imageConfig: {
+          aspectRatio: aspectRatios[conceptType] || "16:9",
+        },
       },
     });
 
