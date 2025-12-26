@@ -1,0 +1,135 @@
+Replit Agent Prompt
+
+Build a lightweight Style-to-Typography Recommendation Service.
+
+Goal
+Most uploaded images contain no visible text. Instead of OCR or font detection, infer typographic intent from visual style and return ranked font recommendations.
+
+This is a suggestion engine, not a detector.
+
+Functional Requirements
+
+Input
+
+POST endpoint /api/style/typography
+
+Accepts an uploaded image (PNG/JPEG)
+
+Visual Signal Extraction
+
+Use lightweight image heuristics (OpenCV or JS equivalents)
+
+Extract:
+
+global contrast
+
+edge sharpness / softness
+
+geometric vs organic bias
+
+visual density
+
+symmetry / balance
+
+material bias (paper / metal / glass / unknown)
+
+Typography Intent Inference
+
+Convert visual signals into an abstract intent model:
+
+serifness (0–1)
+
+weightBias (light → heavy)
+
+widthBias (condensed → wide)
+
+formality (casual → formal)
+
+eraBias (modern, industrial, classical, futurist)
+
+All mappings must be deterministic and explainable
+
+No ML models
+
+Font Recommendation Engine
+
+Maintain a small, opinionated font catalog (Google Fonts)
+
+Each font has metadata matching the intent dimensions
+
+Score fonts against inferred intent
+
+Return top 3 ranked matches with scores
+
+Response Shape
+
+{
+  "signals": { ... },
+  "intent": { ... },
+  "recommendations": [
+    { "family": "Inter", "score": 0.92 },
+    { "family": "Space Grotesk", "score": 0.84 }
+  ]
+}
+
+Technical Constraints
+
+TypeScript
+
+Node / Express
+
+Replit-compatible (no native build steps)
+
+No heavy ML dependencies
+
+No OCR
+
+Clear file separation:
+
+styleSignals.ts
+
+typographyIntent.ts
+
+fontCatalog.ts
+
+recommendFonts.ts
+
+routes/typography.ts
+
+Design Philosophy
+
+Typography is inferred from mood and structure, not glyphs
+
+System must work on:
+
+abstract art
+
+UI screenshots
+
+product photography
+
+mood boards
+
+Output must be explainable to designers
+
+Favor clarity over cleverness
+
+Out of Scope
+
+No font detection
+
+No training data
+
+No neural networks
+
+No UI (API only)
+
+Success Criteria
+
+Works on images with zero text
+
+Produces stable, believable font suggestions
+
+Easy to tune heuristics
+
+Ready to feed into a design-token pipeline later
