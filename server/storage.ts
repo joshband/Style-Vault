@@ -1,4 +1,4 @@
-import { type Style, type InsertStyle, type GeneratedImage, type InsertGeneratedImage, type MoodBoardAssets, type UiConceptAssets, type MetadataTags, type MetadataEnrichmentStatus, type Job, type InsertJob, type JobStatus, type JobType, type Batch, type InsertBatch, type StyleSpec, type ImageAssetType, type Bookmark, type InsertBookmark, type Rating, type InsertRating, type Collection, type InsertCollection, type CollectionItem, type InsertCollectionItem, styles, generatedImages, jobs, batches, imageAssets, bookmarks, ratings, collections, collectionItems } from "@shared/schema";
+import { type Style, type InsertStyle, type GeneratedImage, type InsertGeneratedImage, type MoodBoardAssets, type UiConceptAssets, type MetadataTags, type MetadataEnrichmentStatus, type Job, type InsertJob, type JobStatus, type JobType, type Batch, type InsertBatch, type StyleSpec, type ImageAssetType, type Bookmark, type InsertBookmark, type Rating, type InsertRating, type Collection, type InsertCollection, type CollectionItem, type InsertCollectionItem, type StyleVersion, type InsertStyleVersion, type VersionChangeType, styles, generatedImages, jobs, batches, imageAssets, bookmarks, ratings, collections, collectionItems, styleVersions } from "@shared/schema";
 import { users } from "@shared/models/auth";
 import { db } from "./db";
 import { eq, desc, and, or, inArray, sql } from "drizzle-orm";
@@ -107,6 +107,13 @@ export interface IStorage {
   removeStyleFromCollection(collectionId: string, styleId: string): Promise<void>;
   isStyleInCollection(collectionId: string, styleId: string): Promise<boolean>;
   getCollectionsContainingStyle(userId: string, styleId: string): Promise<Collection[]>;
+
+  // Style version operations
+  getStyleVersions(styleId: string): Promise<StyleVersion[]>;
+  getStyleVersionById(versionId: string): Promise<StyleVersion | undefined>;
+  createStyleVersion(version: InsertStyleVersion): Promise<StyleVersion>;
+  getLatestVersionNumber(styleId: string): Promise<number>;
+  revertToVersion(styleId: string, versionId: string): Promise<Style | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1012,6 +1019,49 @@ export class DatabaseStorage implements IStorage {
       }
     }
     return result;
+  }
+
+  // Style version operations
+  async getStyleVersions(styleId: string): Promise<StyleVersion[]> {
+    return db.select().from(styleVersions)
+      .where(eq(styleVersions.styleId, styleId))
+      .orderBy(desc(styleVersions.versionNumber));
+  }
+
+  async getStyleVersionById(versionId: string): Promise<StyleVersion | undefined> {
+    const [version] = await db.select().from(styleVersions).where(eq(styleVersions.id, versionId));
+    return version;
+  }
+
+  async createStyleVersion(version: InsertStyleVersion): Promise<StyleVersion> {
+    const [created] = await db.insert(styleVersions).values(version).returning();
+    return created;
+  }
+
+  async getLatestVersionNumber(styleId: string): Promise<number> {
+    const [result] = await db.select({ max: sql<number>`COALESCE(MAX(${styleVersions.versionNumber}), 0)` })
+      .from(styleVersions)
+      .where(eq(styleVersions.styleId, styleId));
+    return result?.max ?? 0;
+  }
+
+  async revertToVersion(styleId: string, versionId: string): Promise<Style | undefined> {
+    const version = await this.getStyleVersionById(versionId);
+    if (!version || version.styleId !== styleId) {
+      return undefined;
+    }
+
+    const [updated] = await db.update(styles)
+      .set({
+        tokens: version.tokens,
+        promptScaffolding: version.promptScaffolding || { base: "", modifiers: [], negative: "" },
+        metadataTags: version.metadataTags,
+        updatedAt: new Date(),
+      })
+      .where(eq(styles.id, styleId))
+      .returning();
+    
+    return updated;
   }
 }
 

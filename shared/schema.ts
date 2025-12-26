@@ -324,3 +324,31 @@ export const insertCollectionItemSchema = createInsertSchema(collectionItems).om
 
 export type InsertCollectionItem = z.infer<typeof insertCollectionItemSchema>;
 export type CollectionItem = typeof collectionItems.$inferSelect;
+
+// Style versions table - tracks history of style changes for versioning
+export type VersionChangeType = "created" | "tokens_updated" | "previews_updated" | "metadata_updated" | "manual_save" | "reverted";
+
+export const styleVersions = pgTable("style_versions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  styleId: varchar("style_id").notNull(),
+  versionNumber: integer("version_number").notNull(),
+  changeType: text("change_type").$type<VersionChangeType>().notNull(),
+  changeDescription: text("change_description"),
+  createdBy: varchar("created_by"),
+  tokens: jsonb("tokens").$type<Record<string, any>>().notNull(),
+  promptScaffolding: jsonb("prompt_scaffolding").$type<{
+    base: string;
+    modifiers: string[];
+    negative: string;
+  }>(),
+  metadataTags: jsonb("metadata_tags").$type<MetadataTags>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertStyleVersionSchema = createInsertSchema(styleVersions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertStyleVersion = z.infer<typeof insertStyleVersionSchema>;
+export type StyleVersion = typeof styleVersions.$inferSelect;
