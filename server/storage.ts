@@ -1,4 +1,4 @@
-import { type Style, type InsertStyle, type GeneratedImage, type InsertGeneratedImage, type MoodBoardAssets, type UiConceptAssets, type MetadataTags, type MetadataEnrichmentStatus, type Job, type InsertJob, type JobStatus, type JobType, type Batch, type InsertBatch, type StyleSpec, type ImageAssetType, type Bookmark, type InsertBookmark, type Rating, type InsertRating, type Collection, type InsertCollection, type CollectionItem, type InsertCollectionItem, type StyleVersion, type InsertStyleVersion, type VersionChangeType, styles, generatedImages, jobs, batches, imageAssets, bookmarks, ratings, collections, collectionItems, styleVersions } from "@shared/schema";
+import { type Style, type InsertStyle, type GeneratedImage, type InsertGeneratedImage, type MoodBoardAssets, type UiConceptAssets, type MetadataTags, type MetadataEnrichmentStatus, type Job, type InsertJob, type JobStatus, type JobType, type Batch, type InsertBatch, type StyleSpec, type ImageAssetType, type Bookmark, type InsertBookmark, type Rating, type InsertRating, type Collection, type InsertCollection, type CollectionItem, type InsertCollectionItem, type StyleVersion, type InsertStyleVersion, type VersionChangeType, styles, generatedImages, jobs, batches, imageAssets, objectAssets, bookmarks, ratings, collections, collectionItems, styleVersions } from "@shared/schema";
 import { users } from "@shared/models/auth";
 import { db } from "./db";
 import { eq, desc, and, or, inArray, sql } from "drizzle-orm";
@@ -426,14 +426,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getImageIdsByStyleId(styleId: string): Promise<Record<string, string>> {
-    const assets = await db
-      .select({ id: imageAssets.id, type: imageAssets.type })
-      .from(imageAssets)
-      .where(eq(imageAssets.styleId, styleId));
+    const [legacyAssets, objAssets] = await Promise.all([
+      db.select({ id: imageAssets.id, type: imageAssets.type })
+        .from(imageAssets)
+        .where(eq(imageAssets.styleId, styleId)),
+      db.select({ id: objectAssets.id, type: objectAssets.type })
+        .from(objectAssets)
+        .where(eq(objectAssets.styleId, styleId)),
+    ]);
     
     const result: Record<string, string> = {};
-    for (const asset of assets) {
+    for (const asset of objAssets) {
       result[asset.type] = asset.id;
+    }
+    for (const asset of legacyAssets) {
+      if (!result[asset.type]) {
+        result[asset.type] = asset.id;
+      }
     }
     return result;
   }
@@ -441,18 +450,31 @@ export class DatabaseStorage implements IStorage {
   async getImageIdsByStyleIds(styleIds: string[]): Promise<Map<string, Record<string, string>>> {
     if (styleIds.length === 0) return new Map();
     
-    const assets = await db
-      .select({ id: imageAssets.id, type: imageAssets.type, styleId: imageAssets.styleId })
-      .from(imageAssets)
-      .where(inArray(imageAssets.styleId, styleIds));
+    const [legacyAssets, objAssets] = await Promise.all([
+      db.select({ id: imageAssets.id, type: imageAssets.type, styleId: imageAssets.styleId })
+        .from(imageAssets)
+        .where(inArray(imageAssets.styleId, styleIds)),
+      db.select({ id: objectAssets.id, type: objectAssets.type, styleId: objectAssets.styleId })
+        .from(objectAssets)
+        .where(inArray(objectAssets.styleId, styleIds)),
+    ]);
     
     const result = new Map<string, Record<string, string>>();
-    for (const asset of assets) {
+    for (const asset of objAssets) {
       if (!asset.styleId) continue;
       if (!result.has(asset.styleId)) {
         result.set(asset.styleId, {});
       }
       result.get(asset.styleId)![asset.type] = asset.id;
+    }
+    for (const asset of legacyAssets) {
+      if (!asset.styleId) continue;
+      if (!result.has(asset.styleId)) {
+        result.set(asset.styleId, {});
+      }
+      if (!result.get(asset.styleId)![asset.type]) {
+        result.get(asset.styleId)![asset.type] = asset.id;
+      }
     }
     return result;
   }

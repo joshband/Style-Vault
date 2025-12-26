@@ -374,9 +374,17 @@ export async function registerRoutes(
   app.delete("/api/styles/:id", async (req, res) => {
     try {
       const styleId = req.params.id;
+      
+      const { deleteStyleImages } = await import("./image-service");
+      const { deleteObjectAssetsByStyle } = await import("./object-image-service");
+      
+      await Promise.all([
+        deleteStyleImages(styleId),
+        deleteObjectAssetsByStyle(styleId),
+      ]);
+      
       await storage.deleteStyle(styleId);
       
-      // Invalidate cache
       cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
       cache.delete(CACHE_KEYS.STYLE_DETAIL(styleId));
       
@@ -590,7 +598,7 @@ export async function registerRoutes(
     });
   });
 
-  // Image assets API - serve optimized images by ID
+  // Image assets API - serve optimized images by ID (supports both imageAssets and objectAssets)
   app.get("/api/images/:id", async (req, res) => {
     try {
       const { id } = req.params;
@@ -600,6 +608,24 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Invalid size. Use: thumb, medium, or full" });
       }
       
+      const { getImageFromObjectStorage } = await import("./object-image-service");
+      const objectImage = await getImageFromObjectStorage(id, size as "thumb" | "medium" | "full");
+      
+      if (objectImage) {
+        const matches = objectImage.data.match(/^data:([^;]+);base64,(.+)$/);
+        if (matches) {
+          const mimeType = matches[1];
+          const buffer = Buffer.from(matches[2], "base64");
+          
+          res.set({
+            "Content-Type": mimeType,
+            "Cache-Control": "public, max-age=31536000, immutable",
+            "Content-Length": buffer.length.toString(),
+          });
+          return res.send(buffer);
+        }
+      }
+      
       const { getImage } = await import("./image-service");
       const image = await getImage(id, size as "thumb" | "medium" | "full");
       
@@ -607,7 +633,6 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Image not found" });
       }
       
-      // Parse base64 and serve as binary with appropriate cache headers
       const matches = image.data.match(/^data:([^;]+);base64,(.+)$/);
       if (matches) {
         const mimeType = matches[1];
@@ -621,7 +646,6 @@ export async function registerRoutes(
         return res.send(buffer);
       }
       
-      // Fallback: return as JSON if not valid base64
       res.json(image);
     } catch (error) {
       console.error("Error serving image:", error);
