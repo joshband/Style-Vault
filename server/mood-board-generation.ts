@@ -245,9 +245,9 @@ Visual Era: ${eraKeywords}
 Mood Keywords: ${moodKeywords}
 
 ================================================================================
-UI LAYOUT & ELEMENTS (Square 1:1 Format for Thumbnail)
+UI LAYOUT & ELEMENTS (16:9 Landscape Format for Thumbnail)
 ================================================================================
-Create a visually striking, SQUARE (1:1 aspect ratio) software interface that immediately conveys this style's unique aesthetic. This is the PRIMARY PREVIEW IMAGE for browsing styles.
+Create a visually striking, LANDSCAPE (16:9 aspect ratio) software interface that immediately conveys this style's unique aesthetic. This is the PRIMARY PREVIEW IMAGE for browsing styles.
 
 COMPOSITION REQUIREMENTS:
 - Single unified interface view (not a collage)
