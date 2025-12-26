@@ -162,7 +162,13 @@ A 16:9 landscape interface with:
 - Grid of buttons or sequencer pads in token colors
 - Sliders and faders matching token aesthetic
 - VU meters using token accent colors
-- Plugin name header in token typography style
+
+================================================================================
+CRITICAL: NO TEXT OR LABELS
+================================================================================
+DO NOT include any text, words, labels, numbers, or letters in the image.
+Use only abstract symbols, icons, and visual patterns - no readable characters.
+Any buttons or controls should be represented by shapes/icons only, not text.
 
 ALL elements MUST use the exact hex colors from the Design Tokens above. The interface should be immediately recognizable as using this specific color palette.`,
 
@@ -216,10 +222,18 @@ FOOTER OR SIDEBAR:
 DESIGN REQUIREMENTS:
 - Use ample whitespace and modern spacing
 - Apply token colors consistently: primary for CTAs, secondary for backgrounds, accent for highlights
-- Ensure clear visual hierarchy with the token typography
-- All backgrounds, buttons, text, and accents MUST use the exact hex colors from Design Tokens above
+- Ensure clear visual hierarchy
+- All backgrounds, buttons, and accents MUST use the exact hex colors from Design Tokens above
 
-The interface should look like a real, polished SaaS application that immediately showcases how this style applies to everyday web components.`,
+================================================================================
+CRITICAL: NO TEXT OR LABELS
+================================================================================
+DO NOT include any text, words, labels, numbers, or letters in the image.
+Use only abstract placeholder shapes, icons, and visual patterns - no readable characters.
+Represent headings and body text as simple horizontal lines or blocks of varying widths.
+Buttons should show only icons or colored shapes, not text labels.
+
+The interface should look like a real, polished SaaS application wireframe that immediately showcases how this style applies to everyday web components.`,
 
     softwareApp: `Create a beautiful software application interface mockup for "${styleName}" - this will be used as the primary thumbnail/preview for this visual style.
 
@@ -267,6 +281,14 @@ VISUAL PRIORITIES:
 - Strong contrast for thumbnail legibility
 - Professional, polished application appearance
 - Evocative of the style's mood: ${moodKeywords}
+
+================================================================================
+CRITICAL: NO TEXT OR LABELS
+================================================================================
+DO NOT include any text, words, labels, numbers, or letters in the image.
+Use only abstract placeholder shapes, icons, and visual patterns - no readable characters.
+Represent any headings or labels as simple horizontal lines or blocks.
+Buttons and controls should show only icons or colored shapes, not text.
 
 ALL elements MUST use the exact hex colors from the Design Tokens above. This image will represent this style in gallery views, so it must be visually distinctive and showcase the color palette prominently.`,
   };
