@@ -47,7 +47,9 @@ const StyleCardComponent = memo(function StyleCard({ style, className, onDelete 
         entries.forEach((entry) => {
           if (entry.isIntersecting && !hasPreloaded.current) {
             hasPreloaded.current = true;
-            const fullImageUrl = style.imageIds?.preview_landscape 
+            const fullImageUrl = style.imageIds?.ui_software_app
+              ? `/api/images/${style.imageIds.ui_software_app}`
+              : style.imageIds?.preview_landscape 
               ? `/api/images/${style.imageIds.preview_landscape}`
               : style.imageIds?.reference
               ? `/api/images/${style.imageIds.reference}`
@@ -160,12 +162,14 @@ const StyleCardComponent = memo(function StyleCard({ style, className, onDelete 
             }}
             transition={{ duration: 0.2, ease: "easeOut" }}
           >
-            {/* Preview Image */}
+            {/* Preview Image - prioritize ui_software_app as primary thumbnail */}
             <div className="relative aspect-[16/10] bg-muted overflow-hidden">
-              {(style.imageIds?.preview_landscape || style.imageIds?.reference || style.thumbnailPreview) ? (
+              {(style.imageIds?.ui_software_app || style.imageIds?.preview_landscape || style.imageIds?.reference || style.thumbnailPreview) ? (
                 <img 
                   src={
-                    style.imageIds?.preview_landscape 
+                    style.imageIds?.ui_software_app
+                      ? `/api/images/${style.imageIds.ui_software_app}?size=thumb`
+                      : style.imageIds?.preview_landscape 
                       ? `/api/images/${style.imageIds.preview_landscape}?size=thumb`
                       : style.imageIds?.reference
                       ? `/api/images/${style.imageIds.reference}?size=thumb`

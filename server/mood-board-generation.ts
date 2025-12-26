@@ -120,7 +120,7 @@ The resulting image MUST visually match the extracted Design Tokens. Colors shou
 function buildUiConceptPrompt(
   request: MoodBoardRequest,
   summary: TokenSummary,
-  conceptType: "audioPlugin" | "dashboard"
+  conceptType: "audioPlugin" | "dashboard" | "softwareApp"
 ): string {
   const { styleName, styleDescription, metadataTags } = request;
   const colorList = summary.colors.map((c) => `${c.name}: ${c.hex}`).join(", ");
@@ -220,6 +220,55 @@ DESIGN REQUIREMENTS:
 - All backgrounds, buttons, text, and accents MUST use the exact hex colors from Design Tokens above
 
 The interface should look like a real, polished SaaS application that immediately showcases how this style applies to everyday web components.`,
+
+    softwareApp: `Create a beautiful software application interface mockup for "${styleName}" - this will be used as the primary thumbnail/preview for this visual style.
+
+================================================================================
+PRIMARY DIRECTIVE: DESIGN TOKENS (HIGHEST PRIORITY)
+================================================================================
+The following Design Tokens were extracted from the source image. These are the AUTHORITATIVE visual specifications:
+
+MANDATORY COLOR PALETTE - Use ONLY these exact hex values:
+${summary.colors.map((c) => `  ${c.name}: ${c.hex} (EXACT - no substitution)`).join("\n")}
+
+TOKEN-DEFINED PROPERTIES:
+- Typography: serif="${summary.typography.serif}", sans="${summary.typography.sans}", mono="${summary.typography.mono}"
+- Surface Texture: grain="${summary.texture.grain}", finish="${summary.texture.finish}"
+- Lighting: type="${summary.lighting.type}", direction="${summary.lighting.direction}", intensity="${summary.lighting.intensity}"
+- Mood: tone="${summary.mood.tone}", saturation=${summary.mood.saturation}, contrast=${summary.mood.contrast}
+
+================================================================================
+SECONDARY: SEMANTIC CONTEXT (Use to Inform Composition)
+================================================================================
+Style Description: ${styleDescription}
+Visual Era: ${eraKeywords}
+Mood Keywords: ${moodKeywords}
+
+================================================================================
+UI LAYOUT & ELEMENTS (Square 1:1 Format for Thumbnail)
+================================================================================
+Create a visually striking, SQUARE (1:1 aspect ratio) software interface that immediately conveys this style's unique aesthetic. This is the PRIMARY PREVIEW IMAGE for browsing styles.
+
+COMPOSITION REQUIREMENTS:
+- Single unified interface view (not a collage)
+- Clean, modern software application feel
+- Prominent use of the token color palette
+- Clear visual hierarchy that reads well at small sizes
+
+SUGGESTED ELEMENTS (choose what fits the style mood):
+- A header/title bar with navigation or menu elements
+- Central content area with cards, panels, or widgets
+- Interactive elements: buttons, toggles, or icons
+- Data visualization elements if appropriate (charts, graphs, meters)
+- Subtle depth through shadows or layering
+
+VISUAL PRIORITIES:
+- The color palette should be immediately recognizable
+- Strong contrast for thumbnail legibility
+- Professional, polished application appearance
+- Evocative of the style's mood: ${moodKeywords}
+
+ALL elements MUST use the exact hex colors from the Design Tokens above. This image will represent this style in gallery views, so it must be visually distinctive and showcase the color palette prominently.`,
   };
 
   return conceptPrompts[conceptType];
@@ -273,9 +322,9 @@ export async function generateMoodBoardCollage(
   }
 }
 
-async function generateSingleUiConcept(
+export async function generateSingleUiConcept(
   request: MoodBoardRequest,
-  conceptType: "audioPlugin" | "dashboard"
+  conceptType: "audioPlugin" | "dashboard" | "softwareApp"
 ): Promise<string | null> {
   const summary = extractTokenSummary(request.tokens);
   const prompt = buildUiConceptPrompt(request, summary, conceptType);
@@ -306,28 +355,34 @@ export async function generateUiConcepts(
   onProgress?: ProgressCallback
 ): Promise<UiConceptAssets> {
   if (onProgress) {
-    await onProgress(55, "Generating audio plugin UI concept...");
+    await onProgress(50, "Generating software app UI thumbnail...");
+    const softwareApp = await generateSingleUiConcept(request, "softwareApp");
+    
+    await onProgress(65, "Generating audio plugin UI concept...");
     const audioPlugin = await generateSingleUiConcept(request, "audioPlugin");
     
-    await onProgress(75, "Generating dashboard UI concept...");
+    await onProgress(80, "Generating dashboard UI concept...");
     const dashboard = await generateSingleUiConcept(request, "dashboard");
     
     return {
+      softwareApp: softwareApp || undefined,
       audioPlugin: audioPlugin || undefined,
       dashboard: dashboard || undefined,
-      status: audioPlugin || dashboard ? "complete" : "failed",
+      status: softwareApp || audioPlugin || dashboard ? "complete" : "failed",
       history: [],
     };
   } else {
-    const [audioPlugin, dashboard] = await Promise.all([
+    const [softwareApp, audioPlugin, dashboard] = await Promise.all([
+      generateSingleUiConcept(request, "softwareApp"),
       generateSingleUiConcept(request, "audioPlugin"),
       generateSingleUiConcept(request, "dashboard"),
     ]);
 
     return {
+      softwareApp: softwareApp || undefined,
       audioPlugin: audioPlugin || undefined,
       dashboard: dashboard || undefined,
-      status: audioPlugin || dashboard ? "complete" : "failed",
+      status: softwareApp || audioPlugin || dashboard ? "complete" : "failed",
       history: [],
     };
   }
@@ -340,25 +395,30 @@ export async function generateAllMoodBoardAssets(
   
   if (onProgress) {
     await onProgress(5, "Preparing style tokens...");
-    await onProgress(8, "Starting parallel asset generation: mood board, audio plugin, dashboard...");
+    await onProgress(8, "Starting parallel asset generation: mood board, software app, audio plugin, dashboard...");
     
     // Track completion for progress updates
     let completedCount = 0;
-    const totalTasks = 3;
+    const totalTasks = 4;
     
     const updateProgress = async (taskName: string) => {
       completedCount++;
-      // Progress goes from 10 to 90 as tasks complete (10, 37, 63, 90)
       const progress = 10 + Math.floor((completedCount / totalTasks) * 80);
       await onProgress(progress, `Generated ${taskName} (${completedCount}/${totalTasks})`);
     };
     
-    // Run all three image generations in parallel for ~3x speed improvement
-    const [moodBoard, audioPlugin, dashboard] = await Promise.all([
+    // Run all four image generations in parallel
+    const [moodBoard, softwareApp, audioPlugin, dashboard] = await Promise.all([
       (async () => {
         await onProgress(12, "Generating mood board collage...");
         const result = await generateMoodBoardCollage(request);
         await updateProgress("mood board collage");
+        return result;
+      })(),
+      (async () => {
+        await onProgress(13, "Generating software app UI thumbnail...");
+        const result = await generateSingleUiConcept(request, "softwareApp");
+        await updateProgress("software app UI");
         return result;
       })(),
       (async () => {
@@ -378,9 +438,10 @@ export async function generateAllMoodBoardAssets(
     await onProgress(95, "Finalizing assets...");
     
     const uiConcepts: UiConceptAssets = {
+      softwareApp: softwareApp || undefined,
       audioPlugin: audioPlugin || undefined,
       dashboard: dashboard || undefined,
-      status: audioPlugin || dashboard ? "complete" : "failed",
+      status: softwareApp || audioPlugin || dashboard ? "complete" : "failed",
       history: [],
     };
     

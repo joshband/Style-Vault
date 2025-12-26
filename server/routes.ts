@@ -773,6 +773,81 @@ export async function registerRoutes(
     }
   });
 
+  // Regenerate softwareApp UI for all styles (admin endpoint)
+  app.post("/api/admin/regenerate-software-app", async (req, res) => {
+    try {
+      const { generateSingleUiConcept } = await import("./mood-board-generation");
+      const { storeImage } = await import("./image-service");
+      const allStyles = await storage.getStyles();
+      
+      const results: { styleId: string; styleName: string; success: boolean; error?: string }[] = [];
+      
+      for (const style of allStyles) {
+        try {
+          const softwareApp = await generateSingleUiConcept({
+            styleName: style.name,
+            styleDescription: style.description,
+            tokens: style.tokens,
+            metadataTags: style.metadataTags || getDefaultMetadataTags(),
+          }, "softwareApp");
+          
+          if (softwareApp) {
+            // Store the image in image_assets table
+            await storeImage(softwareApp, "ui_software_app", style.id);
+            
+            // Re-fetch the style to get current state
+            const freshStyle = await storage.getStyleById(style.id);
+            if (!freshStyle) {
+              results.push({ styleId: style.id, styleName: style.name, success: false, error: "Style not found after generation" });
+              continue;
+            }
+            
+            // Update style uiConcepts with the new softwareApp, preserving existing data
+            const existingMoodBoard = freshStyle.moodBoard as any || { status: "complete", history: [] };
+            const existingUiConcepts = freshStyle.uiConcepts as any || { status: "pending", history: [] };
+            const updatedUiConcepts = {
+              ...existingUiConcepts,
+              softwareApp,
+              status: "complete",
+            };
+            
+            await storage.updateStyleMoodBoard(
+              style.id,
+              existingMoodBoard,
+              updatedUiConcepts
+            );
+            
+            // Invalidate cache for this specific style
+            cache.delete(CACHE_KEYS.STYLE_DETAIL(style.id));
+            
+            results.push({ styleId: style.id, styleName: style.name, success: true });
+          } else {
+            results.push({ styleId: style.id, styleName: style.name, success: false, error: "Generation returned null" });
+          }
+        } catch (err) {
+          results.push({
+            styleId: style.id,
+            styleName: style.name,
+            success: false,
+            error: err instanceof Error ? err.message : "Unknown error",
+          });
+        }
+      }
+      
+      // Invalidate the style summaries cache so fresh imageIds are fetched
+      cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
+      
+      const successCount = results.filter(r => r.success).length;
+      res.json({
+        message: `Regenerated softwareApp for ${successCount}/${results.length} styles`,
+        results,
+      });
+    } catch (error) {
+      console.error("Software app regeneration error:", error);
+      res.status(500).json({ error: "Software app regeneration failed" });
+    }
+  });
+
   // Get image asset IDs for a style
   app.get("/api/styles/:id/image-ids", async (req, res) => {
     try {
@@ -1571,8 +1646,9 @@ export async function registerRoutes(
         });
       }
       
-      if (existingUiConcepts.status === "complete" && (existingUiConcepts.audioPlugin || existingUiConcepts.dashboard)) {
+      if (existingUiConcepts.status === "complete" && (existingUiConcepts.softwareApp || existingUiConcepts.audioPlugin || existingUiConcepts.dashboard)) {
         uiConceptsHistory.unshift({
+          softwareApp: existingUiConcepts.softwareApp,
           audioPlugin: existingUiConcepts.audioPlugin,
           dashboard: existingUiConcepts.dashboard,
           componentLibrary: existingUiConcepts.componentLibrary,
