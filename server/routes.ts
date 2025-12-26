@@ -663,6 +663,65 @@ export async function registerRoutes(
     });
   });
 
+  // Typography recommendation API
+  // Analyzes image visual signals and recommends fonts based on style
+  app.post("/api/style/typography", async (req, res) => {
+    try {
+      const { imageBase64 } = req.body;
+
+      if (!imageBase64) {
+        return res.status(400).json({ error: "Image data required" });
+      }
+
+      const { extractStyleSignals, extractStyleSignalsFallback } = await import("./typography/styleSignals");
+      const { inferTypographyIntent } = await import("./typography/typographyIntent");
+      const { recommendFonts, recommendFontPairing } = await import("./typography/recommendFonts");
+
+      // Extract visual signals from image
+      let signalResult = await extractStyleSignals(imageBase64);
+      
+      // Fallback to basic analysis if Python CV fails
+      if (!signalResult.success || !signalResult.signals) {
+        console.warn("[Typography] CV extraction failed, using fallback");
+        signalResult = await extractStyleSignalsFallback(imageBase64);
+      }
+
+      if (!signalResult.signals) {
+        return res.status(500).json({
+          error: "Failed to extract visual signals",
+          message: signalResult.error || "Unknown error",
+        });
+      }
+
+      // Infer typography intent from signals
+      const intentResult = inferTypographyIntent(signalResult.signals);
+
+      // Get font recommendations
+      const recommendations = recommendFonts(intentResult.intent, { maxResults: 3 });
+      
+      // Also get a heading/body pairing suggestion
+      const pairing = recommendFontPairing(intentResult.intent);
+
+      res.json({
+        signals: signalResult.signals,
+        intent: intentResult.intent,
+        explanations: intentResult.explanations,
+        recommendations: recommendations.recommendations,
+        pairing: {
+          heading: pairing.heading,
+          body: pairing.body,
+        },
+        processingTimeMs: signalResult.processingTimeMs,
+      });
+    } catch (error) {
+      console.error("Error in typography recommendation:", error);
+      res.status(500).json({
+        error: "Failed to generate typography recommendations",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
   // Image assets API - serve optimized images by ID (supports both imageAssets and objectAssets)
   app.get("/api/images/:id", async (req, res) => {
     try {
