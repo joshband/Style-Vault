@@ -1,16 +1,17 @@
-import { useRoute } from "wouter";
+import { useRoute, useLocation } from "wouter";
 import { type StyleSpec } from "@/lib/store";
 import { Layout } from "@/components/layout";
 import { TokenViewer } from "@/components/token-viewer";
 import { ColorPaletteSwatches } from "@/components/color-palette-swatches";
 import { StyleSpecEditor } from "@/components/style-spec-editor";
-import { ArrowLeft, Download, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Palette, MessageSquare, Share2, Check, Copy, Droplets, FileEdit, Bookmark, Star, User, FolderPlus, Folder, Plus, FileCode, FileJson, Paintbrush, History, RotateCcw, Save, Sparkles, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Download, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Share2, Check, Copy, Bookmark, Star, User, FolderPlus, Folder, Plus, FileCode, FileJson, Paintbrush, History, RotateCcw, Save, Sparkles, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { useState, useEffect, useCallback, type ReactNode } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { AiMoodBoard } from "@/components/ai-mood-board";
-import { ActiveJobsIndicator } from "@/components/active-jobs-indicator";
+import { ExportDialog } from "@/components/export-dialog";
+import { DeployDialog } from "@/components/deploy-dialog";
 import { useAuth } from "@/hooks/use-auth";
 
 interface StyleSummary {
@@ -31,6 +32,7 @@ interface StyleSummary {
   creatorId?: string | null;
   creatorName?: string | null;
   isPublic?: boolean;
+  neighbors?: { prevId: string | null; nextId: string | null };
 }
 
 interface StyleAssets {
@@ -56,22 +58,11 @@ interface StyleVersion {
   createdAt: string;
 }
 
-interface SectionHeaderProps {
-  icon: ReactNode;
-  title: string;
-  description: string;
-}
-
-function SectionHeader({ icon, title, description }: SectionHeaderProps) {
+function SectionHeader({ title, description }: { title: string; description?: string }) {
   return (
-    <div className="flex items-start gap-3 mb-6">
-      <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-muted flex items-center justify-center text-muted-foreground">
-        {icon}
-      </div>
-      <div>
-        <h2 className="text-lg font-serif font-medium text-foreground">{title}</h2>
-        <p className="text-sm text-muted-foreground mt-0.5">{description}</p>
-      </div>
+    <div className="mb-6">
+      <h2 className="text-lg font-serif font-medium text-foreground">{title}</h2>
+      {description && <p className="text-sm text-muted-foreground mt-0.5">{description}</p>}
     </div>
   );
 }
@@ -88,8 +79,10 @@ function PreviewSkeleton({ aspect }: { aspect: string }) {
 
 export default function Inspect() {
   const [, params] = useRoute("/style/:id");
+  const [, navigate] = useLocation();
   const id = params?.id;
   const { user, isAuthenticated } = useAuth();
+  const containerRef = useRef<HTMLDivElement>(null);
   const [summary, setSummary] = useState<StyleSummary | null>(null);
   const [assets, setAssets] = useState<StyleAssets | null>(null);
   const [loading, setLoading] = useState(true);
@@ -753,6 +746,130 @@ export default ${safeName};`;
     return lines.join('\n');
   };
 
+  const convertTokensToFigma = (tokens: any, styleName: string): string => {
+    const variables: any[] = [];
+    const safeStyleName = styleName.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    const collectionId = `collection_${safeStyleName}`;
+    const modeId = `mode_${safeStyleName}_default`;
+    
+    const hexToFigmaColor = (color: string): { r: number; g: number; b: number; a: number } => {
+      let r = 0, g = 0, b = 0, a = 1;
+      if (color.startsWith('#')) {
+        const hex = color.slice(1);
+        if (hex.length === 3) {
+          r = parseInt(hex[0] + hex[0], 16) / 255;
+          g = parseInt(hex[1] + hex[1], 16) / 255;
+          b = parseInt(hex[2] + hex[2], 16) / 255;
+        } else if (hex.length >= 6) {
+          r = parseInt(hex.slice(0, 2), 16) / 255;
+          g = parseInt(hex.slice(2, 4), 16) / 255;
+          b = parseInt(hex.slice(4, 6), 16) / 255;
+          if (hex.length === 8) a = parseInt(hex.slice(6, 8), 16) / 255;
+        }
+      }
+      return { r, g, b, a };
+    };
+    
+    const addVariable = (path: string[], value: any, type: string) => {
+      const name = path.join('/');
+      const varId = `var_${path.join('_').replace(/[^a-z0-9_]/gi, '_')}`;
+      let resolvedType = 'STRING';
+      let resolvedValue: any = value;
+      
+      if (type === 'color' || (typeof value === 'string' && /^#|^rgb/.test(value))) {
+        resolvedType = 'COLOR';
+        resolvedValue = hexToFigmaColor(String(value));
+      } else if (type === 'dimension' || type === 'spacing' || type === 'borderRadius') {
+        resolvedType = 'FLOAT';
+        resolvedValue = parseFloat(String(value).replace(/[^\d.-]/g, '')) || 0;
+      } else if (typeof value === 'number') {
+        resolvedType = 'FLOAT';
+        resolvedValue = value;
+      } else if (typeof value === 'boolean') {
+        resolvedType = 'BOOLEAN';
+        resolvedValue = value;
+      } else {
+        resolvedType = 'STRING';
+        resolvedValue = String(value);
+      }
+      
+      variables.push({ id: varId, name, resolvedType, valuesByMode: { [modeId]: resolvedValue } });
+    };
+    
+    const traverse = (obj: any, path: string[] = []) => {
+      for (const [key, value] of Object.entries(obj)) {
+        if (value && typeof value === 'object') {
+          if ('$value' in value) {
+            addVariable([...path, key], (value as any).$value, (value as any).$type || '');
+          } else {
+            traverse(value, [...path, key]);
+          }
+        }
+      }
+    };
+    traverse(tokens);
+    
+    return JSON.stringify({
+      version: '1.0',
+      meta: { name: styleName, generator: 'Visual DNA' },
+      variableCollections: [{ id: collectionId, name: styleName, modes: [{ modeId, name: 'Default' }], defaultModeId: modeId }],
+      variables,
+    }, null, 2);
+  };
+
+  const convertTokensToAdobeXD = (tokens: any, styleName: string): string => {
+    const assets: any = { version: 1, meta: { name: styleName, generator: 'Visual DNA' }, colors: [], characterStyles: [] };
+    
+    const parseColorToRGBA = (color: string) => {
+      if (!color.startsWith('#')) return null;
+      const hex = color.slice(1);
+      let r = 0, g = 0, b = 0, a = 255;
+      if (hex.length === 6) { r = parseInt(hex.slice(0,2),16); g = parseInt(hex.slice(2,4),16); b = parseInt(hex.slice(4,6),16); }
+      else if (hex.length === 8) { r = parseInt(hex.slice(0,2),16); g = parseInt(hex.slice(2,4),16); b = parseInt(hex.slice(4,6),16); a = parseInt(hex.slice(6,8),16); }
+      return { r, g, b, a: a/255 };
+    };
+    
+    const extractColors = (obj: any, prefix = '') => {
+      for (const [key, value] of Object.entries(obj)) {
+        const name = prefix ? `${prefix}/${key}` : key;
+        if (value && typeof value === 'object') {
+          if ('$value' in value && typeof (value as any).$value === 'string') {
+            const rgba = parseColorToRGBA((value as any).$value);
+            if (rgba) assets.colors.push({ name, value: { mode: 'RGB', value: rgba, alpha: rgba.a } });
+          } else { extractColors(value, name); }
+        }
+      }
+    };
+    if (tokens.color) extractColors(tokens.color);
+    
+    const extractTypography = (obj: any, prefix = '') => {
+      for (const [key, value] of Object.entries(obj)) {
+        const name = prefix ? `${prefix}/${key}` : key;
+        if (value && typeof value === 'object') {
+          if ('$value' in value) {
+            const tokenObj = value as { $value: any; $type?: string };
+            const type = tokenObj.$type || '';
+            const val = tokenObj.$value;
+            
+            if (type === 'fontFamily' || key.toLowerCase().includes('family')) {
+              assets.characterStyles.push({ name, style: { fontFamily: String(val) } });
+            } else if (type === 'fontSize' || key.toLowerCase().includes('size')) {
+              const sizeVal = parseFloat(String(val).replace(/[^\d.]/g, '')) || 16;
+              assets.characterStyles.push({ name, style: { fontSize: sizeVal } });
+            } else if (type === 'fontWeight' || key.toLowerCase().includes('weight')) {
+              assets.characterStyles.push({ name, style: { fontWeight: val } });
+            }
+          } else {
+            extractTypography(value, name);
+          }
+        }
+      }
+    };
+    if (tokens.typography) extractTypography(tokens.typography);
+    
+    return JSON.stringify(assets, null, 2);
+  };
+
   const downloadFile = (content: string, filename: string, mimeType: string) => {
     const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
@@ -765,7 +882,7 @@ export default ${safeName};`;
     URL.revokeObjectURL(url);
   };
 
-  const handleExport = (format: 'json' | 'css' | 'scss' | 'tailwind' | 'react' | 'flutter') => {
+  const handleExport = (format: 'json' | 'css' | 'scss' | 'tailwind' | 'react' | 'flutter' | 'figma' | 'adobe-xd') => {
     if (!summary) return;
     const baseName = summary.name.toLowerCase().replace(/\s+/g, "-");
     
@@ -787,6 +904,12 @@ export default ${safeName};`;
         break;
       case 'flutter':
         downloadFile(convertTokensToFlutter(summary.tokens, summary.name), `${baseName}_theme.dart`, 'text/x-dart');
+        break;
+      case 'figma':
+        downloadFile(convertTokensToFigma(summary.tokens, summary.name), `${baseName}-figma-variables.json`, 'application/json');
+        break;
+      case 'adobe-xd':
+        downloadFile(convertTokensToAdobeXD(summary.tokens, summary.name), `${baseName}-adobe-xd.json`, 'application/json');
         break;
     }
   };
@@ -820,550 +943,589 @@ export default ${safeName};`;
 
   const previews = assets?.previews || {};
 
+  // Extract primary colors for Quick Read (first 6) - visual only
+  const getPrimaryColors = () => {
+    if (!summary?.tokens?.color) return [];
+    const colors: string[] = [];
+    const colorTokens = summary.tokens.color;
+    
+    const extractColors = (obj: any) => {
+      for (const key in obj) {
+        if (colors.length >= 6) break;
+        const val = obj[key];
+        if (val?.$value && typeof val.$value === 'string') {
+          colors.push(val.$value);
+        } else if (typeof val === 'object' && !val.$value) {
+          extractColors(val);
+        }
+      }
+    };
+    extractColors(colorTokens);
+    return colors;
+  };
+  
+  const primaryColors = getPrimaryColors();
+  
+  // Derive human-readable traits from tokens
+  const getHumanTraits = () => {
+    const traits: { contrast: string; density: string; vibe: string } = {
+      contrast: 'Medium',
+      density: 'Balanced',
+      vibe: ''
+    };
+    
+    // Derive Contrast from color luminance range
+    if (primaryColors.length >= 2) {
+      const getLuminance = (color: string): number => {
+        // Simple luminance estimation from hex/rgb
+        let r = 0, g = 0, b = 0;
+        if (color.startsWith('#')) {
+          const hex = color.slice(1);
+          r = parseInt(hex.slice(0, 2), 16) / 255;
+          g = parseInt(hex.slice(2, 4), 16) / 255;
+          b = parseInt(hex.slice(4, 6), 16) / 255;
+        } else if (color.startsWith('rgb')) {
+          const match = color.match(/\d+/g);
+          if (match) {
+            r = parseInt(match[0]) / 255;
+            g = parseInt(match[1]) / 255;
+            b = parseInt(match[2]) / 255;
+          }
+        } else if (color.startsWith('oklch')) {
+          // Extract lightness from oklch
+          const match = color.match(/oklch\(\s*([\d.]+)/);
+          if (match) return parseFloat(match[1]);
+        }
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      };
+      
+      const luminances = primaryColors.map(getLuminance);
+      const range = Math.max(...luminances) - Math.min(...luminances);
+      
+      if (range < 0.3) traits.contrast = 'Low';
+      else if (range > 0.6) traits.contrast = 'High';
+      else traits.contrast = 'Medium';
+    }
+    
+    // Derive Density from spacing tokens
+    if (summary?.tokens?.spacing) {
+      const spacingTokens = summary.tokens.spacing;
+      const spacingValues: number[] = [];
+      
+      const extractSpacing = (obj: any) => {
+        for (const key in obj) {
+          const val = obj[key];
+          if (val?.$value) {
+            const numMatch = String(val.$value).match(/[\d.]+/);
+            if (numMatch) spacingValues.push(parseFloat(numMatch[0]));
+          } else if (typeof val === 'object') {
+            extractSpacing(val);
+          }
+        }
+      };
+      extractSpacing(spacingTokens);
+      
+      if (spacingValues.length > 0) {
+        const avgSpacing = spacingValues.reduce((a, b) => a + b, 0) / spacingValues.length;
+        if (avgSpacing < 8) traits.density = 'Tight';
+        else if (avgSpacing > 20) traits.density = 'Airy';
+        else traits.density = 'Balanced';
+      }
+    }
+    
+    // Derive Vibe from metadata
+    const vibeTags = summary?.metadataTags?.subjective?.emotionalImpact || 
+                     summary?.metadataTags?.objective?.visualMood || 
+                     [];
+    if (vibeTags.length > 0) {
+      traits.vibe = vibeTags[0];
+    } else if (summary?.description) {
+      // Fallback: use first few words of description
+      traits.vibe = summary.description.split(/[,.]/).at(0)?.trim() || '';
+    }
+    
+    return traits;
+  };
+  
+  const humanTraits = getHumanTraits();
+
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto space-y-8 md:space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        {/* Header */}
-        <div className="space-y-4">
-          <Link href="/" className="inline-flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors uppercase tracking-wider font-mono w-fit">
-            <ArrowLeft size={12} /> Back to Vault
-          </Link>
-          
-          <div className="space-y-2">
-            <div className="flex items-start justify-between gap-4">
-              <h1 className="text-3xl md:text-4xl font-serif font-medium text-foreground">{summary.name}</h1>
+      <div ref={containerRef} className="max-w-4xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        
+        {/* === SECTION 1: HERO === */}
+        <header className="space-y-3">
+          {/* Nav bar */}
+          <div className="flex items-center justify-between">
+            <Link href="/" className="inline-flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+              <ArrowLeft size={12} /> Back
+            </Link>
+            <div className="flex items-center gap-2">
+              {summary?.neighbors && (summary.neighbors.prevId || summary.neighbors.nextId) && (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => summary.neighbors?.prevId && navigate(`/style/${summary.neighbors.prevId}`)}
+                    disabled={!summary.neighbors.prevId}
+                    className="p-1.5 rounded border border-border hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    data-testid="button-prev-style"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+                  <button
+                    onClick={() => summary.neighbors?.nextId && navigate(`/style/${summary.neighbors.nextId}`)}
+                    disabled={!summary.neighbors.nextId}
+                    className="p-1.5 rounded border border-border hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    data-testid="button-next-style"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+              )}
               {isOwner && (
                 <button
                   onClick={handleToggleVisibility}
                   disabled={visibilityLoading}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border border-border hover:bg-muted transition-colors"
+                  className="p-1.5 rounded border border-border hover:bg-muted transition-colors"
                   data-testid="button-toggle-visibility"
+                  title={isPublic ? "Public" : "Private"}
                 >
-                  {visibilityLoading ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : isPublic ? (
-                    <Eye size={14} />
-                  ) : (
-                    <EyeOff size={14} />
-                  )}
-                  <span>{isPublic ? "Public" : "Private"}</span>
+                  {visibilityLoading ? <Loader2 size={14} className="animate-spin" /> : isPublic ? <Eye size={14} /> : <EyeOff size={14} />}
                 </button>
               )}
             </div>
-            <p className="text-muted-foreground text-lg font-light leading-relaxed max-w-2xl">
-              {summary.description}
-            </p>
-            {summary.creatorName && summary.creatorId && (
-              <Link 
-                href={`/creator/${summary.creatorId}`}
-                className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
-                data-testid={`link-creator-${summary.creatorId}`}
-              >
-                <User size={14} />
-                <span>by {summary.creatorName}</span>
-              </Link>
+          </div>
+          
+          {/* Title + Vibe */}
+          <div className="space-y-1">
+            <h1 className="text-2xl md:text-3xl font-serif font-medium text-foreground leading-tight">{summary.name}</h1>
+            <p className="text-muted-foreground text-base font-light leading-relaxed">{summary.description}</p>
+          </div>
+          
+          {/* Subtle metadata row: creator + rating */}
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-3">
+              {summary.creatorName && summary.creatorId && (
+                <Link 
+                  href={`/creator/${summary.creatorId}`}
+                  className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
+                  data-testid={`link-creator-${summary.creatorId}`}
+                >
+                  <User size={12} />
+                  <span className="text-xs">{summary.creatorName}</span>
+                </Link>
+              )}
+              {avgRating.count > 0 && (
+                <div className="flex items-center gap-1 text-muted-foreground">
+                  <Star size={12} className="fill-yellow-400 text-yellow-400" />
+                  <span className="text-xs">{avgRating.average.toFixed(1)}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </header>
+
+        {/* === SECTION 2: VISUAL TRUST STRIP === */}
+        <section className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Source Image - Trust Signal */}
+          <div className="relative aspect-square rounded-lg overflow-hidden border border-border bg-muted">
+            {(summary.imageIds?.reference || (summary.referenceImages && summary.referenceImages.length > 0)) ? (
+              <>
+                <img 
+                  src={summary.imageIds?.reference 
+                    ? `/api/images/${summary.imageIds.reference}?size=medium`
+                    : summary.referenceImages[0]
+                  } 
+                  alt="Source reference"
+                  className="absolute inset-0 w-full h-full object-cover"
+                  loading="eager"
+                  data-testid="img-source-reference"
+                />
+                <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/70 text-white text-[10px] font-mono rounded">
+                  Source
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
+                No source image
+              </div>
             )}
           </div>
           
-          {(summary.imageIds?.reference || (summary.referenceImages && summary.referenceImages.length > 0)) && (
-            <div className="space-y-2">
-              <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Source Image
-              </h3>
-              <div className="w-full">
-                <div className="rounded-lg overflow-hidden border border-border bg-muted/30">
-                  <img 
-                    src={summary.imageIds?.reference 
-                      ? `/api/images/${summary.imageIds.reference}?size=medium`
-                      : summary.referenceImages[0]
-                    } 
-                    alt="Source image" 
-                    className="w-full h-auto object-contain"
-                    loading="lazy"
-                    data-testid="img-reference-main"
-                  />
+          {/* Software App UI - Style Output */}
+          <div className="relative aspect-square rounded-lg overflow-hidden border border-border bg-muted">
+            {summary.imageIds?.ui_software_app ? (
+              <>
+                <img 
+                  src={`/api/images/${summary.imageIds.ui_software_app}?size=medium`}
+                  alt="Applied UI"
+                  className="absolute inset-0 w-full h-full object-cover"
+                  loading="eager"
+                  data-testid="img-applied-ui"
+                />
+                <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/70 text-white text-[10px] font-mono rounded">
+                  Applied
                 </div>
+              </>
+            ) : (
+              <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
+                Generating...
               </div>
+            )}
+          </div>
+        </section>
+
+        {/* === SECTION 3: QUICK READ === */}
+        <section className="space-y-4">
+          {/* Palette Strip - Visual only */}
+          {primaryColors.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              {primaryColors.map((color, i) => (
+                <div
+                  key={i}
+                  className="flex-shrink-0 w-10 h-10 rounded-lg shadow-sm"
+                  style={{ backgroundColor: color }}
+                  data-testid={`color-swatch-${i}`}
+                />
+              ))}
             </div>
           )}
           
-          <div className="flex items-center justify-between pt-2">
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              <time dateTime={summary.createdAt}>
-                Created {(() => {
-                  const date = new Date(summary.createdAt);
-                  const displayDate = isNaN(date.getTime()) ? new Date() : date;
-                  return displayDate.toLocaleDateString(undefined, { 
-                    month: 'long', 
-                    day: 'numeric', 
-                    year: 'numeric' 
-                  });
-                })()}
-              </time>
-              <ActiveJobsIndicator styleId={id} />
-            </div>
-            
-            <div className="flex items-center gap-2">
-              {/* Bookmark button */}
-              {isAuthenticated && (
-                <button
-                  onClick={handleToggleBookmark}
-                  disabled={bookmarkLoading}
-                  className={`inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors disabled:opacity-50 ${
-                    isBookmarked 
-                      ? "border-yellow-500 bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20" 
-                      : "border-border bg-muted/50 hover:bg-muted"
-                  }`}
-                  data-testid="button-bookmark-style"
-                >
-                  {bookmarkLoading ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <Bookmark size={14} className={isBookmarked ? "fill-current" : ""} />
-                  )}
-                  <span>{isBookmarked ? "Saved" : "Save"}</span>
-                </button>
-              )}
-              
-              {/* Add to Collection button */}
-              {isAuthenticated && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      disabled={collectionsLoading}
-                      className={`inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors disabled:opacity-50 ${
-                        styleCollections.size > 0
-                          ? "border-blue-500 bg-blue-500/10 text-blue-600 hover:bg-blue-500/20"
-                          : "border-border bg-muted/50 hover:bg-muted"
-                      }`}
-                      data-testid="button-add-to-collection"
-                    >
-                      {collectionsLoading ? (
-                        <Loader2 size={14} className="animate-spin" />
-                      ) : (
-                        <FolderPlus size={14} />
-                      )}
-                      <span>{styleCollections.size > 0 ? `In ${styleCollections.size}` : "Collect"}</span>
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    {collections.length === 0 ? (
-                      <div className="px-2 py-3 text-center">
-                        <p className="text-xs text-muted-foreground mb-2">No collections yet</p>
-                        <Link href="/saved" className="text-xs text-blue-500 hover:underline">
-                          Create your first collection
-                        </Link>
-                      </div>
-                    ) : (
-                      <>
-                        {collections.map((collection) => (
-                          <DropdownMenuItem
-                            key={collection.id}
-                            onClick={() => handleToggleCollection(collection.id)}
-                            className="cursor-pointer"
-                            data-testid={`collection-option-${collection.id}`}
-                          >
-                            <div className="flex items-center gap-2 w-full">
-                              {styleCollections.has(collection.id) ? (
-                                <Check size={14} className="text-green-500" />
-                              ) : (
-                                <Folder size={14} className="text-muted-foreground" />
-                              )}
-                              <span className="flex-1 truncate">{collection.name}</span>
-                            </div>
-                          </DropdownMenuItem>
-                        ))}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem asChild>
-                          <Link href="/saved" className="flex items-center gap-2 cursor-pointer" data-testid="link-manage-collections">
-                            <Plus size={14} />
-                            <span>Manage Collections</span>
-                          </Link>
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-              
-              {/* Share button */}
-              {shareCode ? (
-                <button
-                  onClick={handleCopyLink}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-muted/50 hover:bg-muted transition-colors"
-                  data-testid="button-copy-share-link"
-                >
-                  {copied ? (
-                    <>
-                      <Check size={14} className="text-green-500" />
-                      <span>Copied!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy size={14} />
-                      <span className="font-mono">{shareCode}</span>
-                    </>
-                  )}
-                </button>
-              ) : (
-                <button
-                  onClick={handleShare}
-                  disabled={shareLoading}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-muted/50 hover:bg-muted transition-colors disabled:opacity-50"
-                  data-testid="button-share-style"
-                >
-                  {shareLoading ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <Share2 size={14} />
-                  )}
-                  <span>Share</span>
-                </button>
-              )}
-            </div>
-          </div>
-          
-          {/* Rating Section */}
-          <div className="flex items-center gap-4 pt-2 border-t border-border mt-4">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Rating:</span>
-              <div className="flex items-center gap-0.5">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <button
-                    key={star}
-                    onClick={() => isAuthenticated && handleSubmitRating(star)}
-                    onMouseEnter={() => isAuthenticated && setHoveredStar(star)}
-                    onMouseLeave={() => setHoveredStar(0)}
-                    disabled={ratingLoading || !isAuthenticated}
-                    className={`p-0.5 transition-colors disabled:cursor-default ${
-                      isAuthenticated ? "cursor-pointer hover:scale-110" : ""
-                    }`}
-                    data-testid={`button-rate-${star}`}
-                    title={isAuthenticated ? `Rate ${star} star${star > 1 ? 's' : ''}` : "Sign in to rate"}
-                  >
-                    <Star 
-                      size={18} 
-                      className={`transition-colors ${
-                        star <= (hoveredStar || userRating)
-                          ? "fill-yellow-400 text-yellow-400"
-                          : "text-muted-foreground/40"
-                      }`}
-                    />
-                  </button>
-                ))}
-              </div>
-              {avgRating.count > 0 && (
-                <span className="text-xs text-muted-foreground ml-2">
-                  {avgRating.average.toFixed(1)} ({avgRating.count} {avgRating.count === 1 ? 'rating' : 'ratings'})
-                </span>
-              )}
-              {ratingLoading && <Loader2 size={14} className="animate-spin ml-2" />}
-            </div>
-          </div>
-        </div>
-
-        {/* Section 1: Visual Identity */}
-        <section className="space-y-0">
-          <SectionHeader
-            icon={<Eye size={20} />}
-            title="Visual Identity"
-            description="How this style looks and feels across different compositions"
-          />
-          
-          {/* Canonical Previews */}
-          <div className="space-y-4">
-            <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Canonical Previews
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 sm:grid-rows-[auto_auto]">
-              {assetsLoading ? (
-                <>
-                  <PreviewSkeleton aspect="col-span-1 sm:col-span-4 aspect-video" />
-                  <PreviewSkeleton aspect="sm:col-span-2 sm:row-span-2 aspect-[3/4]" />
-                  <PreviewSkeleton aspect="sm:col-span-2 sm:row-span-2 aspect-square sm:aspect-auto" />
-                </>
-              ) : (
-                <>
-                  <div className="col-span-1 sm:col-span-4 aspect-video bg-muted rounded-lg overflow-hidden border border-border relative group">
-                    {(summary.imageIds?.preview_landscape || previews.landscape) ? (
-                      <>
-                        <img 
-                          src={summary.imageIds?.preview_landscape 
-                            ? `/api/images/${summary.imageIds.preview_landscape}?size=medium`
-                            : previews.landscape
-                          } 
-                          alt="Landscape preview" 
-                          className="absolute inset-0 w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                        <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 text-white text-xs font-mono rounded">
-                          Landscape
-                        </div>
-                      </>
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                        No landscape preview
-                      </div>
-                    )}
-                  </div>
-                  <div className="sm:col-span-2 sm:row-span-2 aspect-[3/4] bg-muted rounded-lg overflow-hidden border border-border relative">
-                    {(summary.imageIds?.preview_portrait || previews.portrait) ? (
-                      <>
-                        <img 
-                          src={summary.imageIds?.preview_portrait
-                            ? `/api/images/${summary.imageIds.preview_portrait}?size=medium`
-                            : previews.portrait
-                          } 
-                          alt="Portrait preview" 
-                          className="absolute inset-0 w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                        <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 text-white text-xs font-mono rounded">
-                          Portrait
-                        </div>
-                      </>
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                        No portrait preview
-                      </div>
-                    )}
-                  </div>
-                  <div className="sm:col-span-2 sm:row-span-2 aspect-square sm:aspect-auto bg-muted rounded-lg overflow-hidden border border-border relative">
-                    {(summary.imageIds?.preview_still_life || previews.stillLife) ? (
-                      <>
-                        <img 
-                          src={summary.imageIds?.preview_still_life
-                            ? `/api/images/${summary.imageIds.preview_still_life}?size=medium`
-                            : previews.stillLife
-                          } 
-                          alt="Still life preview" 
-                          className="absolute inset-0 w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                        <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 text-white text-xs font-mono rounded">
-                          Still Life
-                        </div>
-                      </>
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                        No still life preview
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Mood Board & UI Concepts */}
-          <div className="pt-6">
-            {assetsLoading ? (
-              <div className="flex items-center justify-center py-12 bg-muted/30 rounded-lg border border-border">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span className="text-sm">Loading mood board...</span>
-                </div>
-              </div>
-            ) : (
-              <AiMoodBoard
-                styleId={summary.id}
-                styleName={summary.name}
-                moodBoard={assets?.moodBoard}
-                uiConcepts={assets?.uiConcepts}
-              />
-            )}
-          </div>
-        </section>
-
-        {/* Section 2: Color Palette */}
-        <section className="space-y-0">
-          <SectionHeader
-            icon={<Droplets size={20} />}
-            title="Color Palette"
-            description="Click any swatch to copy the hex code"
-          />
-          <ColorPaletteSwatches tokens={summary.tokens} />
-        </section>
-
-        {/* Section 3: Design Tokens */}
-        <section className="space-y-0">
-          <SectionHeader
-            icon={<Palette size={20} />}
-            title="Design Tokens"
-            description="The technical DNA behind this visual language"
-          />
-
-          <div className="space-y-4">
-            {/* Export CTA */}
-            <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg border border-border">
-              <div>
-                <p className="text-sm font-medium text-foreground">Export Design Tokens</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Download in multiple formats for your workflow</p>
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button 
-                    data-testid="button-export-tokens"
-                    className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
-                  >
-                    <Download size={16} />
-                    Export
-                    <ChevronDown size={14} />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuItem 
-                    onClick={() => handleExport('json')}
-                    className="cursor-pointer"
-                    data-testid="export-json"
-                  >
-                    <FileJson size={16} className="mr-2 text-blue-500" />
-                    <div>
-                      <div className="font-medium">JSON (W3C DTCG)</div>
-                      <div className="text-xs text-muted-foreground">Standards-compliant tokens</div>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={() => handleExport('css')}
-                    className="cursor-pointer"
-                    data-testid="export-css"
-                  >
-                    <FileCode size={16} className="mr-2 text-orange-500" />
-                    <div>
-                      <div className="font-medium">CSS Variables</div>
-                      <div className="text-xs text-muted-foreground">Custom properties for web</div>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={() => handleExport('scss')}
-                    className="cursor-pointer"
-                    data-testid="export-scss"
-                  >
-                    <FileCode size={16} className="mr-2 text-pink-500" />
-                    <div>
-                      <div className="font-medium">SCSS Variables</div>
-                      <div className="text-xs text-muted-foreground">Sass/SCSS $variables</div>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem 
-                    onClick={() => handleExport('tailwind')}
-                    className="cursor-pointer"
-                    data-testid="export-tailwind"
-                  >
-                    <Paintbrush size={16} className="mr-2 text-cyan-500" />
-                    <div>
-                      <div className="font-medium">Tailwind Config</div>
-                      <div className="text-xs text-muted-foreground">theme.extend snippet</div>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={() => handleExport('react')}
-                    className="cursor-pointer"
-                    data-testid="export-react"
-                  >
-                    <FileCode size={16} className="mr-2 text-blue-400" />
-                    <div>
-                      <div className="font-medium">React/TypeScript</div>
-                      <div className="text-xs text-muted-foreground">Typed theme object</div>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={() => handleExport('flutter')}
-                    className="cursor-pointer"
-                    data-testid="export-flutter"
-                  >
-                    <FileCode size={16} className="mr-2 text-sky-500" />
-                    <div>
-                      <div className="font-medium">Flutter/Dart</div>
-                      <div className="text-xs text-muted-foreground">Static class with constants</div>
-                    </div>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
-            {/* Collapsible Token Viewer */}
-            <div className="border border-border rounded-lg overflow-hidden">
-              <button
-                onClick={() => setTokensExpanded(!tokensExpanded)}
-                className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
-                data-testid="toggle-token-viewer"
-              >
-                <span className="text-sm font-medium text-foreground">View Token Structure</span>
-                {tokensExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-              </button>
-              {tokensExpanded && (
-                <div className="p-4 pt-0 border-t border-border animate-in fade-in duration-200">
-                  <TokenViewer tokens={summary.tokens} />
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-
-        {/* Section 4: Prompt Scaffolding */}
-        <section className="space-y-0">
-          <div className="flex items-start justify-between gap-4 mb-6">
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-muted flex items-center justify-center text-muted-foreground">
-                <MessageSquare size={20} />
-              </div>
-              <div>
-                <h2 className="text-lg font-serif font-medium text-foreground">Prompt Scaffolding</h2>
-                <p className="text-sm text-muted-foreground mt-0.5">Ready-to-use prompts for applying this style in AI tools</p>
-              </div>
-            </div>
-            <Button
-              onClick={() => {
-                setTryItOpen(true);
-                setTryItImage(null);
-                setTryItError(null);
-                setTryItPrompt("");
-              }}
-              className="flex items-center gap-2"
-              data-testid="button-try-it-now"
-            >
-              <Sparkles size={16} />
-              Try it Now
-            </Button>
-          </div>
-          
-          <div className="space-y-6">
-            {summary.promptScaffolding && (
+          {/* Human Traits - No technical language, no numbers */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
+            <span><span className="text-foreground font-medium">Contrast</span> {humanTraits.contrast}</span>
+            <span className="text-border">•</span>
+            <span><span className="text-foreground font-medium">Density</span> {humanTraits.density}</span>
+            {humanTraits.vibe && (
               <>
-                <div className="space-y-2">
-                  <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Base Prompt</h3>
-                  <div className="p-4 bg-muted/50 rounded-lg border border-border">
-                    <p className="text-sm font-mono text-foreground whitespace-pre-wrap">{summary.promptScaffolding.base}</p>
-                  </div>
-                </div>
-                
-                {summary.promptScaffolding.modifiers && summary.promptScaffolding.modifiers.length > 0 && (
-                  <div className="space-y-2">
-                    <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Style Modifiers</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {summary.promptScaffolding.modifiers.map((mod: string, i: number) => (
-                        <span key={i} className="px-2 py-1 bg-muted/70 text-xs rounded-md font-mono text-muted-foreground">
-                          {mod}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                {summary.promptScaffolding.negative && (
-                  <div className="space-y-2">
-                    <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Negative Prompt</h3>
-                    <div className="p-4 bg-red-500/5 rounded-lg border border-red-500/20">
-                      <p className="text-sm font-mono text-muted-foreground whitespace-pre-wrap">{summary.promptScaffolding.negative}</p>
-                    </div>
-                  </div>
-                )}
+                <span className="text-border">•</span>
+                <span><span className="text-foreground font-medium">Vibe</span> {humanTraits.vibe}</span>
               </>
             )}
           </div>
         </section>
+
+        {/* === SECTION 4: PRIMARY ACTIONS CTA === */}
+        <section className="flex flex-col sm:flex-row gap-2">
+          {/* Save */}
+          <button
+            onClick={isAuthenticated ? handleToggleBookmark : undefined}
+            disabled={bookmarkLoading || !isAuthenticated}
+            className={`flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium rounded-lg border transition-colors disabled:opacity-50 ${
+              isBookmarked 
+                ? "border-yellow-500 bg-yellow-500/10 text-yellow-600" 
+                : "border-border bg-muted/50 hover:bg-muted"
+            }`}
+            data-testid="button-save-style"
+            title={!isAuthenticated ? "Sign in to save" : undefined}
+          >
+            {bookmarkLoading ? <Loader2 size={16} className="animate-spin" /> : <Bookmark size={16} className={isBookmarked ? "fill-current" : ""} />}
+            {isBookmarked ? "Saved" : "Save"}
+          </button>
+          
+          {/* Export */}
+          <ExportDialog 
+            tokens={summary.tokens} 
+            styleName={summary.name}
+            trigger={
+              <button 
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+                data-testid="button-export-primary"
+              >
+                <Download size={16} />
+                Export
+                <ChevronDown size={14} />
+              </button>
+            }
+          />
+          
+          {/* Deploy */}
+          <DeployDialog 
+            tokens={summary.tokens} 
+            styleName={summary.name}
+            trigger={
+              <button 
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 border border-border bg-muted/50 hover:bg-muted rounded-lg text-sm font-medium transition-colors"
+                data-testid="button-deploy-primary"
+              >
+                <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M8 2L14 8L8 14" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M2 8H13" strokeLinecap="round" />
+                </svg>
+                Deploy
+              </button>
+            }
+          />
+          
+          {/* Remix / Apply */}
+          <Button
+            onClick={() => {
+              setTryItOpen(true);
+              setTryItImage(null);
+              setTryItError(null);
+              setTryItPrompt("");
+            }}
+            variant="outline"
+            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3"
+            data-testid="button-remix-style"
+          >
+            <Sparkles size={16} />
+            Remix
+          </Button>
+        </section>
+
+        {/* === COLLAPSED SECTIONS === */}
+        <div className="border border-border rounded-lg divide-y divide-border">
+          
+          {/* Canonical Previews */}
+          <details className="group">
+            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+              <span className="text-sm font-medium text-foreground">Canonical Previews</span>
+              <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="p-4 pt-0">
+              <div className="grid grid-cols-3 gap-2">
+                {['landscape', 'portrait', 'stillLife'].map((type) => {
+                  const key = type === 'stillLife' ? 'preview_still_life' : `preview_${type}`;
+                  const imgSrc = summary.imageIds?.[key] 
+                    ? `/api/images/${summary.imageIds[key]}?size=medium`
+                    : (previews as any)[type];
+                  return (
+                    <div key={type} className="aspect-square bg-muted rounded-lg overflow-hidden border border-border relative">
+                      {imgSrc ? (
+                        <img src={imgSrc} alt={type} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+                      ) : (
+                        <div className="flex items-center justify-center h-full text-muted-foreground text-xs capitalize">{type}</div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </details>
+
+
+          {/* Create / Prompt Details */}
+          <details className="group">
+            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+              <span className="text-sm font-medium text-foreground">Style Guide</span>
+              <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="p-4 pt-0 space-y-4">
+              {summary.promptScaffolding?.base && (
+                <div>
+                  <h4 className="text-xs font-medium text-muted-foreground mb-1">Description</h4>
+                  <p className="text-sm text-foreground">{summary.promptScaffolding.base}</p>
+                </div>
+              )}
+              {summary.promptScaffolding?.modifiers?.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-medium text-muted-foreground mb-1">Characteristics</h4>
+                  <div className="flex flex-wrap gap-1">
+                    {summary.promptScaffolding.modifiers.map((mod: string, i: number) => (
+                      <span key={i} className="px-2 py-0.5 bg-muted text-xs rounded">{mod}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {summary.promptScaffolding?.negative && (
+                <div>
+                  <h4 className="text-xs font-medium text-muted-foreground mb-1">Avoid</h4>
+                  <p className="text-sm text-muted-foreground">{summary.promptScaffolding.negative}</p>
+                </div>
+              )}
+            </div>
+          </details>
+
+          {/* Usage Notes */}
+          <details className="group">
+            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+              <span className="text-sm font-medium text-foreground">Usage Notes</span>
+              <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="p-4 pt-0">
+              <StyleSpecEditor 
+                styleId={summary.id} 
+                styleSpec={summary.styleSpec}
+                createdAt={summary.createdAt}
+                updatedAt={summary.updatedAt}
+                onUpdate={handleSpecUpdate}
+              />
+            </div>
+          </details>
+
+          {/* Explorations - generated assets showing style possibilities */}
+          <details className="group">
+            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+              <span className="text-sm font-medium text-foreground">Explorations</span>
+              <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="p-4 pt-0">
+              {assetsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <AiMoodBoard
+                  styleId={summary.id}
+                  styleName={summary.name}
+                  moodBoard={assets?.moodBoard}
+                  uiConcepts={assets?.uiConcepts}
+                />
+              )}
+            </div>
+          </details>
+
+          {/* Revisions */}
+          <details 
+            className="group"
+            onToggle={(e) => {
+              if ((e.target as HTMLDetailsElement).open && !versionsExpanded) {
+                setVersionsExpanded(true);
+              }
+            }}
+          >
+            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+              <span className="text-sm font-medium text-foreground">Revisions</span>
+              <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="p-4 pt-0 space-y-3">
+              {isOwner && (
+                <Button variant="outline" size="sm" onClick={handleSaveVersion} disabled={savingVersion}>
+                  {savingVersion ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Save size={14} className="mr-2" />}
+                  Save Snapshot
+                </Button>
+              )}
+              {versionsLoading ? (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 size={14} className="animate-spin" />
+                  <span className="text-sm">Loading...</span>
+                </div>
+              ) : versions.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No revisions yet</p>
+              ) : (
+                <div className="space-y-2">
+                  {versions.map((version) => (
+                    <div key={version.id} className="flex items-center justify-between p-2 bg-muted/30 rounded text-sm">
+                      <span>v{version.versionNumber} — {version.changeType}</span>
+                      {isOwner && (
+                        <button
+                          onClick={() => handleRevertToVersion(version.id)}
+                          disabled={revertingVersion === version.id}
+                          className="p-1 hover:bg-muted rounded"
+                        >
+                          {revertingVersion === version.id ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </details>
+
+          {/* Share & Rate */}
+          <details className="group">
+            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+              <span className="text-sm font-medium text-foreground">Share & Rate</span>
+              <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="p-4 pt-0 space-y-4">
+              {/* Share */}
+              <div className="flex items-center gap-2">
+                {shareCode ? (
+                  <button
+                    onClick={handleCopyLink}
+                    className="inline-flex items-center gap-2 px-3 py-2 text-sm rounded-lg border border-border hover:bg-muted transition-colors"
+                  >
+                    {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+                    <span className="font-mono">{shareCode}</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleShare}
+                    disabled={shareLoading}
+                    className="inline-flex items-center gap-2 px-3 py-2 text-sm rounded-lg border border-border hover:bg-muted transition-colors"
+                  >
+                    {shareLoading ? <Loader2 size={14} className="animate-spin" /> : <Share2 size={14} />}
+                    Generate Share Link
+                  </button>
+                )}
+              </div>
+              
+              {/* Rating */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Your rating:</span>
+                <div className="flex items-center gap-0.5">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      onClick={() => isAuthenticated && handleSubmitRating(star)}
+                      onMouseEnter={() => isAuthenticated && setHoveredStar(star)}
+                      onMouseLeave={() => setHoveredStar(0)}
+                      disabled={ratingLoading || !isAuthenticated}
+                      className="p-0.5 disabled:cursor-default"
+                      title={isAuthenticated ? `Rate ${star}` : "Sign in to rate"}
+                    >
+                      <Star size={16} className={star <= (hoveredStar || userRating) ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/40"} />
+                    </button>
+                  ))}
+                </div>
+                {ratingLoading && <Loader2 size={14} className="animate-spin" />}
+              </div>
+
+              {/* Collections */}
+              {isAuthenticated && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Collections:</span>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg border border-border hover:bg-muted">
+                        <FolderPlus size={14} />
+                        {styleCollections.size > 0 ? `In ${styleCollections.size}` : "Add"}
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-48">
+                      {collections.length === 0 ? (
+                        <div className="px-2 py-2 text-center text-xs text-muted-foreground">
+                          <Link href="/saved" className="text-blue-500 hover:underline">Create collection</Link>
+                        </div>
+                      ) : (
+                        collections.map((c) => (
+                          <DropdownMenuItem key={c.id} onClick={() => handleToggleCollection(c.id)} className="cursor-pointer">
+                            {styleCollections.has(c.id) ? <Check size={14} className="mr-2 text-green-500" /> : <Folder size={14} className="mr-2" />}
+                            {c.name}
+                          </DropdownMenuItem>
+                        ))
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              )}
+            </div>
+          </details>
+
+          {/* Design DNA - Tokens section, collapsed by default */}
+          <details className="group" onToggle={(e) => { if ((e.target as HTMLDetailsElement).open) setTokensExpanded(true); }}>
+            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+              <span className="text-sm font-medium text-foreground">Design DNA</span>
+              <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="p-4 pt-0 space-y-6">
+              {tokensExpanded && (
+                <>
+                  <div>
+                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Color Palette</h4>
+                    <ColorPaletteSwatches tokens={summary.tokens} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">All Tokens</h4>
+                    <TokenViewer tokens={summary.tokens} />
+                  </div>
+                </>
+              )}
+            </div>
+          </details>
+        </div>
 
         {/* Try It Now Dialog */}
         {tryItOpen && (
@@ -1372,7 +1534,7 @@ export default ${safeName};`;
               <div className="flex items-center justify-between p-4 border-b border-border">
                 <div className="flex items-center gap-2">
                   <Sparkles size={20} className="text-primary" />
-                  <h3 className="text-lg font-medium">Generate with {summary.name}</h3>
+                  <h3 className="text-lg font-medium">Create with {summary.name}</h3>
                 </div>
                 <button
                   onClick={() => setTryItOpen(false)}
@@ -1423,17 +1585,16 @@ export default ${safeName};`;
                 
                 {tryItImage && (
                   <div className="space-y-2">
-                    <h4 className="text-sm font-medium text-muted-foreground">Generated Image</h4>
                     <div className="rounded-lg overflow-hidden border border-border">
                       <img 
                         src={tryItImage} 
-                        alt="Generated image"
+                        alt="Created image"
                         className="w-full h-auto"
                         data-testid="img-generated-result"
                       />
                     </div>
                     <p className="text-xs text-muted-foreground text-center">
-                      Image generated using the "{summary.name}" style with Design Token colors
+                      Created using {summary.name}
                     </p>
                   </div>
                 )}
@@ -1442,132 +1603,6 @@ export default ${safeName};`;
           </div>
         )}
 
-        {/* Section 5: Style Specification */}
-        <section className="space-y-0">
-          <SectionHeader
-            icon={<FileEdit size={20} />}
-            title="Style Specification"
-            description="Usage guidelines and design notes for this style"
-          />
-          <StyleSpecEditor 
-            styleId={summary.id} 
-            styleSpec={summary.styleSpec}
-            createdAt={summary.createdAt}
-            updatedAt={summary.updatedAt}
-            onUpdate={handleSpecUpdate}
-          />
-        </section>
-
-        {/* Section 6: Version History */}
-        <section className="space-y-0">
-          <SectionHeader
-            icon={<History size={20} />}
-            title="Version History"
-            description="Track changes and revert to previous versions"
-          />
-          
-          <div className="space-y-4">
-            {/* Actions row */}
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setVersionsExpanded(!versionsExpanded)}
-                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                data-testid="toggle-version-history"
-              >
-                {versionsExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                {versionsExpanded ? "Hide history" : "Show history"}
-              </button>
-              
-              {isOwner && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSaveVersion}
-                  disabled={savingVersion}
-                  data-testid="save-version-btn"
-                >
-                  {savingVersion ? (
-                    <Loader2 size={14} className="mr-2 animate-spin" />
-                  ) : (
-                    <Save size={14} className="mr-2" />
-                  )}
-                  Save Snapshot
-                </Button>
-              )}
-            </div>
-
-            {/* Version list */}
-            {versionsExpanded && (
-              <div className="space-y-2 animate-in fade-in duration-200">
-                {versionsLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 size={24} className="animate-spin text-muted-foreground" />
-                  </div>
-                ) : versions.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <History size={32} className="mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">No version history yet</p>
-                    <p className="text-xs mt-1">Versions are created when tokens are updated</p>
-                  </div>
-                ) : (
-                  <div className="border border-border rounded-lg divide-y divide-border">
-                    {versions.map((version) => (
-                      <div
-                        key={version.id}
-                        className="p-4 flex items-start justify-between gap-4"
-                        data-testid={`version-item-${version.id}`}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">
-                              Version {version.versionNumber}
-                            </span>
-                            <span className={`text-xs px-2 py-0.5 rounded-full ${
-                              version.changeType === "created" ? "bg-green-500/10 text-green-600" :
-                              version.changeType === "tokens_updated" ? "bg-blue-500/10 text-blue-600" :
-                              version.changeType === "manual_save" ? "bg-purple-500/10 text-purple-600" :
-                              version.changeType === "reverted" ? "bg-orange-500/10 text-orange-600" :
-                              "bg-muted text-muted-foreground"
-                            }`}>
-                              {version.changeType.replace("_", " ")}
-                            </span>
-                          </div>
-                          {version.changeDescription && (
-                            <p className="text-sm text-muted-foreground mt-1 truncate">
-                              {version.changeDescription}
-                            </p>
-                          )}
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {new Date(version.createdAt).toLocaleString()}
-                          </p>
-                        </div>
-                        
-                        {isOwner && version.versionNumber < Math.max(...versions.map(v => v.versionNumber)) && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRevertToVersion(version.id)}
-                            disabled={revertingVersion === version.id}
-                            data-testid={`revert-btn-${version.id}`}
-                          >
-                            {revertingVersion === version.id ? (
-                              <Loader2 size={14} className="animate-spin" />
-                            ) : (
-                              <>
-                                <RotateCcw size={14} className="mr-1" />
-                                Revert
-                              </>
-                            )}
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </section>
       </div>
     </Layout>
   );
