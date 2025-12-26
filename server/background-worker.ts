@@ -3,14 +3,21 @@ import { startJobInBackground } from "./job-runner";
 import { generateAllMoodBoardAssets } from "./mood-board-generation";
 import { analyzeImageForStyle } from "./analysis";
 import type { Style, MoodBoardAssets, UiConceptAssets, MetadataTags, JobType } from "@shared/schema";
-import pLimit from "p-limit";
 import { cache, CACHE_KEYS } from "./cache";
+import { getPLimit } from "./utils/esm-interop";
 
 const SCHEDULER_INTERVAL_MS = 60000;
 const MAX_CONCURRENT_BACKGROUND_JOBS = 2;
 
-const backgroundLimit = pLimit(MAX_CONCURRENT_BACKGROUND_JOBS);
+let backgroundLimit: Awaited<ReturnType<typeof getPLimit>> | null = null;
 let schedulerRunning = false;
+
+async function getBackgroundLimit() {
+  if (!backgroundLimit) {
+    backgroundLimit = await getPLimit(MAX_CONCURRENT_BACKGROUND_JOBS);
+  }
+  return backgroundLimit;
+}
 
 export async function repairStyleName(styleId: string): Promise<string | null> {
   const style = await storage.getStyleById(styleId);
@@ -162,7 +169,8 @@ async function runSchedulerCycle(): Promise<void> {
           { styleId: style.id },
           async (input, onProgress) => {
             await onProgress(10, "Analyzing image for style name...");
-            const newName = await backgroundLimit(() => repairStyleName(input.styleId));
+            const limit = await getBackgroundLimit();
+            const newName = await limit(() => repairStyleName(input.styleId));
             await onProgress(100, newName ? `Renamed to: ${newName}` : "Name unchanged");
             return { newName };
           },
@@ -188,7 +196,8 @@ async function runSchedulerCycle(): Promise<void> {
           { styleId: style.id },
           async (input, onProgress) => {
             await onProgress(10, "Starting asset generation...");
-            const success = await backgroundLimit(() => generateMissingAssets(input.styleId));
+            const limit = await getBackgroundLimit();
+            const success = await limit(() => generateMissingAssets(input.styleId));
             await onProgress(100, success ? "Assets generated" : "Generation failed");
             return { success };
           },

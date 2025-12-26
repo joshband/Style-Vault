@@ -1,5 +1,4 @@
-import pLimit from "p-limit";
-import pRetry from "p-retry";
+import { getPLimit, getPRetry } from "../../utils/esm-interop";
 
 /**
  * Batch Processing Utilities for Gemini
@@ -79,7 +78,8 @@ export async function batchProcess<T, R>(
     onProgress,
   } = options;
 
-  const limit = pLimit(concurrency);
+  const limit = await getPLimit(concurrency);
+  const { pRetry, AbortError } = await getPRetry();
   let completed = 0;
 
   const promises = items.map((item, index) =>
@@ -95,7 +95,7 @@ export async function batchProcess<T, R>(
             if (isRateLimitError(error)) {
               throw error;
             }
-            throw new pRetry.AbortError(
+            throw new AbortError(
               error instanceof Error ? error : new Error(String(error))
             );
           }
@@ -124,6 +124,8 @@ export async function batchProcessWithSSE<T, R>(
   const results: R[] = [];
   let errors = 0;
 
+  const { pRetry, AbortError } = await getPRetry();
+
   for (let index = 0; index < items.length; index++) {
     const item = items[index];
     sendEvent({ type: "processing", index, item });
@@ -136,7 +138,7 @@ export async function batchProcessWithSSE<T, R>(
         factor: 2,
         onFailedAttempt: (error) => {
           if (!isRateLimitError(error)) {
-            throw new pRetry.AbortError(
+            throw new AbortError(
               error instanceof Error ? error : new Error(String(error))
             );
           }

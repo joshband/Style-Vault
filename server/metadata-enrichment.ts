@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { storage } from "./storage";
 import type { Style, MetadataTags, MetadataEnrichmentStatus } from "@shared/schema";
-import pLimit from "p-limit";
+import { getPLimit } from "./utils/esm-interop";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
@@ -253,7 +253,7 @@ export async function enrichPendingStyles(): Promise<EnrichmentProcessResult[]> 
   const stylesToProcess = [...pendingStyles, ...queuedStyles, ...failedStyles].slice(0, 5);
   
   // Process up to 3 styles in parallel for faster batch enrichment
-  const limit = pLimit(3);
+  const limit = await getPLimit(3);
   
   const results = await Promise.all(
     stylesToProcess.map(style =>
@@ -416,7 +416,7 @@ export async function enrichAllStyleSpecs(): Promise<{ processed: number; succes
 
   console.log(`Found ${stylesWithoutSpec.length} styles needing spec generation`);
   
-  const limit = pLimit(2);
+  const limit = await getPLimit(2);
   const errors: string[] = [];
   let success = 0;
 

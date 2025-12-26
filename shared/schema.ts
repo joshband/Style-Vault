@@ -352,3 +352,45 @@ export const insertStyleVersionSchema = createInsertSchema(styleVersions).omit({
 
 export type InsertStyleVersion = z.infer<typeof insertStyleVersionSchema>;
 export type StyleVersion = typeof styleVersions.$inferSelect;
+
+// Token cache table - caches CV extraction results keyed by image hash
+export const tokenCache = pgTable("token_cache", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  imageHash: varchar("image_hash").notNull().unique(),
+  tokens: jsonb("tokens").$type<Record<string, any>>().notNull(),
+  extractionMethod: text("extraction_method").default("cv").notNull(),
+  processingTimeMs: integer("processing_time_ms"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at"),
+});
+
+export const insertTokenCacheSchema = createInsertSchema(tokenCache).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertTokenCache = z.infer<typeof insertTokenCacheSchema>;
+export type TokenCache = typeof tokenCache.$inferSelect;
+
+// Object storage assets - stores references to images in App Storage
+export const objectAssets = pgTable("object_assets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  styleId: varchar("style_id"),
+  type: text("type").$type<ImageAssetType>().notNull(),
+  objectKey: text("object_key").notNull(),
+  thumbKey: text("thumb_key"),
+  mediumKey: text("medium_key"),
+  originalWidth: integer("original_width"),
+  originalHeight: integer("original_height"),
+  mimeType: text("mime_type").default("image/webp"),
+  size: integer("size"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertObjectAssetSchema = createInsertSchema(objectAssets).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertObjectAsset = z.infer<typeof insertObjectAssetSchema>;
+export type ObjectAsset = typeof objectAssets.$inferSelect;
