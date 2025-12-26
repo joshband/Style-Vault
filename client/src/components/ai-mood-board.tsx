@@ -150,7 +150,7 @@ export function AiMoodBoard({
 
   // Loading placeholder component for images still being generated
   const LoadingPlaceholder = ({ label }: { label: string }) => (
-    <div className="relative rounded-lg overflow-hidden border border-border bg-muted/50 aspect-video flex items-center justify-center">
+    <div className="relative rounded-lg overflow-hidden border border-border bg-white aspect-video flex items-center justify-center">
       <div className="text-center space-y-2">
         <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto" />
         <span className="text-xs text-muted-foreground">{label}</span>
@@ -215,7 +215,7 @@ export function AiMoodBoard({
                   data-testid="img-audio"
                 />
                 <DownloadButton src={uiConcepts?.audioPlugin || ""} filename={`${styleName}-audio-plugin.png`} />
-                <div className="p-2 bg-muted/50 text-center">
+                <div className="p-2 bg-white text-center">
                   <span className="text-xs text-muted-foreground">Audio Plugin</span>
                 </div>
               </div>
@@ -233,7 +233,7 @@ export function AiMoodBoard({
                   data-testid="img-dashboard"
                 />
                 <DownloadButton src={uiConcepts?.dashboard || ""} filename={`${styleName}-dashboard.png`} />
-                <div className="p-2 bg-muted/50 text-center">
+                <div className="p-2 bg-white text-center">
                   <span className="text-xs text-muted-foreground">Dashboard</span>
                 </div>
               </div>
@@ -293,7 +293,7 @@ export function AiMoodBoard({
                       loading="lazy"
                     />
                     <DownloadButton src={entry.audioPlugin} filename={`${styleName}-audio-plugin-${index + 1}.png`} />
-                    <div className="p-2 bg-muted/30 text-center">
+                    <div className="p-2 bg-white text-center">
                       <span className="text-xs text-muted-foreground">Audio Plugin</span>
                     </div>
                   </div>
@@ -307,7 +307,7 @@ export function AiMoodBoard({
                       loading="lazy"
                     />
                     <DownloadButton src={entry.dashboard} filename={`${styleName}-dashboard-${index + 1}.png`} />
-                    <div className="p-2 bg-muted/30 text-center">
+                    <div className="p-2 bg-white text-center">
                       <span className="text-xs text-muted-foreground">Dashboard</span>
                     </div>
                   </div>
