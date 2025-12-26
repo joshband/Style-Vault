@@ -19,6 +19,11 @@ import { exportMaterialUI } from './material-ui';
 import { exportJUCE } from './juce';
 import { exportUnity } from './unity';
 import { exportWebComponents } from './web-components';
+import { exportAdobeASE } from './adobe-ase';
+import { exportUnrealEngine } from './unreal-engine';
+import { exportNextJS } from './nextjs';
+import { exportAndroidXML } from './android-xml';
+import { exportSketch } from './sketch';
 
 export function initializeExporters(): void {
   registerExporter(exportDTCGJson);
@@ -34,6 +39,11 @@ export function initializeExporters(): void {
   registerExporter(exportJUCE);
   registerExporter(exportUnity);
   registerExporter(exportWebComponents);
+  registerExporter(exportAdobeASE);
+  registerExporter(exportUnrealEngine);
+  registerExporter(exportNextJS);
+  registerExporter(exportAndroidXML);
+  registerExporter(exportSketch);
 }
 
 export * from './dtcg-json';
@@ -49,3 +59,8 @@ export * from './material-ui';
 export * from './juce';
 export * from './unity';
 export * from './web-components';
+export * from './adobe-ase';
+export * from './unreal-engine';
+export * from './nextjs';
+export * from './android-xml';
+export * from './sketch';
