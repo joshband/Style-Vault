@@ -1277,28 +1277,6 @@ export default ${safeName};`;
         {/* === COLLAPSED SECTIONS === */}
         <div className="border border-border rounded-lg divide-y divide-border">
           
-          {/* Gallery - Mood Board & UI Concepts */}
-          <details className="group">
-            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
-              <span className="text-sm font-medium text-foreground">Gallery</span>
-              <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
-            </summary>
-            <div className="p-4 pt-0">
-              {assetsLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                </div>
-              ) : (
-                <AiMoodBoard
-                  styleId={summary.id}
-                  styleName={summary.name}
-                  moodBoard={assets?.moodBoard}
-                  uiConcepts={assets?.uiConcepts}
-                />
-              )}
-            </div>
-          </details>
-
           {/* Canonical Previews */}
           <details className="group">
             <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
@@ -1373,6 +1351,28 @@ export default ${safeName};`;
                 updatedAt={summary.updatedAt}
                 onUpdate={handleSpecUpdate}
               />
+            </div>
+          </details>
+
+          {/* Explorations - generated assets showing style possibilities */}
+          <details className="group">
+            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+              <span className="text-sm font-medium text-foreground">Explorations</span>
+              <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="p-4 pt-0">
+              {assetsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <AiMoodBoard
+                  styleId={summary.id}
+                  styleName={summary.name}
+                  moodBoard={assets?.moodBoard}
+                  uiConcepts={assets?.uiConcepts}
+                />
+              )}
             </div>
           </details>
 
