@@ -1,0 +1,14 @@
+Implement basic creator profiles showing a user’s public styles and info.
+Steps:
+1. **User Model**: Expand the user structure (if we have one; if not, create a simple one). Fields: username, display_name, maybe avatar URL, join date.
+2. **API**: 
+   - GET `/api/v1/users/{username}` returns profile info and maybe a list of that user’s public styles (their contributions to gallery).
+   - GET `/api/v1/users/{username}/styles` could list all their styles (public and private, but only show private if the requesting user is the owner).
+3. **UI**: When a username is clicked (e.g., in gallery style card “by Alice”), navigate to a profile page for that user.
+   - On the profile page, display user’s display name, avatar (if any), and their public styles in a grid (similar to gallery view but filtered).
+   - Possibly also show counts (X styles, Y forks, etc., if easily computed).
+4. Allow the user to edit their own profile: maybe a minimal form to set display_name or avatar. This could tie into Replit identity if using Replit auth (in which case display_name could come from Replit). If not using Replit auth, maintain a separate user register/login which might be beyond current scope. For now, if lacking full auth, you can simulate with a global pseudo-user or skip profile editing.
+5. Ensure each public style links to its author's profile in the gallery listings.
+6. Privacy: Only public info is shown. If a user has private styles, we won't list them on a public profile.
+7. If no user accounts at all yet, you might need to implement at least a basic login system to distinguish users. Perhaps integrate a quick solution like JWT-based auth or a third-party OAuth (Replit or GitHub) to identify creators. This is a significant piece; however, since it's needed for many features (collections per user, gallery, etc.), it should be tackled. Possibly use Supabase Auth or Firebase Auth to manage the heavy lifting.
+8. Test by creating two users (in dev, maybe manually insert or use two browsers if auth is implemented), give them each public styles, and ensure each profile page only shows that user’s styles and info.
