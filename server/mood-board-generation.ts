@@ -78,31 +78,43 @@ function buildMoodBoardPrompt(request: MoodBoardRequest, summary: TokenSummary):
   const lightingKeywords = metadataTags.lighting.slice(0, 2).join(", ") || summary.lighting.type;
   const mediumKeywords = metadataTags.medium.slice(0, 2).join(", ") || "digital";
 
-  return `Create a stunning, high-fidelity mood board collage that perfectly captures the visual essence of "${styleName}".
+  return `Create a mood board collage for "${styleName}".
 
-STYLE ESSENCE: ${styleDescription}
+================================================================================
+PRIMARY DIRECTIVE: DESIGN TOKENS (HIGHEST PRIORITY)
+================================================================================
+The following Design Tokens were extracted from the source image and MUST be the primary visual drivers. These are NON-NEGOTIABLE specifications:
 
-LAYOUT: A sophisticated Pinterest-style grid collage with varied tile sizes in a 3:4 portrait aspect ratio. Include 8-12 tiles arranged asymmetrically with thin gaps.
+MANDATORY COLOR PALETTE - Use ONLY these exact hex values:
+${summary.colors.map((c) => `  ${c.name}: ${c.hex} (EXACT - no substitution)`).join("\n")}
 
-CRITICAL COLOR PALETTE - USE THESE EXACT COLORS:
-${summary.colors.map((c) => `- ${c.name}: ${c.hex}`).join("\n")}
+TOKEN-DEFINED PROPERTIES:
+- Typography Style: serif="${summary.typography.serif}", sans="${summary.typography.sans}", mono="${summary.typography.mono}"
+- Surface Texture: grain="${summary.texture.grain}", finish="${summary.texture.finish}"
+- Lighting System: type="${summary.lighting.type}", direction="${summary.lighting.direction}", intensity="${summary.lighting.intensity}"
+- Mood Parameters: tone="${summary.mood.tone}", saturation=${summary.mood.saturation}, contrast=${summary.mood.contrast}
 
-REQUIRED ELEMENTS (each should deeply reflect the style's aesthetic):
-1. COLOR PALETTE STRIP: A horizontal strip of color swatches matching: ${colorList}
-2. HERO TYPOGRAPHY: Large display text with style keywords "${moodKeywords.toUpperCase()}" - the typography itself should LOOK like the style (aged, modern, painterly, etc.)
-3. TEXTURE SAMPLES: 2-3 tiles showing abstract textures that match "${textureKeywords}" - these should feel authentic to the style's visual language
-4. ARTISTIC REFERENCE TILES: 2-3 tiles with abstract patterns/paintings that capture the movement/era: ${eraKeywords}. Use brushstrokes, gradients, or patterns that embody the style.
-5. EVOCATIVE OBJECTS: 1-2 tiles showing objects that represent the style's world - could be vintage equipment, natural elements, architectural details
-6. ATMOSPHERE: Ensure the overall lighting feels like "${lightingKeywords}" - warm, cool, dramatic, or soft accordingly
+================================================================================
+SECONDARY: SEMANTIC CONTEXT (Lower Priority - Use to Inform Composition)
+================================================================================
+Style Description: ${styleDescription}
+Era Context: ${eraKeywords}
+Medium Reference: ${mediumKeywords}
+Mood Keywords: ${moodKeywords}
 
-VISUAL COHERENCE RULES:
-- Every element should feel like it belongs to the same visual universe
-- The texture of paper/surfaces should match the style's era: ${eraKeywords}
-- Colors should be rich and accurate to the palette provided
-- Medium should feel like: ${mediumKeywords}
-- Mood should evoke: ${moodKeywords}
+================================================================================
+LAYOUT & COMPOSITION
+================================================================================
+A sophisticated Pinterest-style grid collage with varied tile sizes in a 3:4 portrait aspect ratio. Include 8-12 tiles arranged asymmetrically with thin gaps.
 
-Make this feel like a premium design agency's style exploration - editorial, refined, and deeply evocative of the visual direction.`;
+REQUIRED ELEMENTS (each MUST use the token-defined colors above):
+1. COLOR PALETTE STRIP: Swatches showing: ${colorList}
+2. HERO TYPOGRAPHY: Display text using the token typography styles
+3. TEXTURE SAMPLES: 2-3 tiles matching token texture: "${summary.texture.finish}" grain
+4. ARTISTIC TILES: 2-3 abstract patterns using ONLY the token colors
+5. EVOCATIVE OBJECTS: 1-2 tiles with objects lit according to token lighting: "${summary.lighting.type}"
+
+The resulting image MUST visually match the extracted Design Tokens. Colors should be immediately recognizable as the hex values specified above.`;
 }
 
 function buildUiConceptPrompt(
@@ -118,68 +130,77 @@ function buildUiConceptPrompt(
   const eraKeywords = metadataTags.era.slice(0, 2).join(", ") || "contemporary";
 
   const conceptPrompts = {
-    audioPlugin: `Create a stunning, photorealistic UI mockup of a professional audio plugin/synthesizer interface that FULLY embodies the "${styleName}" visual style.
+    audioPlugin: `Create a professional audio plugin/synthesizer interface for "${styleName}".
 
-STYLE TO CAPTURE: ${styleDescription}
+================================================================================
+PRIMARY DIRECTIVE: DESIGN TOKENS (HIGHEST PRIORITY)
+================================================================================
+The following Design Tokens were extracted from the source image. These are the AUTHORITATIVE visual specifications:
 
-CRITICAL - This interface must LOOK and FEEL like ${styleName}:
-- Every surface, knob, and element should have textures matching: ${textureKeywords}
-- Lighting should feel: ${lightingKeywords}
-- Overall mood should be: ${moodKeywords}
-- Visual era/aesthetic: ${eraKeywords}
+MANDATORY COLOR PALETTE - Use ONLY these exact hex values:
+${summary.colors.map((c) => `  ${c.name}: ${c.hex} (EXACT - no substitution)`).join("\n")}
 
-COLOR PALETTE - USE THESE EXACT COLORS:
-${summary.colors.map((c) => `- ${c.name}: ${c.hex}`).join("\n")}
+TOKEN-DEFINED PROPERTIES:
+- Typography: serif="${summary.typography.serif}", sans="${summary.typography.sans}", mono="${summary.typography.mono}"
+- Surface Texture: grain="${summary.texture.grain}", finish="${summary.texture.finish}"
+- Lighting: type="${summary.lighting.type}", direction="${summary.lighting.direction}", intensity="${summary.lighting.intensity}"
+- Mood: tone="${summary.mood.tone}", saturation=${summary.mood.saturation}, contrast=${summary.mood.contrast}
 
-LAYOUT: A 16:9 landscape interface.
+================================================================================
+SECONDARY: SEMANTIC CONTEXT (Use to Inform Composition)
+================================================================================
+Style Description: ${styleDescription}
+Visual Era: ${eraKeywords}
+Mood Keywords: ${moodKeywords}
 
-REQUIRED UI ELEMENTS (styled to match the aesthetic):
-- 3-4 large circular knobs with tactile textures matching the style
-- A waveform/oscilloscope display using the color palette
-- Grid of buttons or sequencer pads 
-- Sliders and faders
-- VU meters or level indicators
-- Plugin name header
+================================================================================
+UI LAYOUT & ELEMENTS
+================================================================================
+A 16:9 landscape interface with:
+- 3-4 large circular knobs using token colors for accents/indicators
+- Waveform/oscilloscope display colored with the token palette
+- Grid of buttons or sequencer pads in token colors
+- Sliders and faders matching token aesthetic
+- VU meters using token accent colors
+- Plugin name header in token typography style
 
-VISUAL TREATMENT:
-- Surfaces should have the texture of: ${textureKeywords}
-- Lighting should create: ${lightingKeywords} effects on the 3D elements
-- The whole interface should feel like it belongs in the world of ${styleName}
-- Every detail from shadows to highlights should reinforce the style
+ALL elements MUST use the exact hex colors from the Design Tokens above. The interface should be immediately recognizable as using this specific color palette.`,
 
-Make this look like a premium, production-ready plugin that a designer would be proud to showcase.`,
+    dashboard: `Create a modern data dashboard interface for "${styleName}".
 
-    dashboard: `Create a stunning, high-fidelity UI mockup of a modern data dashboard that FULLY embodies the "${styleName}" visual style.
+================================================================================
+PRIMARY DIRECTIVE: DESIGN TOKENS (HIGHEST PRIORITY)
+================================================================================
+The following Design Tokens were extracted from the source image. These are the AUTHORITATIVE visual specifications:
 
-STYLE TO CAPTURE: ${styleDescription}
+MANDATORY COLOR PALETTE - Use ONLY these exact hex values:
+${summary.colors.map((c) => `  ${c.name}: ${c.hex} (EXACT - no substitution)`).join("\n")}
 
-CRITICAL - This dashboard must LOOK and FEEL like ${styleName}:
-- Every panel, card, and element should reflect: ${textureKeywords}
-- Lighting/atmosphere should feel: ${lightingKeywords}
-- Overall mood should be: ${moodKeywords}
-- Visual era/aesthetic: ${eraKeywords}
+TOKEN-DEFINED PROPERTIES:
+- Typography: serif="${summary.typography.serif}", sans="${summary.typography.sans}", mono="${summary.typography.mono}"
+- Surface Texture: grain="${summary.texture.grain}", finish="${summary.texture.finish}"
+- Lighting: type="${summary.lighting.type}", direction="${summary.lighting.direction}", intensity="${summary.lighting.intensity}"
+- Mood: tone="${summary.mood.tone}", saturation=${summary.mood.saturation}, contrast=${summary.mood.contrast}
 
-COLOR PALETTE - USE THESE EXACT COLORS:
-${summary.colors.map((c) => `- ${c.name}: ${c.hex}`).join("\n")}
+================================================================================
+SECONDARY: SEMANTIC CONTEXT (Use to Inform Composition)
+================================================================================
+Style Description: ${styleDescription}
+Visual Era: ${eraKeywords}
+Mood Keywords: ${moodKeywords}
 
-LAYOUT: A 16:9 landscape dashboard.
+================================================================================
+UI LAYOUT & ELEMENTS
+================================================================================
+A 16:9 landscape dashboard with:
+- Sidebar navigation using token colors
+- 2-3 data visualization panels with charts using ONLY token palette colors
+- Metric cards with KPIs in token colors
+- Header bar styled with token typography
+- Tables and list components using token colors
+- Progress indicators using token accent colors
 
-REQUIRED UI ELEMENTS (each styled to match the aesthetic):
-- Sidebar navigation with icons
-- 2-3 data visualization panels (charts/graphs using the palette colors)
-- Metric cards with KPIs
-- Header bar with title
-- Tables or list components
-- Progress indicators
-
-VISUAL TREATMENT:
-- Card surfaces should have texture: ${textureKeywords}
-- Charts should use the exact color palette provided
-- Shadows and depth should feel like: ${lightingKeywords}
-- Typography should feel appropriate for: ${eraKeywords}
-- The entire interface should be cohesive with the style's visual language
-
-This should look like a real, polished application that demonstrates how ${styleName} translates into functional UI.`,
+ALL charts, graphs, and UI elements MUST use the exact hex colors from the Design Tokens. The dashboard should be immediately recognizable as using this specific color palette.`,
   };
 
   return conceptPrompts[conceptType];
