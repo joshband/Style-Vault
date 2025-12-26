@@ -10,8 +10,13 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { computeImageHash, getCachedTokens, setCachedTokens } from './token-cache';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const getModuleDir = (): string => {
+  if (typeof import.meta.url !== 'undefined') {
+    return path.dirname(fileURLToPath(import.meta.url));
+  }
+  return process.cwd();
+};
+const __dirname = getModuleDir();
 
 export interface CVColorToken {
   space: string;
