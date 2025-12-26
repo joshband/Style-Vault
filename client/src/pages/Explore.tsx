@@ -162,7 +162,7 @@ export default function Explore() {
             <div className="space-y-1">
               <h1 className="text-2xl md:text-3xl font-serif font-medium text-foreground">Style Vault</h1>
               <p className="text-muted-foreground text-sm max-w-xl">
-                Your collection of visual styles
+                Community styles
               </p>
             </div>
           </div>
@@ -195,9 +195,9 @@ export default function Explore() {
                   ? `Select 2 styles to compare (${selectedForCompare.size}/2 selected)`
                   : totalCount > 0 
                     ? hasActiveFilters 
-                      ? `${totalCount} styles match your filters`
-                      : `${totalCount} styles in your collection` 
-                    : "Your collection of visual styles"}
+                      ? `${totalCount} styles`
+                      : `${totalCount} community styles` 
+                    : "Community styles"}
               </p>
             </div>
             <Button
