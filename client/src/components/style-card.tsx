@@ -13,6 +13,7 @@ interface StyleSummary {
   description: string;
   createdAt: string;
   metadataTags?: any;
+  keywords?: string[];
   moodBoardStatus?: string;
   uiConceptsStatus?: string;
   thumbnailPreview?: string | null;
@@ -199,6 +200,24 @@ const StyleCardComponent = memo(function StyleCard({ style, className, onDelete 
               <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
                 {style.description}
               </p>
+
+              {style.keywords && style.keywords.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1" data-testid={`tags-style-${style.id}`}>
+                  {style.keywords.slice(0, 4).map((keyword, idx) => (
+                    <span 
+                      key={idx}
+                      className="px-1.5 py-0.5 text-[10px] bg-muted text-muted-foreground rounded-md"
+                    >
+                      {keyword}
+                    </span>
+                  ))}
+                  {style.keywords.length > 4 && (
+                    <span className="px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                      +{style.keywords.length - 4}
+                    </span>
+                  )}
+                </div>
+              )}
 
               <div className="flex items-center justify-between mt-1">
                 <time 
