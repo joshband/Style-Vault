@@ -238,9 +238,103 @@ export async function extractTokensWithWalkthrough(imageBase64: string): Promise
 }
 
 /**
+ * Validate and normalize a single OKLCH color token
+ * Returns normalized values with bounds checking
+ * Note: OKLCH chroma can go up to ~0.5 for very saturated colors
+ */
+function normalizeOklchColor(color: CVColorToken): CVColorToken {
+  return {
+    space: color.space || 'oklch',
+    l: Math.max(0, Math.min(1, color.l || 0)),
+    c: Math.max(0, Math.min(0.5, color.c || 0)),
+    h: color.h != null && !isNaN(color.h) ? ((color.h % 360) + 360) % 360 : 0,
+  };
+}
+
+/**
+ * Convert OKLCH to linear sRGB
+ * Based on CSS Color Level 4 specification
+ */
+function oklchToLinearSrgb(l: number, c: number, h: number): [number, number, number] {
+  const hRad = (h * Math.PI) / 180;
+  const a = c * Math.cos(hRad);
+  const b = c * Math.sin(hRad);
+
+  const l_ = l + 0.3963377774 * a + 0.2158037573 * b;
+  const m_ = l - 0.1055613458 * a - 0.0638541728 * b;
+  const s_ = l - 0.0894841775 * a - 1.2914855480 * b;
+
+  const lCubed = l_ * l_ * l_;
+  const mCubed = m_ * m_ * m_;
+  const sCubed = s_ * s_ * s_;
+
+  const r = +4.0767416621 * lCubed - 3.3077115913 * mCubed + 0.2309699292 * sCubed;
+  const g = -1.2684380046 * lCubed + 2.6097574011 * mCubed - 0.3413193965 * sCubed;
+  const bOut = -0.0041960863 * lCubed - 0.7034186147 * mCubed + 1.7076147010 * sCubed;
+
+  return [r, g, bOut];
+}
+
+/**
+ * Apply sRGB gamma correction (linear to sRGB)
+ */
+function linearToSrgb(c: number): number {
+  if (c <= 0.0031308) {
+    return 12.92 * c;
+  }
+  return 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+}
+
+/**
+ * Convert OKLCH color to hex string
+ */
+function oklchToHex(l: number, c: number, h: number): string {
+  const [rLin, gLin, bLin] = oklchToLinearSrgb(l, c, h);
+  
+  const r = Math.round(Math.max(0, Math.min(1, linearToSrgb(rLin))) * 255);
+  const g = Math.round(Math.max(0, Math.min(1, linearToSrgb(gLin))) * 255);
+  const b = Math.round(Math.max(0, Math.min(1, linearToSrgb(bLin))) * 255);
+  
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+
+/**
+ * Validate extracted tokens and log any issues
+ * Returns true if tokens are valid enough to use
+ */
+export function validateExtractedTokens(tokens: CVExtractedTokens): { valid: boolean; warnings: string[] } {
+  const warnings: string[] = [];
+  
+  if (!tokens.color || tokens.color.length === 0) {
+    warnings.push("No colors extracted");
+  } else if (tokens.color.length < 3) {
+    warnings.push(`Only ${tokens.color.length} colors extracted, palette may be limited`);
+  }
+  
+  if (!tokens.spacing || tokens.spacing.length === 0) {
+    warnings.push("No spacing values detected");
+  }
+  
+  const valid = tokens.color && tokens.color.length > 0;
+  
+  if (warnings.length > 0) {
+    console.log('[CV Validation] Warnings:', warnings.join('; '));
+  }
+  
+  return { valid, warnings };
+}
+
+/**
  * Convert CV-extracted tokens to W3C DTCG format
+ * Includes validation and normalization
  */
 export function convertToDTCG(cvTokens: CVExtractedTokens): Record<string, any> {
+  const validation = validateExtractedTokens(cvTokens);
+  if (!validation.valid) {
+    console.warn('[CV Bridge] Token validation failed:', validation.warnings);
+    throw new Error(`CV token extraction failed: ${validation.warnings.join('; ')}`);
+  }
+  
   const dtcg: Record<string, any> = {
     $schema: "https://design-tokens.github.io/community-group/format/",
     color: {
@@ -253,16 +347,21 @@ export function convertToDTCG(cvTokens: CVExtractedTokens): Record<string, any> 
   };
 
   const colorNames = ['primary', 'secondary', 'tertiary', 'accent', 'background', 'surface', 'muted', 'subtle'];
-  cvTokens.color.forEach((color, index) => {
+  const colors = cvTokens.color || [];
+  colors.forEach((color, index) => {
     const name = colorNames[index] || `color-${index + 1}`;
+    const normalized = normalizeOklchColor(color);
+    const hexValue = oklchToHex(normalized.l, normalized.c, normalized.h);
     dtcg.color.palette[name] = {
       $type: "color",
-      $value: `oklch(${color.l} ${color.c} ${color.h})`,
+      $value: hexValue,
       $description: `Extracted via CV analysis (${cvTokens.meta.method})`,
     };
   });
 
-  cvTokens.spacing.forEach((value, index) => {
+  const validSpacing = cvTokens.spacing.filter(s => s > 0 && s <= 500);
+  const uniqueSpacing = Array.from(new Set(validSpacing)).sort((a, b) => a - b);
+  uniqueSpacing.forEach((value) => {
     dtcg.spacing[`space-${value}`] = {
       $type: "dimension",
       $value: `${value}px`,
@@ -270,7 +369,9 @@ export function convertToDTCG(cvTokens: CVExtractedTokens): Record<string, any> 
     };
   });
 
-  cvTokens.borderRadius.forEach((value, index) => {
+  const validRadius = cvTokens.borderRadius.filter(r => r >= 0 && r <= 200);
+  const uniqueRadius = Array.from(new Set(validRadius)).sort((a, b) => a - b);
+  uniqueRadius.forEach((value) => {
     dtcg.borderRadius[`radius-${value}`] = {
       $type: "dimension",
       $value: `${value}px`,
@@ -278,15 +379,19 @@ export function convertToDTCG(cvTokens: CVExtractedTokens): Record<string, any> 
     };
   });
 
+  const elevationLevel = Math.max(0, Math.min(3, cvTokens.elevation.elevation || 0));
+  const shadowStrength = Math.max(0, Math.min(1, cvTokens.elevation.shadowStrength || 0));
   dtcg.elevation = {
     level: {
       $type: "number",
-      $value: cvTokens.elevation.elevation,
-      $description: `Shadow strength: ${cvTokens.elevation.shadowStrength}`,
+      $value: elevationLevel,
+      $description: `Shadow strength: ${shadowStrength.toFixed(2)}`,
     },
   };
 
-  cvTokens.strokeWidth.forEach((value) => {
+  const validStroke = cvTokens.strokeWidth.filter(s => s > 0 && s <= 20);
+  const uniqueStroke = Array.from(new Set(validStroke)).sort((a, b) => a - b);
+  uniqueStroke.forEach((value) => {
     dtcg.strokeWidth[`stroke-${value}`] = {
       $type: "dimension",
       $value: `${value}px`,

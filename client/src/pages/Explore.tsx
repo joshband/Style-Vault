@@ -3,34 +3,63 @@ import { StyleCard } from "@/components/style-card";
 import { StyleCardSkeleton } from "@/components/style-card-skeleton";
 import { Layout } from "@/components/layout";
 import { motion, AnimatePresence } from "framer-motion";
-import { RefreshCw, PenTool } from "lucide-react";
-import { useCallback } from "react";
+import { RefreshCw, PenTool, Loader2 } from "lucide-react";
+import { useCallback, useRef, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
+
+interface PaginatedResponse {
+  items: Style[];
+  total: number;
+  hasMore: boolean;
+  nextCursor: string | null;
+}
+
+const PAGE_SIZE = 6;
 
 export default function Explore() {
   const queryClient = useQueryClient();
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   
-  const { data: styles = [], isLoading, isError, refetch } = useQuery<Style[]>({
-    queryKey: ["/api/styles"],
-    queryFn: async () => {
-      const response = await fetch("/api/styles");
+  const {
+    data,
+    isLoading,
+    isError,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    refetch,
+  } = useInfiniteQuery<PaginatedResponse>({
+    queryKey: ["/api/styles", "paginated"],
+    queryFn: async ({ pageParam }) => {
+      const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
+      if (pageParam) {
+        params.set("cursor", pageParam as string);
+      }
+      const response = await fetch(`/api/styles?${params}`);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return response.json();
     },
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    initialPageParam: undefined as string | undefined,
     staleTime: 60000,
     refetchOnWindowFocus: true,
     retry: 3,
     retryDelay: (attempt) => Math.min(500 * attempt, 2000),
   });
 
+  const allStyles = useMemo(() => {
+    return data?.pages.flatMap((page) => page.items) ?? [];
+  }, [data]);
+
+  const totalCount = data?.pages[0]?.total ?? 0;
+
   const deleteMutation = useMutation({
     mutationFn: deleteStyleApi,
-    onSuccess: (_, deletedId) => {
-      queryClient.setQueryData<Style[]>(["/api/styles"], (old) => 
-        old?.filter(s => s.id !== deletedId) ?? []
-      );
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/styles"] });
     },
   });
 
@@ -39,6 +68,22 @@ export default function Explore() {
   }, [deleteMutation]);
 
   const handleRetry = useCallback(() => refetch(), [refetch]);
+
+  useEffect(() => {
+    if (!sentinelRef.current || !containerRef.current) return;
+    
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { root: null, rootMargin: "300px" }
+    );
+    
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [hasNextPage, fetchNextPage, isFetchingNextPage]);
 
   if (isLoading) {
     return (
@@ -64,17 +109,18 @@ export default function Explore() {
 
   return (
     <Layout>
-      <div className="flex flex-col gap-6 md:gap-8">
-        <div className="border-b border-border pb-4 md:pb-6">
-          <div className="space-y-1">
-            <h1 className="text-2xl md:text-3xl font-serif font-medium text-foreground">Style Vault</h1>
-            <p className="text-muted-foreground text-sm max-w-xl">
-              Your collection of visual styles
-            </p>
+      <div ref={containerRef} className="flex flex-col gap-6 md:gap-8">
+        <div className="border-b border-border pb-4 md:pb-6 flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <h1 className="text-2xl md:text-3xl font-serif font-medium text-foreground">Style Vault</h1>
+              <p className="text-muted-foreground text-sm max-w-xl">
+                {totalCount > 0 ? `${totalCount} styles in your collection` : "Your collection of visual styles"}
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Error State */}
         {isError && (
           <div className="py-16 text-center border border-dashed border-destructive/50 rounded-lg bg-destructive/5">
             <p className="text-destructive mb-2">Unable to load your styles</p>
@@ -92,8 +138,7 @@ export default function Explore() {
           </div>
         )}
 
-        {/* Empty State */}
-        {!isError && styles.length === 0 && (
+        {!isError && allStyles.length === 0 && (
           <motion.div 
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -125,23 +170,41 @@ export default function Explore() {
           </motion.div>
         )}
 
-        {/* Styles Grid */}
-        {!isError && styles.length > 0 && (
-          <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            <AnimatePresence>
-              {styles.map((style, index) => (
-                <motion.div
-                  key={style.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ duration: 0.3, delay: index * 0.05, ease: "easeOut" }}
-                >
-                  <StyleCard style={style} onDelete={handleStyleDelete} />
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
+        {!isError && allStyles.length > 0 && (
+          <>
+            <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+              <AnimatePresence mode="popLayout">
+                {allStyles.map((style, index) => (
+                  <motion.div
+                    key={style.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.3, delay: Math.min(index * 0.03, 0.3), ease: "easeOut" }}
+                  >
+                    <StyleCard style={style} onDelete={handleStyleDelete} />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+            
+            <div ref={sentinelRef} className="h-4" aria-hidden="true" />
+            
+            {isFetchingNextPage && (
+              <div className="flex items-center justify-center py-8">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span className="text-sm">Loading more styles...</span>
+                </div>
+              </div>
+            )}
+            
+            {!hasNextPage && allStyles.length > PAGE_SIZE && (
+              <div className="text-center py-4 text-muted-foreground text-sm">
+                All styles loaded
+              </div>
+            )}
+          </>
         )}
       </div>
     </Layout>

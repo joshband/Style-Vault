@@ -1,10 +1,12 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Upload, Wand2, ArrowRight, ArrowLeft, Loader2, X, Layers, Check, Sparkles, AlertCircle, RefreshCw } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { createStyle, SAMPLE_TOKENS } from "@/lib/store";
 import { useToast } from "@/hooks/use-toast";
-import { compressImage, getImageSizeKB } from "@/lib/image-utils";
+import { useJob, Job } from "@/hooks/use-job";
+import { compressImage, getImageSizeKB, compressPreviews, compressDataUrl } from "@/lib/image-utils";
 import { cn } from "@/lib/utils";
+import { Progress } from "@/components/ui/progress";
 
 type WizardStep = 1 | 2;
 type InputMode = "image" | "prompt" | null;
@@ -117,6 +119,62 @@ export default function Author() {
   const [generateError, setGenerateError] = useState<AuthorError | null>(null);
   const [saveError, setSaveError] = useState<AuthorError | null>(null);
 
+  // Job-based progress tracking
+  const [analysisJobId, setAnalysisJobId] = useState<string | null>(null);
+  const [previewJobId, setPreviewJobId] = useState<string | null>(null);
+  const pendingFileRef = useRef<File | null>(null);
+
+  // Hook into analysis job status
+  const { job: analysisJob } = useJob(analysisJobId, {
+    onSuccess: useCallback((job: Job) => {
+      if (job.output) {
+        setName(job.output.styleName || "");
+        setDescription(job.output.description || "");
+        setAnalyzeError(null);
+      }
+      setIsAnalyzing(false);
+      setAnalysisJobId(null);
+    }, []),
+    onError: useCallback((job: Job) => {
+      const classified = classifyError(new Error(job.error || "Analysis failed"), "image analysis");
+      setAnalyzeError(classified);
+      if (pendingFileRef.current) {
+        setFallbackFromFile(pendingFileRef.current.name);
+      }
+      setIsAnalyzing(false);
+      setAnalysisJobId(null);
+    }, []),
+  });
+
+  // Hook into preview job status
+  const handlePreviewSuccess = useCallback((job: Job) => {
+    if (job.output) {
+      setGeneratedPreviews({
+        stillLife: job.output.stillLife || "",
+        landscape: job.output.landscape || "",
+        portrait: job.output.portrait || "",
+      });
+      setGenerateError(null);
+    }
+    setIsGenerating(false);
+    setPreviewJobId(null);
+    setStep(2);
+  }, []);
+
+  const handlePreviewError = useCallback((job: Job) => {
+    const classified = classifyError(new Error(job.error || "Preview generation failed"), "preview generation");
+    setGenerateError(classified);
+    setGeneratedPreviews({ stillLife: "", landscape: "", portrait: "" });
+    setIsGenerating(false);
+    setPreviewJobId(null);
+    setStep(2);
+  }, []);
+
+  const { job: previewJob } = useJob(previewJobId, {
+    onSuccess: handlePreviewSuccess,
+    onError: handlePreviewError,
+  });
+
   // Submission guard - any operation in progress blocks others
   const isProcessing = isAnalyzing || isGenerating || isSaving;
 
@@ -130,6 +188,7 @@ export default function Author() {
     setIsAnalyzing(true);
     setInputMode("image");
     setAnalyzeError(null); // Clear previous errors
+    pendingFileRef.current = file;
 
     try {
       const compressedDataUrl = await compressImage(file);
@@ -139,17 +198,17 @@ export default function Author() {
       setReferenceImage(compressedDataUrl);
 
       try {
-        const response = await fetch("/api/analyze-image", {
+        // Use job-based endpoint for progress tracking
+        const response = await fetch("/api/jobs/analyze-image", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ imageBase64: compressedDataUrl }),
         });
 
         if (response.ok) {
-          const { styleName, description: desc } = await response.json();
-          setName(styleName || "");
-          setDescription(desc || "");
-          setAnalyzeError(null);
+          const { jobId } = await response.json();
+          setAnalysisJobId(jobId);
+          // Job polling will handle success/error via useJob hook
         } else {
           // Non-OK response - try to get error details
           let errorText = "Analysis failed";
@@ -161,17 +220,18 @@ export default function Author() {
           const classified = classifyError(new Error(errorText), "image analysis");
           setAnalyzeError(classified);
           setFallbackFromFile(file.name);
+          setIsAnalyzing(false);
         }
       } catch (error) {
         const classified = classifyError(error, "image analysis");
         setAnalyzeError(classified);
         setFallbackFromFile(file.name);
+        setIsAnalyzing(false);
       }
     } catch (error) {
       const classified = classifyError(error, "image compression");
       setAnalyzeError(classified);
       setFallbackFromFile(file.name);
-    } finally {
       setIsAnalyzing(false);
     }
   };
@@ -207,7 +267,8 @@ export default function Author() {
     setGenerateError(null); // Clear previous errors
 
     try {
-      const response = await fetch("/api/generate-previews", {
+      // Use job-based endpoint for progress tracking
+      const response = await fetch("/api/jobs/generate-previews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -218,14 +279,9 @@ export default function Author() {
       });
 
       if (response.ok) {
-        const { previews } = await response.json();
-        setGeneratedPreviews({
-          stillLife: previews.stillLife || "",
-          landscape: previews.landscape || "",
-          portrait: previews.portrait || "",
-        });
-        setGenerateError(null);
-        setStep(2);
+        const { jobId } = await response.json();
+        setPreviewJobId(jobId);
+        // Job polling will handle success/error via useJob hook
       } else {
         // Non-OK response - try to get error details
         let errorText = "Preview generation failed";
@@ -239,6 +295,7 @@ export default function Author() {
         
         // Still proceed to step 2 with empty previews if possible
         setGeneratedPreviews({ stillLife: "", landscape: "", portrait: "" });
+        setIsGenerating(false);
         setStep(2);
       }
     } catch (error) {
@@ -247,9 +304,8 @@ export default function Author() {
       
       // Still proceed to step 2 with empty previews
       setGeneratedPreviews({ stillLife: "", landscape: "", portrait: "" });
-      setStep(2);
-    } finally {
       setIsGenerating(false);
+      setStep(2);
     }
   };
   
@@ -261,7 +317,8 @@ export default function Author() {
     setGenerateError(null);
 
     try {
-      const response = await fetch("/api/generate-previews", {
+      // Use job-based endpoint for progress tracking
+      const response = await fetch("/api/jobs/generate-previews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -272,17 +329,9 @@ export default function Author() {
       });
 
       if (response.ok) {
-        const { previews } = await response.json();
-        setGeneratedPreviews({
-          stillLife: previews.stillLife || "",
-          landscape: previews.landscape || "",
-          portrait: previews.portrait || "",
-        });
-        setGenerateError(null);
-        toast({
-          title: "Previews generated",
-          description: "Your style previews are now ready",
-        });
+        const { jobId } = await response.json();
+        setPreviewJobId(jobId);
+        // Job polling will handle success/error via useJob hook
       } else {
         let errorText = "Preview generation failed";
         try {
@@ -290,10 +339,10 @@ export default function Author() {
           errorText = errorData.error || errorData.message || errorText;
         } catch {}
         setGenerateError(classifyError(new Error(errorText), "preview generation"));
+        setIsGenerating(false);
       }
     } catch (error) {
       setGenerateError(classifyError(error, "preview generation"));
-    } finally {
       setIsGenerating(false);
     }
   };
@@ -316,6 +365,8 @@ export default function Author() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const [saveProgress, setSaveProgress] = useState<string>("Preparing...");
+  
   const handleCreateStyle = async () => {
     if (!name.trim()) {
       toast({
@@ -332,11 +383,26 @@ export default function Author() {
     setSaveError(null); // Clear previous errors
 
     try {
+      // Compress images before saving to reduce payload size
+      setSaveProgress("Compressing images...");
+      
+      let compressedReference: string | null = null;
+      if (referenceImage) {
+        compressedReference = await compressDataUrl(referenceImage, 1200, 0.8);
+      }
+      
+      let compressedPreviews = { stillLife: "", landscape: "", portrait: "" };
+      if (generatedPreviews) {
+        compressedPreviews = await compressPreviews(generatedPreviews);
+      }
+      
+      setSaveProgress("Saving to vault...");
+      
       await createStyle({
         name: name.trim(),
         description: description.trim(),
-        referenceImages: referenceImage ? [referenceImage] : [],
-        previews: generatedPreviews || { stillLife: "", landscape: "", portrait: "" },
+        referenceImages: compressedReference ? [compressedReference] : [],
+        previews: compressedPreviews,
         tokens: SAMPLE_TOKENS,
         promptScaffolding: {
           base: description,
@@ -347,8 +413,8 @@ export default function Author() {
       });
 
       toast({
-        title: "Style created successfully",
-        description: `"${name}" has been added to your library`,
+        title: "Style saved successfully",
+        description: `"${name}" has been added to your vault`,
       });
 
       setLocation("/");
@@ -357,12 +423,13 @@ export default function Author() {
       setSaveError(classified);
       
       toast({
-        title: "Creation failed",
+        title: "Save failed",
         description: classified.message,
         variant: "destructive",
       });
     } finally {
       setIsSaving(false);
+      setSaveProgress("Preparing...");
     }
   };
 
@@ -374,7 +441,7 @@ export default function Author() {
       <header className="h-14 border-b border-border flex items-center justify-between px-4 md:px-8 bg-background/95 backdrop-blur-sm sticky top-0 z-20">
         <Link href="/" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
           <Layers size={20} />
-          <span className="font-serif font-medium text-sm">Style Explorer</span>
+          <span className="font-serif font-medium text-sm">Visual DNA</span>
         </Link>
         <Link 
           href="/" 
@@ -442,29 +509,42 @@ export default function Author() {
 
               {/* Input Options */}
               {!inputMode && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Upload Image Option */}
-                  <div
-                    onDragOver={handleDragOver}
-                    onDrop={handleDrop}
-                    onClick={() => fileInputRef.current?.click()}
-                    className="aspect-square border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center text-muted-foreground hover:bg-muted/50 hover:border-primary/50 transition-all cursor-pointer p-6"
-                    data-testid="dropzone-image"
-                  >
-                    <Upload size={40} className="mb-4 opacity-50" />
-                    <span className="text-sm font-medium text-center">Upload Reference Image</span>
-                    <span className="text-xs mt-2 opacity-60 text-center">Drag & drop or click to browse</span>
-                  </div>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Upload Image Option */}
+                    <div
+                      onDragOver={handleDragOver}
+                      onDrop={handleDrop}
+                      onClick={() => fileInputRef.current?.click()}
+                      className="aspect-square border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center text-muted-foreground hover:bg-muted/50 hover:border-primary/50 transition-all cursor-pointer p-6"
+                      data-testid="dropzone-image"
+                    >
+                      <Upload size={40} className="mb-4 opacity-50" />
+                      <span className="text-sm font-medium text-center">Upload Reference Image</span>
+                      <span className="text-xs mt-2 opacity-60 text-center">Drag & drop or click to browse</span>
+                    </div>
 
-                  {/* Text Prompt Option */}
-                  <div
-                    onClick={() => setInputMode("prompt")}
-                    className="aspect-square border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center text-muted-foreground hover:bg-muted/50 hover:border-primary/50 transition-all cursor-pointer p-6"
-                    data-testid="option-prompt"
-                  >
-                    <Sparkles size={40} className="mb-4 opacity-50" />
-                    <span className="text-sm font-medium text-center">Describe with Words</span>
-                    <span className="text-xs mt-2 opacity-60 text-center">Enter a text description</span>
+                    {/* Text Prompt Option */}
+                    <div
+                      onClick={() => setInputMode("prompt")}
+                      className="aspect-square border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center text-muted-foreground hover:bg-muted/50 hover:border-primary/50 transition-all cursor-pointer p-6"
+                      data-testid="option-prompt"
+                    >
+                      <Sparkles size={40} className="mb-4 opacity-50" />
+                      <span className="text-sm font-medium text-center">Describe with Words</span>
+                      <span className="text-xs mt-2 opacity-60 text-center">Enter a text description</span>
+                    </div>
+                  </div>
+                  
+                  {/* Batch upload link */}
+                  <div className="text-center">
+                    <Link 
+                      href="/batch" 
+                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      data-testid="link-batch-upload"
+                    >
+                      Have multiple images? <span className="underline">Try batch upload</span>
+                    </Link>
                   </div>
                 </div>
               )}
@@ -487,10 +567,20 @@ export default function Author() {
                       <X size={16} />
                     </button>
                     {isAnalyzing && (
-                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                        <div className="flex items-center gap-2 text-white text-sm">
-                          <Loader2 size={18} className="animate-spin" />
-                          Analyzing image...
+                      <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center p-4">
+                        <div className="w-full max-w-xs space-y-3">
+                          <div className="flex items-center justify-center gap-2 text-white text-sm">
+                            <Loader2 size={18} className="animate-spin" />
+                            <span>{analysisJob?.progressMessage || "Analyzing image..."}</span>
+                          </div>
+                          <Progress 
+                            value={analysisJob?.progress || 0} 
+                            className="h-2 bg-white/20" 
+                            data-testid="progress-analysis"
+                          />
+                          <div className="text-center text-xs text-white/70">
+                            {analysisJob?.progress || 0}%
+                          </div>
                         </div>
                       </div>
                     )}
@@ -576,7 +666,7 @@ export default function Author() {
               />
 
               {/* Next Button */}
-              <div className="pt-4">
+              <div className="pt-4 space-y-3">
                 <button
                   onClick={proceedToStep2}
                   disabled={!canProceedToStep2 || isGenerating}
@@ -591,7 +681,7 @@ export default function Author() {
                   {isGenerating ? (
                     <>
                       <Loader2 size={18} className="animate-spin" />
-                      Generating previews...
+                      {previewJob?.progressMessage || "Generating previews..."}
                     </>
                   ) : (
                     <>
@@ -600,8 +690,20 @@ export default function Author() {
                     </>
                   )}
                 </button>
-                {!hasValidInput && inputMode && (
-                  <p className="text-xs text-muted-foreground text-center mt-2">
+                {isGenerating && previewJob && (
+                  <div className="space-y-1">
+                    <Progress 
+                      value={previewJob.progress} 
+                      className="h-2" 
+                      data-testid="progress-preview"
+                    />
+                    <div className="text-center text-xs text-muted-foreground">
+                      {previewJob.progress}%
+                    </div>
+                  </div>
+                )}
+                {!hasValidInput && inputMode && !isGenerating && (
+                  <p className="text-xs text-muted-foreground text-center">
                     {inputMode === "image" ? "Upload an image to continue" : "Enter at least 10 characters"}
                   </p>
                 )}
@@ -611,15 +713,31 @@ export default function Author() {
 
           {/* Step 2: Review & Commit */}
           {step === 2 && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="text-center space-y-2">
                 <h1 className="text-2xl md:text-3xl font-serif font-medium text-foreground">
                   Review Your Style
                 </h1>
                 <p className="text-muted-foreground text-sm">
-                  Finalize the name and description before creating
+                  Finalize the name and description before saving
                 </p>
               </div>
+
+              {/* Reference Image - Fixed at top */}
+              {referenceImage && (
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Reference Image
+                  </label>
+                  <div className="relative aspect-video max-w-md mx-auto border border-border rounded-xl overflow-hidden bg-muted">
+                    <img
+                      src={referenceImage}
+                      alt="Reference"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Preview Generation Error Alert with Retry */}
               {generateError && (
@@ -775,7 +893,7 @@ export default function Author() {
                   {isSaving ? (
                     <>
                       <Loader2 size={18} className="animate-spin" />
-                      Creating...
+                      {saveProgress}
                     </>
                   ) : isGenerating ? (
                     <>
@@ -784,8 +902,8 @@ export default function Author() {
                     </>
                   ) : (
                     <>
-                      <Wand2 size={18} />
-                      Create Style
+                      <Check size={18} />
+                      Save Style
                     </>
                   )}
                 </button>

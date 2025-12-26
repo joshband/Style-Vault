@@ -275,6 +275,168 @@ export async function enrichPendingStyles(): Promise<EnrichmentProcessResult[]> 
   return results;
 }
 
+interface StyleSpecContent {
+  usageGuidelines: string;
+  designNotes: string;
+}
+
+function buildStyleSpecPrompt(style: Style): string {
+  const tokensPreview = JSON.stringify(style.tokens, null, 2).slice(0, 2000);
+  const metadataTags = style.metadataTags as Partial<MetadataTags> | null;
+  
+  return `You are a senior design director writing documentation for a visual style system. Based on the style's characteristics, write clear, practical guidance for designers and developers.
+
+Style Name: ${style.name}
+Description: ${style.description}
+
+Design Tokens (excerpt):
+${tokensPreview}
+
+${metadataTags ? `Metadata Tags:
+- Mood: ${(metadataTags.mood || []).join(", ") || "N/A"}
+- Color Family: ${(metadataTags.colorFamily || []).join(", ") || "N/A"}
+- Lighting: ${(metadataTags.lighting || []).join(", ") || "N/A"}
+- Art Period: ${(metadataTags.artPeriod || []).join(", ") || "N/A"}
+- Usage Examples: ${(metadataTags.usageExamples || []).join(", ") || "N/A"}
+- Stylistic Principles: ${(metadataTags.stylisticPrinciples || []).join(", ") || "N/A"}
+- Psychological Effect: ${(metadataTags.psychologicalEffect || []).join(", ") || "N/A"}
+- Audience Perception: ${(metadataTags.audiencePerception || []).join(", ") || "N/A"}` : ""}
+
+Generate two pieces of content:
+
+1. USAGE GUIDELINES (2-3 sentences): When and how to use this style. Be specific about contexts, project types, and appropriate use cases. Start directly with the content, no header.
+
+2. DESIGN NOTES (3-5 sentences): Technical observations about the color palette, typography suggestions, and implementation tips. Include specific recommendations for pairing with other elements. Start directly with the content, no header.
+
+Respond with ONLY valid JSON:
+{
+  "usageGuidelines": "Your usage guidelines text here...",
+  "designNotes": "Your design notes text here..."
+}`;
+}
+
+export async function generateStyleSpecContent(styleId: string): Promise<StyleSpecContent | null> {
+  const style = await storage.getStyleById(styleId);
+  if (!style) {
+    console.log(`Style ${styleId} not found for spec generation`);
+    return null;
+  }
+
+  const prompt = buildStyleSpecPrompt(style);
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+      config: {
+        temperature: 0.7,
+        topP: 0.9,
+        topK: 40,
+        maxOutputTokens: 1024,
+        responseMimeType: "application/json",
+      },
+    });
+
+    const text = response.text?.trim() || "";
+    
+    let parsed: StyleSpecContent | null = null;
+    
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        parsed = JSON.parse(jsonMatch[0]) as StyleSpecContent;
+      } catch {
+        console.error("Failed to parse JSON from style spec response");
+      }
+    }
+    
+    if (!parsed) {
+      const guidelinesMatch = text.match(/usage\s*guidelines[:\s]*["']?([\s\S]*?)(?=design\s*notes|$)/i);
+      const notesMatch = text.match(/design\s*notes[:\s]*["']?([\s\S]*?)$/i);
+      
+      const extractedGuidelines = guidelinesMatch?.[1]?.replace(/["']/g, "").trim() || "";
+      const extractedNotes = notesMatch?.[1]?.replace(/["']/g, "").trim() || "";
+      
+      if (extractedGuidelines.length > 20 || extractedNotes.length > 20) {
+        parsed = {
+          usageGuidelines: extractedGuidelines,
+          designNotes: extractedNotes,
+        };
+        console.log(`Fallback parsing extracted: guidelines=${extractedGuidelines.length} chars, notes=${extractedNotes.length} chars`);
+      }
+    }
+    
+    if (!parsed) {
+      console.error("Failed to extract JSON from style spec response");
+      return null;
+    }
+    
+    const validSpec: StyleSpecContent = {
+      usageGuidelines: typeof parsed.usageGuidelines === "string" ? parsed.usageGuidelines : "",
+      designNotes: typeof parsed.designNotes === "string" ? parsed.designNotes : "",
+    };
+    
+    if (validSpec.usageGuidelines.length < 20 && validSpec.designNotes.length < 20) {
+      console.error("Style spec content too short, treating as failure");
+      return null;
+    }
+
+    return validSpec;
+  } catch (error) {
+    console.error(`Error generating style spec for ${styleId}:`, error);
+    return null;
+  }
+}
+
+export async function enrichStyleSpec(styleId: string): Promise<boolean> {
+  const style = await storage.getStyleById(styleId);
+  if (!style) return false;
+
+  const specContent = await generateStyleSpecContent(styleId);
+  if (!specContent) return false;
+
+  const updatedSpec = {
+    usageGuidelines: specContent.usageGuidelines,
+    designNotes: specContent.designNotes,
+    updatedAt: new Date().toISOString(),
+  };
+
+  await storage.updateStyleSpec(styleId, updatedSpec);
+  console.log(`Generated style spec for: ${style.name}`);
+  return true;
+}
+
+export async function enrichAllStyleSpecs(): Promise<{ processed: number; success: number; errors: string[] }> {
+  const styles = await storage.getStyles();
+  
+  const stylesWithoutSpec = styles.filter(s => {
+    const spec = s.styleSpec as { usageGuidelines?: string; designNotes?: string } | null;
+    return !spec?.usageGuidelines || !spec?.designNotes;
+  });
+
+  console.log(`Found ${stylesWithoutSpec.length} styles needing spec generation`);
+  
+  const limit = pLimit(2);
+  const errors: string[] = [];
+  let success = 0;
+
+  await Promise.all(
+    stylesWithoutSpec.map(style =>
+      limit(async () => {
+        try {
+          const result = await enrichStyleSpec(style.id);
+          if (result) success++;
+        } catch (error) {
+          const errMsg = `${style.name}: ${error instanceof Error ? error.message : "Unknown error"}`;
+          errors.push(errMsg);
+        }
+      })
+    )
+  );
+
+  return { processed: stylesWithoutSpec.length, success, errors };
+}
+
 export async function getTagsSummary(): Promise<Record<string, Record<string, number>>> {
   const styles = await storage.getStyles();
   
