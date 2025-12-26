@@ -1321,61 +1321,172 @@ export default ${safeName};`;
           </div>
         </section>
 
-        {/* Create */}
+        {/* Create - Accordion with Try It Now action */}
         <section className="space-y-0">
-          <div className="flex items-start justify-between gap-4 mb-6">
-            <div>
-              <h2 className="text-lg font-serif font-medium text-foreground">Create</h2>
-              <p className="text-sm text-muted-foreground mt-0.5">Generate new images using this style</p>
-            </div>
-            <Button
-              onClick={() => {
-                setTryItOpen(true);
-                setTryItImage(null);
-                setTryItError(null);
-                setTryItPrompt("");
-              }}
-              className="flex items-center gap-2"
-              data-testid="button-try-it-now"
-            >
-              <Sparkles size={16} />
-              Try it Now
-            </Button>
-          </div>
+          <SectionHeader
+            title="Create"
+            description="Generate new images using this style"
+          />
           
-          <div className="space-y-6">
-            {summary.promptScaffolding && (
-              <>
-                <div className="space-y-2">
-                  <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Style Description</h3>
-                  <div className="p-4 bg-muted/50 rounded-lg border border-border">
-                    <p className="text-sm text-foreground whitespace-pre-wrap">{summary.promptScaffolding.base}</p>
+          <div className="border border-border rounded-lg overflow-hidden divide-y divide-border">
+            {/* Try It Now - Primary action */}
+            <div className="p-4 bg-muted/30">
+              <Button
+                onClick={() => {
+                  setTryItOpen(true);
+                  setTryItImage(null);
+                  setTryItError(null);
+                  setTryItPrompt("");
+                }}
+                className="w-full sm:w-auto flex items-center justify-center gap-2"
+                data-testid="button-try-it-now"
+              >
+                <Sparkles size={16} />
+                Try it Now
+              </Button>
+            </div>
+            
+            {/* Style Description - Collapsible */}
+            {summary.promptScaffolding?.base && (
+              <details className="group">
+                <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+                  <span className="text-sm font-medium text-foreground">Style Description</span>
+                  <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+                </summary>
+                <div className="px-4 pb-4">
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{summary.promptScaffolding.base}</p>
+                </div>
+              </details>
+            )}
+            
+            {/* Characteristics - Collapsible */}
+            {summary.promptScaffolding?.modifiers && summary.promptScaffolding.modifiers.length > 0 && (
+              <details className="group">
+                <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+                  <span className="text-sm font-medium text-foreground">Characteristics</span>
+                  <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+                </summary>
+                <div className="px-4 pb-4">
+                  <div className="flex flex-wrap gap-2">
+                    {summary.promptScaffolding.modifiers.map((mod: string, i: number) => (
+                      <span key={i} className="px-2 py-1 bg-muted text-xs rounded-md text-muted-foreground">
+                        {mod}
+                      </span>
+                    ))}
                   </div>
                 </div>
-                
-                {summary.promptScaffolding.modifiers && summary.promptScaffolding.modifiers.length > 0 && (
-                  <div className="space-y-2">
-                    <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Characteristics</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {summary.promptScaffolding.modifiers.map((mod: string, i: number) => (
-                        <span key={i} className="px-2 py-1 bg-muted/70 text-xs rounded-md text-muted-foreground">
-                          {mod}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                {summary.promptScaffolding.negative && (
-                  <div className="space-y-2">
-                    <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Avoid</h3>
-                    <div className="p-4 bg-muted/30 rounded-lg border border-border">
-                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{summary.promptScaffolding.negative}</p>
-                    </div>
-                  </div>
-                )}
-              </>
+              </details>
             )}
+            
+            {/* Avoid - Collapsible */}
+            {summary.promptScaffolding?.negative && (
+              <details className="group">
+                <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+                  <span className="text-sm font-medium text-foreground">Avoid</span>
+                  <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+                </summary>
+                <div className="px-4 pb-4">
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{summary.promptScaffolding.negative}</p>
+                </div>
+              </details>
+            )}
+
+            {/* Usage Notes - Nested */}
+            <details className="group">
+              <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+                <span className="text-sm font-medium text-foreground">Usage Notes</span>
+                <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+              </summary>
+              <div className="px-4 pb-4">
+                <StyleSpecEditor 
+                  styleId={summary.id} 
+                  styleSpec={summary.styleSpec}
+                  createdAt={summary.createdAt}
+                  updatedAt={summary.updatedAt}
+                  onUpdate={handleSpecUpdate}
+                />
+              </div>
+            </details>
+
+            {/* Revisions - Nested */}
+            <details className="group">
+              <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+                <span className="text-sm font-medium text-foreground">Revisions</span>
+                <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+              </summary>
+              <div className="px-4 pb-4 space-y-4">
+                {isOwner && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSaveVersion}
+                    disabled={savingVersion}
+                    data-testid="save-version-btn"
+                  >
+                    {savingVersion ? (
+                      <>
+                        <Loader2 size={14} className="mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save size={14} className="mr-2" />
+                        Save Snapshot
+                      </>
+                    )}
+                  </Button>
+                )}
+                
+                {versionsLoading ? (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Loader2 size={14} className="animate-spin" />
+                    <span className="text-sm">Loading versions...</span>
+                  </div>
+                ) : versions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No revision history yet</p>
+                ) : (
+                  <div className="space-y-2">
+                    {versions.map((version) => (
+                      <div 
+                        key={version.id} 
+                        className="flex items-center justify-between p-3 bg-muted/30 rounded-lg text-sm"
+                      >
+                        <div className="flex items-center gap-3">
+                          <History size={14} className="text-muted-foreground" />
+                          <div>
+                            <span className="font-medium">v{version.versionNumber}</span>
+                            <span className="text-muted-foreground ml-2">
+                              {version.changeType}
+                              {version.changeDescription && ` — ${version.changeDescription}`}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(version.createdAt).toLocaleDateString()}
+                          </span>
+                          {isOwner && (
+                            <button
+                              onClick={() => handleRevertToVersion(version.id)}
+                              disabled={revertingVersion === version.id}
+                              className="p-1 hover:bg-muted rounded transition-colors"
+                              title="Revert to this version"
+                              data-testid={`revert-version-${version.id}`}
+                            >
+                              {revertingVersion === version.id ? (
+                                <Loader2 size={14} className="animate-spin" />
+                              ) : (
+                                <RotateCcw size={14} />
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </details>
           </div>
         </section>
 
@@ -1455,127 +1566,6 @@ export default ${safeName};`;
           </div>
         )}
 
-        {/* Usage Notes */}
-        <section className="space-y-0">
-          <SectionHeader
-            title="Usage Notes"
-            description="Guidelines for applying this style"
-          />
-          <StyleSpecEditor 
-            styleId={summary.id} 
-            styleSpec={summary.styleSpec}
-            createdAt={summary.createdAt}
-            updatedAt={summary.updatedAt}
-            onUpdate={handleSpecUpdate}
-          />
-        </section>
-
-        {/* Revisions */}
-        <section className="space-y-0">
-          <SectionHeader
-            title="Revisions"
-          />
-          
-          <div className="space-y-4">
-            {/* Actions row */}
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setVersionsExpanded(!versionsExpanded)}
-                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                data-testid="toggle-version-history"
-              >
-                {versionsExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                {versionsExpanded ? "Hide history" : "Show history"}
-              </button>
-              
-              {isOwner && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSaveVersion}
-                  disabled={savingVersion}
-                  data-testid="save-version-btn"
-                >
-                  {savingVersion ? (
-                    <Loader2 size={14} className="mr-2 animate-spin" />
-                  ) : (
-                    <Save size={14} className="mr-2" />
-                  )}
-                  Save Snapshot
-                </Button>
-              )}
-            </div>
-
-            {/* Version list */}
-            {versionsExpanded && (
-              <div className="space-y-2 animate-in fade-in duration-200">
-                {versionsLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 size={24} className="animate-spin text-muted-foreground" />
-                  </div>
-                ) : versions.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <p className="text-sm">No revisions yet</p>
-                  </div>
-                ) : (
-                  <div className="border border-border rounded-lg divide-y divide-border">
-                    {versions.map((version) => (
-                      <div
-                        key={version.id}
-                        className="p-4 flex items-start justify-between gap-4"
-                        data-testid={`version-item-${version.id}`}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">
-                              Version {version.versionNumber}
-                            </span>
-                            <span className={`text-xs px-2 py-0.5 rounded-full ${
-                              version.changeType === "created" ? "bg-green-500/10 text-green-600" :
-                              version.changeType === "tokens_updated" ? "bg-blue-500/10 text-blue-600" :
-                              version.changeType === "manual_save" ? "bg-purple-500/10 text-purple-600" :
-                              version.changeType === "reverted" ? "bg-orange-500/10 text-orange-600" :
-                              "bg-muted text-muted-foreground"
-                            }`}>
-                              {version.changeType.replace("_", " ")}
-                            </span>
-                          </div>
-                          {version.changeDescription && (
-                            <p className="text-sm text-muted-foreground mt-1 truncate">
-                              {version.changeDescription}
-                            </p>
-                          )}
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {new Date(version.createdAt).toLocaleString()}
-                          </p>
-                        </div>
-                        
-                        {isOwner && version.versionNumber < Math.max(...versions.map(v => v.versionNumber)) && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRevertToVersion(version.id)}
-                            disabled={revertingVersion === version.id}
-                            data-testid={`revert-btn-${version.id}`}
-                          >
-                            {revertingVersion === version.id ? (
-                              <Loader2 size={14} className="animate-spin" />
-                            ) : (
-                              <>
-                                <RotateCcw size={14} className="mr-1" />
-                                Revert
-                              </>
-                            )}
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </section>
       </div>
     </Layout>
   );
