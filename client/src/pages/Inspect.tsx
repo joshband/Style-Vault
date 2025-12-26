@@ -1078,23 +1078,21 @@ export default ${safeName};`;
 
         {/* Canonical Previews - Visual comparison suite */}
         <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <SectionHeader
-              title="Canonical Previews"
-              description="Standardized images for cross-style comparison"
-            />
-          </div>
+          <SectionHeader
+            title="Canonical Previews"
+            description="Standardized images for cross-style comparison"
+          />
           
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {assetsLoading ? (
               <>
-                <PreviewSkeleton aspect="aspect-video" />
-                <PreviewSkeleton aspect="aspect-[3/4]" />
+                <PreviewSkeleton aspect="aspect-square" />
+                <PreviewSkeleton aspect="aspect-square" />
                 <PreviewSkeleton aspect="aspect-square" />
               </>
             ) : (
               <>
-                <div className="aspect-video bg-muted rounded-lg overflow-hidden border border-border relative group">
+                <div className="aspect-square bg-muted rounded-lg overflow-hidden border border-border relative group">
                   {(summary.imageIds?.preview_landscape || previews.landscape) ? (
                     <>
                       <img 
@@ -1116,7 +1114,7 @@ export default ${safeName};`;
                     </div>
                   )}
                 </div>
-                <div className="aspect-[3/4] bg-muted rounded-lg overflow-hidden border border-border relative group">
+                <div className="aspect-square bg-muted rounded-lg overflow-hidden border border-border relative group">
                   {(summary.imageIds?.preview_portrait || previews.portrait) ? (
                     <>
                       <img 
