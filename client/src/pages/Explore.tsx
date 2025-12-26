@@ -4,7 +4,7 @@ import { StyleCardSkeleton } from "@/components/style-card-skeleton";
 import { StyleFilters, DEFAULT_FILTERS, type StyleFiltersState } from "@/components/style-filters";
 import { Layout } from "@/components/layout";
 import { motion, AnimatePresence } from "framer-motion";
-import { RefreshCw, PenTool, Loader2, SearchX, GitCompareArrows, X, Check } from "lucide-react";
+import { RefreshCw, PenTool, Loader2, GitCompareArrows, X, Check } from "lucide-react";
 import { useCallback, useRef, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -246,7 +246,7 @@ export default function Explore() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4 }}
-            className="py-20 px-6 text-center border border-dashed border-border rounded-xl bg-gradient-to-b from-muted/20 to-transparent"
+            className="py-20 px-6 text-center border border-dashed border-border rounded-xl"
           >
             <div className="max-w-md mx-auto space-y-4">
               <h2 className="text-xl font-serif font-medium text-foreground">
@@ -281,7 +281,6 @@ export default function Explore() {
             className="py-16 px-6 text-center border border-dashed border-border rounded-xl"
           >
             <div className="max-w-md mx-auto space-y-4">
-              <SearchX className="w-12 h-12 mx-auto text-muted-foreground/50" />
               <h2 className="text-lg font-medium text-foreground">
                 No styles match your filters
               </h2>
