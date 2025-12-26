@@ -908,6 +908,41 @@ export async function registerRoutes(
     }
   });
 
+  // Update user profile (requires auth)
+  app.patch("/api/profile", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any)?.claims?.sub;
+      const { displayName } = req.body;
+      
+      if (displayName === undefined) {
+        return res.status(400).json({ error: "No fields to update" });
+      }
+      
+      if (typeof displayName !== "string") {
+        return res.status(400).json({ error: "displayName must be a string" });
+      }
+      
+      const trimmed = displayName.trim();
+      if (trimmed.length === 0) {
+        return res.status(400).json({ error: "displayName cannot be empty" });
+      }
+      
+      if (trimmed.length > 100) {
+        return res.status(400).json({ error: "displayName must be 100 characters or less" });
+      }
+      
+      const updated = await storage.updateUserProfile(userId, { displayName: trimmed });
+      if (!updated) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      res.status(500).json({ error: "Failed to update profile" });
+    }
+  });
+
   // Update style visibility (requires auth, must be owner)
   app.patch("/api/styles/:id/visibility", isAuthenticated, async (req, res) => {
     try {

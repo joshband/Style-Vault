@@ -85,7 +85,8 @@ export interface IStorage {
   getStylesByCreator(creatorId: string): Promise<StyleSummary[]>;
   getPublicStyleSummaries(): Promise<StyleSummary[]>;
   updateStyleVisibility(id: string, isPublic: boolean): Promise<Style | undefined>;
-  getCreatorInfo(userId: string): Promise<{ id: string; name: string; profileImageUrl: string | null; createdAt: Date | null } | undefined>;
+  getCreatorInfo(userId: string): Promise<{ id: string; name: string; displayName: string | null; profileImageUrl: string | null; createdAt: Date | null } | undefined>;
+  updateUserProfile(userId: string, updates: { displayName?: string }): Promise<{ id: string; displayName: string | null } | undefined>;
 
   // Bookmark operations
   getBookmarksByUser(userId: string): Promise<Bookmark[]>;
@@ -908,17 +909,31 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async getCreatorInfo(userId: string): Promise<{ id: string; name: string; profileImageUrl: string | null; createdAt: Date | null } | undefined> {
+  async getCreatorInfo(userId: string): Promise<{ id: string; name: string; displayName: string | null; profileImageUrl: string | null; createdAt: Date | null } | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, userId));
     if (!user) return undefined;
+    const defaultName = user.firstName && user.lastName 
+      ? `${user.firstName} ${user.lastName}` 
+      : user.firstName || user.email || "Unknown";
     return {
       id: user.id,
-      name: user.firstName && user.lastName 
-        ? `${user.firstName} ${user.lastName}` 
-        : user.firstName || user.email || "Unknown",
+      name: user.displayName || defaultName,
+      displayName: user.displayName || null,
       profileImageUrl: user.profileImageUrl || null,
       createdAt: user.createdAt || null,
     };
+  }
+  
+  async updateUserProfile(userId: string, updates: { displayName?: string }): Promise<{ id: string; displayName: string | null } | undefined> {
+    const [updated] = await db
+      .update(users)
+      .set({ 
+        displayName: updates.displayName,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
+      .returning({ id: users.id, displayName: users.displayName });
+    return updated;
   }
 
   // Bookmark operations
