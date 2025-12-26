@@ -892,7 +892,7 @@ module.exports = ${JSON.stringify(config, null, 2)}`;
                 <>
                   <PreviewSkeleton aspect="col-span-1 sm:col-span-4 aspect-video" />
                   <PreviewSkeleton aspect="sm:col-span-2 sm:row-span-2 aspect-[3/4]" />
-                  <PreviewSkeleton aspect="sm:col-span-2 aspect-square" />
+                  <PreviewSkeleton aspect="sm:col-span-2 sm:row-span-2 aspect-square sm:aspect-auto" />
                 </>
               ) : (
                 <>
@@ -940,7 +940,7 @@ module.exports = ${JSON.stringify(config, null, 2)}`;
                       </div>
                     )}
                   </div>
-                  <div className="sm:col-span-2 aspect-square bg-muted rounded-lg overflow-hidden border border-border relative">
+                  <div className="sm:col-span-2 sm:row-span-2 aspect-square sm:aspect-auto bg-muted rounded-lg overflow-hidden border border-border relative">
                     {(summary.imageIds?.preview_still_life || previews.stillLife) ? (
                       <>
                         <img 
