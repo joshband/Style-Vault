@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { AiMoodBoard } from "@/components/ai-mood-board";
+import { ExportDialog } from "@/components/export-dialog";
 import { useAuth } from "@/hooks/use-auth";
 
 interface StyleSummary {
@@ -1221,8 +1222,10 @@ export default ${safeName};`;
           </button>
           
           {/* Export */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+          <ExportDialog 
+            tokens={summary.tokens} 
+            styleName={summary.name}
+            trigger={
               <button 
                 className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
                 data-testid="button-export-primary"
@@ -1231,31 +1234,8 @@ export default ${safeName};`;
                 Export
                 <ChevronDown size={14} />
               </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="center" className="w-56">
-              <DropdownMenuItem onClick={() => handleExport('json')} className="cursor-pointer">
-                <FileJson size={16} className="mr-2 text-blue-500" />
-                <span>JSON (W3C DTCG)</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport('css')} className="cursor-pointer">
-                <FileCode size={16} className="mr-2 text-orange-500" />
-                <span>CSS Variables</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport('tailwind')} className="cursor-pointer">
-                <Paintbrush size={16} className="mr-2 text-cyan-500" />
-                <span>Tailwind Config</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => handleExport('figma')} className="cursor-pointer">
-                <FileJson size={16} className="mr-2 text-purple-500" />
-                <span>Figma Variables</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport('adobe-xd')} className="cursor-pointer">
-                <FileJson size={16} className="mr-2 text-pink-500" />
-                <span>Adobe XD</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            }
+          />
           
           {/* Remix / Apply */}
           <Button
