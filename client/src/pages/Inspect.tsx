@@ -1409,7 +1409,14 @@ export default ${safeName};`;
             </details>
 
             {/* Revisions - Nested */}
-            <details className="group">
+            <details 
+              className="group"
+              onToggle={(e) => {
+                if ((e.target as HTMLDetailsElement).open && !versionsExpanded) {
+                  setVersionsExpanded(true);
+                }
+              }}
+            >
               <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
                 <span className="text-sm font-medium text-foreground">Revisions</span>
                 <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
