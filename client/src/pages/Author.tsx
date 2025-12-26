@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Upload, Wand2, ArrowRight, ArrowLeft, Loader2, X, Layers, Check, Sparkles, AlertCircle, RefreshCw } from "lucide-react";
+import { Upload, Wand2, ArrowRight, ArrowLeft, Loader2, X, Layers, Check, Sparkles, AlertCircle, RefreshCw, FileJson } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { createStyle, SAMPLE_TOKENS } from "@/lib/store";
 import { useToast } from "@/hooks/use-toast";
@@ -7,9 +7,10 @@ import { useJob, Job } from "@/hooks/use-job";
 import { compressImage, getImageSizeKB, compressPreviews, compressDataUrl } from "@/lib/image-utils";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
+import { detectFormat, importTokens, SUPPORTED_FORMATS, ImportResult, countTokens, TokenStats } from "@/lib/token-importers";
 
 type WizardStep = 1 | 2;
-type InputMode = "image" | "prompt" | null;
+type InputMode = "image" | "prompt" | "file" | null;
 type ErrorType = "ai_unavailable" | "cv_disabled" | "network" | "unknown" | null;
 
 interface AuthorError {
@@ -87,10 +88,34 @@ function getTokenSummary(tokens: any): TokenSummary {
   };
 }
 
+function extractColorSwatches(colorTokens: any): { key: string; color: string }[] {
+  const results: { key: string; color: string }[] = [];
+  
+  const traverse = (obj: any, prefix = '') => {
+    for (const [key, value] of Object.entries(obj)) {
+      const fullKey = prefix ? `${prefix}.${key}` : key;
+      if (value && typeof value === 'object') {
+        if ('$value' in value && typeof (value as any).$value === 'string') {
+          const color = (value as any).$value;
+          if (/^#|^rgb|^hsl/.test(color)) {
+            results.push({ key: fullKey, color });
+          }
+        } else {
+          traverse(value, fullKey);
+        }
+      }
+    }
+  };
+  
+  traverse(colorTokens);
+  return results;
+}
+
 export default function Author() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const tokenFileInputRef = useRef<HTMLInputElement>(null);
 
   // Wizard state
   const [step, setStep] = useState<WizardStep>(1);
@@ -99,6 +124,12 @@ export default function Author() {
   // Input state
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
   const [textPrompt, setTextPrompt] = useState("");
+  
+  // File import state
+  const [importedTokens, setImportedTokens] = useState<any>(null);
+  const [importFileName, setImportFileName] = useState<string>("");
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importStats, setImportStats] = useState<TokenStats | null>(null);
 
   // Generated data
   const [name, setName] = useState("");
@@ -178,7 +209,9 @@ export default function Author() {
   // Submission guard - any operation in progress blocks others
   const isProcessing = isAnalyzing || isGenerating || isSaving;
 
-  const hasValidInput = inputMode === "image" ? !!referenceImage : (inputMode === "prompt" && textPrompt.trim().length >= 10);
+  const hasValidInput = inputMode === "image" ? !!referenceImage : 
+    (inputMode === "prompt" && textPrompt.trim().length >= 10) ||
+    (inputMode === "file" && !!importedTokens);
   const canProceedToStep2 = hasValidInput && !isAnalyzing;
 
   const handleFileSelect = async (file: File) => {
@@ -262,6 +295,13 @@ export default function Author() {
 
   const proceedToStep2 = async () => {
     if (!canProceedToStep2 || isProcessing) return; // Prevent duplicate submissions
+
+    // For file imports, skip preview generation and go straight to step 2
+    if (inputMode === "file" && importedTokens) {
+      setGeneratedPreviews({ stillLife: "", landscape: "", portrait: "" });
+      setStep(2);
+      return;
+    }
 
     setIsGenerating(true);
     setGenerateError(null); // Clear previous errors
@@ -362,7 +402,53 @@ export default function Author() {
     setAnalyzeError(null);
     setGenerateError(null);
     setSaveError(null);
+    setImportedTokens(null);
+    setImportFileName("");
+    setImportError(null);
+    setImportStats(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
+    if (tokenFileInputRef.current) tokenFileInputRef.current.value = "";
+  };
+  
+  const handleTokenFileSelect = async (file: File) => {
+    if (isProcessing) return;
+    
+    setInputMode("file");
+    setImportError(null);
+    setImportFileName(file.name);
+    
+    try {
+      const content = await file.text();
+      const format = detectFormat(content, file.name);
+      
+      if (!format) {
+        setImportError("Could not detect file format. Supported formats: JSON, CSS, Tailwind config.");
+        return;
+      }
+      
+      const result = importTokens(content, format, file.name);
+      
+      if (!result.success) {
+        setImportError(result.errors?.join(", ") || "Failed to parse file");
+        return;
+      }
+      
+      setImportedTokens(result.tokens);
+      setImportStats(result.stats || null);
+      if (result.name) {
+        setName(result.name.split(/[-_]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" "));
+      }
+      
+      const stats = result.stats || { colorCount: 0, spacingCount: 0, typographyCount: 0, otherCount: 0 };
+      setDescription(`Imported style with ${stats.colorCount} colors and ${stats.spacingCount} spacing tokens`);
+      
+      toast({
+        title: "Tokens imported",
+        description: `Found ${stats.colorCount} colors from ${file.name}`,
+      });
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : "Failed to read file");
+    }
   };
 
   const [saveProgress, setSaveProgress] = useState<string>("Preparing...");
@@ -403,7 +489,7 @@ export default function Author() {
         description: description.trim(),
         referenceImages: compressedReference ? [compressedReference] : [],
         previews: compressedPreviews,
-        tokens: SAMPLE_TOKENS,
+        tokens: importedTokens || SAMPLE_TOKENS,
         promptScaffolding: {
           base: description,
           modifiers: ["auto-generated"],
@@ -503,14 +589,14 @@ export default function Author() {
                   Create a New Style
                 </h1>
                 <p className="text-muted-foreground text-sm max-w-md mx-auto">
-                  Upload a reference image or describe the style you want to create
+                  Upload an image, describe your style, or import from design tools
                 </p>
               </div>
 
               {/* Input Options */}
               {!inputMode && (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {/* Upload Image Option */}
                     <div
                       onDragOver={handleDragOver}
@@ -520,8 +606,8 @@ export default function Author() {
                       data-testid="dropzone-image"
                     >
                       <Upload size={40} className="mb-4 opacity-50" />
-                      <span className="text-sm font-medium text-center">Upload Reference Image</span>
-                      <span className="text-xs mt-2 opacity-60 text-center">Drag & drop or click to browse</span>
+                      <span className="text-sm font-medium text-center">Upload Image</span>
+                      <span className="text-xs mt-2 opacity-60 text-center">Extract from photo</span>
                     </div>
 
                     {/* Text Prompt Option */}
@@ -531,8 +617,19 @@ export default function Author() {
                       data-testid="option-prompt"
                     >
                       <Sparkles size={40} className="mb-4 opacity-50" />
-                      <span className="text-sm font-medium text-center">Describe with Words</span>
-                      <span className="text-xs mt-2 opacity-60 text-center">Enter a text description</span>
+                      <span className="text-sm font-medium text-center">Describe Style</span>
+                      <span className="text-xs mt-2 opacity-60 text-center">Text description</span>
+                    </div>
+                    
+                    {/* Import File Option */}
+                    <div
+                      onClick={() => tokenFileInputRef.current?.click()}
+                      className="aspect-square border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center text-muted-foreground hover:bg-muted/50 hover:border-primary/50 transition-all cursor-pointer p-6"
+                      data-testid="option-import"
+                    >
+                      <FileJson size={40} className="mb-4 opacity-50" />
+                      <span className="text-sm font-medium text-center">Import Tokens</span>
+                      <span className="text-xs mt-2 opacity-60 text-center">Figma, CSS, DTCG</span>
                     </div>
                   </div>
                   
@@ -655,6 +752,88 @@ export default function Author() {
                   </div>
                 </div>
               )}
+              
+              {/* File Import Preview */}
+              {inputMode === "file" && (
+                <div className="space-y-4">
+                  <div className="p-6 border border-border rounded-xl bg-muted/30">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                        <FileJson className="w-6 h-6 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm truncate">{importFileName}</span>
+                          <button
+                            onClick={resetWizard}
+                            disabled={isProcessing}
+                            className="p-1 hover:bg-muted rounded transition-colors"
+                          >
+                            <X size={14} className="text-muted-foreground" />
+                          </button>
+                        </div>
+                        
+                        {importError ? (
+                          <div className="mt-2 text-sm text-destructive">{importError}</div>
+                        ) : importedTokens ? (
+                          <div className="mt-2 space-y-2">
+                            <div className="flex items-center gap-2 text-sm text-green-600">
+                              <Check size={14} />
+                              Tokens parsed successfully
+                            </div>
+                            <div className="flex flex-wrap gap-2 mt-2">
+                              {importStats && importStats.colorCount > 0 && (
+                                <span className="px-2 py-1 bg-background border border-border rounded text-xs">
+                                  {importStats.colorCount} colors
+                                </span>
+                              )}
+                              {importStats && importStats.spacingCount > 0 && (
+                                <span className="px-2 py-1 bg-background border border-border rounded text-xs">
+                                  {importStats.spacingCount} spacing
+                                </span>
+                              )}
+                              {importStats && importStats.typographyCount > 0 && (
+                                <span className="px-2 py-1 bg-background border border-border rounded text-xs">
+                                  {importStats.typographyCount} typography
+                                </span>
+                              )}
+                              {importStats && importStats.otherCount > 0 && (
+                                <span className="px-2 py-1 bg-background border border-border rounded text-xs">
+                                  {importStats.otherCount} other
+                                </span>
+                              )}
+                            </div>
+                            {/* Color preview swatches */}
+                            {importedTokens.color && (
+                              <div className="flex flex-wrap gap-1 mt-3">
+                                {extractColorSwatches(importedTokens.color).slice(0, 8).map(({ key, color }) => (
+                                  <div
+                                    key={key}
+                                    className="w-6 h-6 rounded border border-border"
+                                    style={{ backgroundColor: color }}
+                                    title={key}
+                                  />
+                                ))}
+                                {importStats && importStats.colorCount > 8 && (
+                                  <div className="w-6 h-6 rounded border border-border bg-muted flex items-center justify-center text-xs text-muted-foreground">
+                                    +{importStats.colorCount - 8}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="mt-2 text-sm text-muted-foreground">Parsing file...</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="text-center text-sm text-muted-foreground">
+                    Supported formats: W3C DTCG, Figma Variables, Tokens Studio, CSS, Tailwind
+                  </div>
+                </div>
+              )}
 
               {/* Hidden File Input */}
               <input
@@ -662,6 +841,13 @@ export default function Author() {
                 type="file"
                 accept="image/*"
                 onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+                className="hidden"
+              />
+              <input
+                ref={tokenFileInputRef}
+                type="file"
+                accept=".json,.css,.js,.tokens,.ase"
+                onChange={(e) => e.target.files?.[0] && handleTokenFileSelect(e.target.files[0])}
                 className="hidden"
               />
 
