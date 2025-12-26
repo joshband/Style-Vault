@@ -149,21 +149,26 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(users, eq(styles.creatorId, users.id))
       .orderBy(desc(styles.createdAt));
     
-    return allStyles.map(s => ({
-      id: s.id,
-      name: s.name,
-      description: s.description,
-      createdAt: s.createdAt,
-      metadataTags: s.metadataTags,
-      moodBoardStatus: (s.moodBoard as any)?.status || "pending",
-      uiConceptsStatus: (s.uiConcepts as any)?.status || "pending",
-      thumbnailPreview: (s.previews as any)?.landscape || (s.previews as any)?.portrait || null,
-      creatorId: s.creatorId,
-      creatorName: s.creatorFirstName && s.creatorLastName 
-        ? `${s.creatorFirstName} ${s.creatorLastName}` 
-        : s.creatorFirstName || null,
-      isPublic: s.isPublic,
-    }));
+    return allStyles.map(s => {
+      const uiConceptsData = s.uiConcepts as UiConceptAssets | null;
+      const uiDashboard = uiConceptsData?.dashboard;
+      const fallbackThumbnail = (s.previews as any)?.landscape || (s.previews as any)?.portrait || null;
+      return {
+        id: s.id,
+        name: s.name,
+        description: s.description,
+        createdAt: s.createdAt,
+        metadataTags: s.metadataTags,
+        moodBoardStatus: (s.moodBoard as any)?.status || "pending",
+        uiConceptsStatus: uiConceptsData?.status || "pending",
+        thumbnailPreview: uiDashboard || fallbackThumbnail,
+        creatorId: s.creatorId,
+        creatorName: s.creatorFirstName && s.creatorLastName 
+          ? `${s.creatorFirstName} ${s.creatorLastName}` 
+          : s.creatorFirstName || null,
+        isPublic: s.isPublic,
+      };
+    });
   }
 
   async getStyleSummariesPaginated(limit: number, cursor?: string, filters?: StyleFilters): Promise<PaginatedStyleSummaries> {
@@ -178,6 +183,7 @@ export class DatabaseStorage implements IStorage {
       metadataTags: styles.metadataTags,
       creatorId: styles.creatorId,
       isPublic: styles.isPublic,
+      uiConcepts: styles.uiConcepts,
       creatorFirstName: users.firstName,
       creatorLastName: users.lastName,
     };
@@ -287,7 +293,9 @@ export class DatabaseStorage implements IStorage {
     return {
       items: items.map(s => {
         const refImages = s.referenceImages as string[] | null;
-        const thumbnail = refImages && refImages.length > 0 ? refImages[0] : null;
+        const uiConceptsData = s.uiConcepts as UiConceptAssets | null;
+        const uiDashboard = uiConceptsData?.dashboard;
+        const fallbackThumbnail = refImages && refImages.length > 0 ? refImages[0] : null;
         return {
           id: s.id,
           name: s.name,
@@ -295,8 +303,8 @@ export class DatabaseStorage implements IStorage {
           createdAt: s.createdAt,
           metadataTags: s.metadataTags,
           moodBoardStatus: "complete",
-          uiConceptsStatus: "complete",
-          thumbnailPreview: thumbnail,
+          uiConceptsStatus: uiConceptsData?.status || "pending",
+          thumbnailPreview: uiDashboard || fallbackThumbnail,
           creatorId: s.creatorId,
           creatorName: s.creatorFirstName && s.creatorLastName 
             ? `${s.creatorFirstName} ${s.creatorLastName}` 
@@ -823,21 +831,26 @@ export class DatabaseStorage implements IStorage {
       .where(eq(styles.creatorId, creatorId))
       .orderBy(desc(styles.createdAt));
     
-    return creatorStyles.map(s => ({
-      id: s.id,
-      name: s.name,
-      description: s.description,
-      createdAt: s.createdAt,
-      metadataTags: s.metadataTags,
-      moodBoardStatus: (s.moodBoard as any)?.status || "pending",
-      uiConceptsStatus: (s.uiConcepts as any)?.status || "pending",
-      thumbnailPreview: (s.previews as any)?.landscape || (s.previews as any)?.portrait || null,
-      creatorId: s.creatorId,
-      creatorName: s.creatorFirstName && s.creatorLastName 
-        ? `${s.creatorFirstName} ${s.creatorLastName}` 
-        : s.creatorFirstName || null,
-      isPublic: s.isPublic,
-    }));
+    return creatorStyles.map(s => {
+      const uiConceptsData = s.uiConcepts as UiConceptAssets | null;
+      const uiDashboard = uiConceptsData?.dashboard;
+      const fallbackThumbnail = (s.previews as any)?.landscape || (s.previews as any)?.portrait || null;
+      return {
+        id: s.id,
+        name: s.name,
+        description: s.description,
+        createdAt: s.createdAt,
+        metadataTags: s.metadataTags,
+        moodBoardStatus: (s.moodBoard as any)?.status || "pending",
+        uiConceptsStatus: uiConceptsData?.status || "pending",
+        thumbnailPreview: uiDashboard || fallbackThumbnail,
+        creatorId: s.creatorId,
+        creatorName: s.creatorFirstName && s.creatorLastName 
+          ? `${s.creatorFirstName} ${s.creatorLastName}` 
+          : s.creatorFirstName || null,
+        isPublic: s.isPublic,
+      };
+    });
   }
 
   async getPublicStyleSummaries(): Promise<StyleSummary[]> {
@@ -861,21 +874,26 @@ export class DatabaseStorage implements IStorage {
       .where(eq(styles.isPublic, true))
       .orderBy(desc(styles.createdAt));
     
-    return publicStyles.map(s => ({
-      id: s.id,
-      name: s.name,
-      description: s.description,
-      createdAt: s.createdAt,
-      metadataTags: s.metadataTags,
-      moodBoardStatus: (s.moodBoard as any)?.status || "pending",
-      uiConceptsStatus: (s.uiConcepts as any)?.status || "pending",
-      thumbnailPreview: (s.previews as any)?.landscape || (s.previews as any)?.portrait || null,
-      creatorId: s.creatorId,
-      creatorName: s.creatorFirstName && s.creatorLastName 
-        ? `${s.creatorFirstName} ${s.creatorLastName}` 
-        : s.creatorFirstName || null,
-      isPublic: s.isPublic,
-    }));
+    return publicStyles.map(s => {
+      const uiConceptsData = s.uiConcepts as UiConceptAssets | null;
+      const uiDashboard = uiConceptsData?.dashboard;
+      const fallbackThumbnail = (s.previews as any)?.landscape || (s.previews as any)?.portrait || null;
+      return {
+        id: s.id,
+        name: s.name,
+        description: s.description,
+        createdAt: s.createdAt,
+        metadataTags: s.metadataTags,
+        moodBoardStatus: (s.moodBoard as any)?.status || "pending",
+        uiConceptsStatus: uiConceptsData?.status || "pending",
+        thumbnailPreview: uiDashboard || fallbackThumbnail,
+        creatorId: s.creatorId,
+        creatorName: s.creatorFirstName && s.creatorLastName 
+          ? `${s.creatorFirstName} ${s.creatorLastName}` 
+          : s.creatorFirstName || null,
+        isPublic: s.isPublic,
+      };
+    });
   }
 
   async updateStyleVisibility(id: string, isPublic: boolean): Promise<Style | undefined> {
@@ -928,21 +946,26 @@ export class DatabaseStorage implements IStorage {
       .where(eq(bookmarks.userId, userId))
       .orderBy(desc(bookmarks.createdAt));
 
-    return bookmarkedStyles.map((s) => ({
-      id: s.id,
-      name: s.name,
-      description: s.description,
-      createdAt: s.createdAt,
-      metadataTags: s.metadataTags,
-      moodBoardStatus: (s.moodBoard as any)?.status || "pending",
-      uiConceptsStatus: (s.uiConcepts as any)?.status || "pending",
-      thumbnailPreview: (s.previews as any)?.landscape || (s.previews as any)?.portrait || null,
-      creatorId: s.creatorId,
-      creatorName: s.creatorFirstName && s.creatorLastName 
-        ? `${s.creatorFirstName} ${s.creatorLastName}` 
-        : s.creatorFirstName || null,
-      isPublic: s.isPublic,
-    }));
+    return bookmarkedStyles.map((s) => {
+      const uiConceptsData = s.uiConcepts as UiConceptAssets | null;
+      const uiDashboard = uiConceptsData?.dashboard;
+      const fallbackThumbnail = (s.previews as any)?.landscape || (s.previews as any)?.portrait || null;
+      return {
+        id: s.id,
+        name: s.name,
+        description: s.description,
+        createdAt: s.createdAt,
+        metadataTags: s.metadataTags,
+        moodBoardStatus: (s.moodBoard as any)?.status || "pending",
+        uiConceptsStatus: uiConceptsData?.status || "pending",
+        thumbnailPreview: uiDashboard || fallbackThumbnail,
+        creatorId: s.creatorId,
+        creatorName: s.creatorFirstName && s.creatorLastName 
+          ? `${s.creatorFirstName} ${s.creatorLastName}` 
+          : s.creatorFirstName || null,
+        isPublic: s.isPublic,
+      };
+    });
   }
 
   async getBookmark(userId: string, styleId: string): Promise<Bookmark | undefined> {
@@ -1075,21 +1098,26 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(users, eq(styles.creatorId, users.id))
       .where(inArray(styles.id, styleIds));
     
-    return collectionStyles.map(s => ({
-      id: s.id,
-      name: s.name,
-      description: s.description,
-      createdAt: s.createdAt,
-      metadataTags: s.metadataTags,
-      moodBoardStatus: (s.moodBoard as MoodBoardAssets)?.status || "pending",
-      uiConceptsStatus: (s.uiConcepts as UiConceptAssets)?.status || "pending",
-      thumbnailPreview: (s.previews as any)?.landscape || null,
-      creatorId: s.creatorId,
-      creatorName: s.creatorFirstName && s.creatorLastName 
-        ? `${s.creatorFirstName} ${s.creatorLastName}` 
-        : s.creatorFirstName || null,
-      isPublic: s.isPublic,
-    }));
+    return collectionStyles.map(s => {
+      const uiConceptsData = s.uiConcepts as UiConceptAssets | null;
+      const uiDashboard = uiConceptsData?.dashboard;
+      const fallbackThumbnail = (s.previews as any)?.landscape || null;
+      return {
+        id: s.id,
+        name: s.name,
+        description: s.description,
+        createdAt: s.createdAt,
+        metadataTags: s.metadataTags,
+        moodBoardStatus: (s.moodBoard as MoodBoardAssets)?.status || "pending",
+        uiConceptsStatus: uiConceptsData?.status || "pending",
+        thumbnailPreview: uiDashboard || fallbackThumbnail,
+        creatorId: s.creatorId,
+        creatorName: s.creatorFirstName && s.creatorLastName 
+          ? `${s.creatorFirstName} ${s.creatorLastName}` 
+          : s.creatorFirstName || null,
+        isPublic: s.isPublic,
+      };
+    });
   }
 
   async addStyleToCollection(collectionId: string, styleId: string): Promise<CollectionItem> {

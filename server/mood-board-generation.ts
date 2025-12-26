@@ -166,7 +166,7 @@ A 16:9 landscape interface with:
 
 ALL elements MUST use the exact hex colors from the Design Tokens above. The interface should be immediately recognizable as using this specific color palette.`,
 
-    dashboard: `Create a modern data dashboard interface for "${styleName}".
+    dashboard: `Create a modern web application user interface mockup for "${styleName}".
 
 ================================================================================
 PRIMARY DIRECTIVE: DESIGN TOKENS (HIGHEST PRIORITY)
@@ -192,15 +192,34 @@ Mood Keywords: ${moodKeywords}
 ================================================================================
 UI LAYOUT & ELEMENTS
 ================================================================================
-A 16:9 landscape dashboard with:
-- Sidebar navigation using token colors
-- 2-3 data visualization panels with charts using ONLY token palette colors
-- Metric cards with KPIs in token colors
-- Header bar styled with token typography
-- Tables and list components using token colors
-- Progress indicators using token accent colors
+Create a clean, professional web application interface in 16:9 landscape format showcasing standard UI components:
 
-ALL charts, graphs, and UI elements MUST use the exact hex colors from the Design Tokens. The dashboard should be immediately recognizable as using this specific color palette.`,
+NAVIGATION:
+- Top navigation bar with logo area and menu items using token colors
+- Clear active state highlighting with token accent colors
+
+MAIN CONTENT AREA:
+- Hero section with heading, subheading, and call-to-action button
+- Card grid showing 2-3 content cards with shadows and rounded corners
+- Each card has an image placeholder, title, description, and action button
+
+UI COMPONENTS SHOWCASE:
+- Primary and secondary buttons in token colors
+- Form inputs (text field, dropdown, toggle switch)
+- Badge/tag elements
+- Avatar/profile indicators
+- Progress or loading indicators
+
+FOOTER OR SIDEBAR:
+- Secondary navigation or additional links
+
+DESIGN REQUIREMENTS:
+- Use ample whitespace and modern spacing
+- Apply token colors consistently: primary for CTAs, secondary for backgrounds, accent for highlights
+- Ensure clear visual hierarchy with the token typography
+- All backgrounds, buttons, text, and accents MUST use the exact hex colors from Design Tokens above
+
+The interface should look like a real, polished SaaS application that immediately showcases how this style applies to everyday web components.`,
   };
 
   return conceptPrompts[conceptType];
