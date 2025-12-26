@@ -686,7 +686,7 @@ export default function Inspect() {
                       </div>
                     )}
                   </div>
-                  <div className="sm:col-span-2 h-full bg-muted rounded-lg overflow-hidden border border-border relative">
+                  <div className="sm:col-span-2 aspect-square bg-muted rounded-lg overflow-hidden border border-border relative">
                     {(summary.imageIds?.preview_still_life || previews.stillLife) ? (
                       <>
                         <img 
