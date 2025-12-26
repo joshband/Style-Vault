@@ -2,6 +2,153 @@ const MAX_DIMENSION = 2048;
 const JPEG_QUALITY = 0.80;
 const MAX_FILE_SIZE = 3 * 1024 * 1024; // 3MB target
 
+/**
+ * Image Preloading System
+ * 
+ * This module provides background image preloading to improve user experience
+ * when browsing the style gallery or using comparison features. Images are
+ * preloaded in the background using requestIdleCallback to avoid interfering
+ * with critical operations.
+ * 
+ * Features:
+ * - Queue-based preloading with concurrency limits
+ * - requestIdleCallback scheduling for non-blocking operation
+ * - Automatic cache checking (browser handles via src assignment)
+ * - IntersectionObserver-based viewport detection for galleries
+ * - Hover-based preloading for comparison views
+ */
+
+const PRELOAD_CONCURRENCY = 3;
+const PRELOAD_DELAY_MS = 100;
+
+type PreloadStatus = 'pending' | 'loading' | 'loaded' | 'error';
+
+interface PreloadEntry {
+  url: string;
+  status: PreloadStatus;
+  priority: number;
+}
+
+class ImagePreloader {
+  private queue: PreloadEntry[] = [];
+  private activeLoads = 0;
+  private loadedUrls = new Set<string>();
+  private processingScheduled = false;
+
+  preload(url: string, priority: number = 0): Promise<void> {
+    if (!url || this.loadedUrls.has(url)) {
+      return Promise.resolve();
+    }
+
+    const existingEntry = this.queue.find(e => e.url === url);
+    if (existingEntry) {
+      existingEntry.priority = Math.max(existingEntry.priority, priority);
+      return Promise.resolve();
+    }
+
+    return new Promise((resolve) => {
+      this.queue.push({ url, status: 'pending', priority });
+      this.queue.sort((a, b) => b.priority - a.priority);
+      this.scheduleProcessing();
+      resolve();
+    });
+  }
+
+  preloadMultiple(urls: string[], priority: number = 0): void {
+    urls.forEach(url => this.preload(url, priority));
+  }
+
+  isLoaded(url: string): boolean {
+    return this.loadedUrls.has(url);
+  }
+
+  private scheduleProcessing(): void {
+    if (this.processingScheduled) return;
+    this.processingScheduled = true;
+
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(() => {
+        setTimeout(() => this.processQueue(), PRELOAD_DELAY_MS);
+      }, { timeout: 2000 });
+    } else {
+      setTimeout(() => this.processQueue(), PRELOAD_DELAY_MS);
+    }
+  }
+
+  private processQueue(): void {
+    this.processingScheduled = false;
+
+    while (this.activeLoads < PRELOAD_CONCURRENCY && this.queue.length > 0) {
+      const entry = this.queue.find(e => e.status === 'pending');
+      if (!entry) break;
+
+      entry.status = 'loading';
+      this.activeLoads++;
+
+      const img = new Image();
+      img.onload = () => {
+        entry.status = 'loaded';
+        this.loadedUrls.add(entry.url);
+        this.activeLoads--;
+        this.removeFromQueue(entry.url);
+        this.scheduleProcessing();
+      };
+      img.onerror = () => {
+        entry.status = 'error';
+        this.activeLoads--;
+        this.removeFromQueue(entry.url);
+        this.scheduleProcessing();
+      };
+      img.src = entry.url;
+    }
+  }
+
+  private removeFromQueue(url: string): void {
+    const index = this.queue.findIndex(e => e.url === url);
+    if (index !== -1) {
+      this.queue.splice(index, 1);
+    }
+  }
+
+  clear(): void {
+    this.queue = [];
+  }
+}
+
+export const imagePreloader = new ImagePreloader();
+
+export function preloadImage(url: string, priority: number = 0): Promise<void> {
+  return imagePreloader.preload(url, priority);
+}
+
+export function preloadImages(urls: string[], priority: number = 0): void {
+  imagePreloader.preloadMultiple(urls, priority);
+}
+
+export function isImagePreloaded(url: string): boolean {
+  return imagePreloader.isLoaded(url);
+}
+
+export function createPreloadObserver(
+  onIntersect: (entry: IntersectionObserverEntry) => void,
+  options?: IntersectionObserverInit
+): IntersectionObserver {
+  return new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          onIntersect(entry);
+        }
+      });
+    },
+    {
+      rootMargin: '200px',
+      threshold: 0.1,
+      ...options,
+    }
+  );
+}
+
 export async function compressImage(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();

@@ -1,10 +1,11 @@
 import { cn } from "@/lib/utils";
 import { Trash2, AlertCircle, Palette } from "lucide-react";
 import { Link, useLocation } from "wouter";
-import { memo, useState, useCallback, useRef } from "react";
+import { memo, useState, useCallback, useRef, useEffect } from "react";
 import { trackStyleView } from "@/lib/suggestions";
 import { motion, AnimatePresence } from "framer-motion";
 import { queryClient } from "@/lib/queryClient";
+import { preloadImage } from "@/lib/image-utils";
 
 interface StyleSummary {
   id: string;
@@ -33,7 +34,38 @@ const StyleCardComponent = memo(function StyleCard({ style, className, onDelete 
   const [dragX, setDragX] = useState(0);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const hasTrackedView = useRef(false);
+  const hasPreloaded = useRef(false);
+  const cardRef = useRef<HTMLDivElement>(null);
   const [, navigate] = useLocation();
+
+  useEffect(() => {
+    const card = cardRef.current;
+    if (!card || hasPreloaded.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && !hasPreloaded.current) {
+            hasPreloaded.current = true;
+            const fullImageUrl = style.imageIds?.preview_landscape 
+              ? `/api/images/${style.imageIds.preview_landscape}`
+              : style.imageIds?.reference
+              ? `/api/images/${style.imageIds.reference}`
+              : null;
+            
+            if (fullImageUrl) {
+              preloadImage(fullImageUrl, 1);
+            }
+            observer.disconnect();
+          }
+        });
+      },
+      { rootMargin: '300px', threshold: 0.1 }
+    );
+
+    observer.observe(card);
+    return () => observer.disconnect();
+  }, [style.imageIds]);
 
   const handlePrefetch = useCallback(() => {
     if (!hasTrackedView.current) {
@@ -84,6 +116,7 @@ const StyleCardComponent = memo(function StyleCard({ style, className, onDelete 
   return (
     <>
       <motion.div
+        ref={cardRef}
         drag="x"
         dragElastic={0.2}
         dragConstraints={{ left: -120, right: 0 }}

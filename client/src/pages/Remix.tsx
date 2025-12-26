@@ -5,6 +5,7 @@ import { Link, useLocation } from "wouter";
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
+import { preloadImage } from "@/lib/image-utils";
 
 interface StyleSummary {
   id: string;
@@ -79,6 +80,12 @@ export default function Remix() {
       newWeights[index] = value;
       return newWeights;
     });
+  }, []);
+
+  const handleStyleHover = useCallback((style: StyleSummary) => {
+    if (style.thumbnailPreview) {
+      preloadImage(style.thumbnailPreview, 2);
+    }
   }, []);
 
   const handleRemix = async () => {
@@ -325,6 +332,7 @@ export default function Remix() {
                   <button
                     key={style.id}
                     onClick={() => toggleStyle(style)}
+                    onMouseEnter={() => handleStyleHover(style)}
                     disabled={!isSelected && selectedStyles.length >= 4}
                     className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
                       isSelected
