@@ -680,16 +680,16 @@ module.exports = ${JSON.stringify(config, null, 2)}`;
           {(summary.imageIds?.reference || (summary.referenceImages && summary.referenceImages.length > 0)) && (
             <div className="space-y-2">
               <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Source Reference
+                Source Image
               </h3>
-              <div className="max-w-md">
+              <div className="w-full">
                 <div className="rounded-lg overflow-hidden border border-border bg-muted/30">
                   <img 
                     src={summary.imageIds?.reference 
                       ? `/api/images/${summary.imageIds.reference}?size=medium`
                       : summary.referenceImages[0]
                     } 
-                    alt="Source reference" 
+                    alt="Source image" 
                     className="w-full h-auto object-contain"
                     loading="lazy"
                     data-testid="img-reference-main"
