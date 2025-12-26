@@ -1,4 +1,4 @@
-export type ExportFormat = 'json' | 'css' | 'scss' | 'react' | 'tailwind' | 'flutter';
+export type ExportFormat = 'json' | 'css' | 'scss' | 'react' | 'tailwind' | 'flutter' | 'figma' | 'adobe-xd';
 
 export interface ExportOption {
   format: ExportFormat;
@@ -14,6 +14,8 @@ export const EXPORT_OPTIONS: ExportOption[] = [
   { format: 'react', label: 'React/TypeScript', extension: 'ts', mimeType: 'text/typescript' },
   { format: 'tailwind', label: 'Tailwind Config', extension: 'js', mimeType: 'text/javascript' },
   { format: 'flutter', label: 'Flutter/Dart', extension: 'dart', mimeType: 'text/x-dart' },
+  { format: 'figma', label: 'Figma Variables', extension: 'json', mimeType: 'application/json' },
+  { format: 'adobe-xd', label: 'Adobe XD', extension: 'json', mimeType: 'application/json' },
 ];
 
 function getTokenValue(token: any): any {
@@ -334,6 +336,234 @@ function extractTypographyTokens(tokens: Record<string, any>): { fontFamily: Rec
   return result;
 }
 
+export function exportToFigma(tokens: Record<string, any>, styleName: string): string {
+  const variables: any[] = [];
+  const collections: any[] = [];
+  
+  const collectionId = `collection_${Date.now()}`;
+  const modeId = `mode_${Date.now()}`;
+  
+  collections.push({
+    id: collectionId,
+    name: styleName,
+    modes: [{ modeId, name: 'Default' }],
+    defaultModeId: modeId,
+    remote: false,
+    hiddenFromPublishing: false,
+  });
+  
+  const addVariable = (path: string[], value: any, type: string) => {
+    const variableId = `var_${path.join('_')}_${Date.now()}`;
+    const name = path.join('/');
+    
+    let resolvedType = 'STRING';
+    let resolvedValue = value;
+    
+    if (type === 'color' || (typeof value === 'string' && /^#|^rgb|^oklch/.test(value))) {
+      resolvedType = 'COLOR';
+      resolvedValue = hexToFigmaColor(value);
+    } else if (type === 'dimension' || type === 'spacing' || type === 'borderRadius') {
+      resolvedType = 'FLOAT';
+      resolvedValue = parseFloat(String(value).replace(/[^\d.-]/g, '')) || 0;
+    } else if (typeof value === 'number') {
+      resolvedType = 'FLOAT';
+      resolvedValue = value;
+    } else if (typeof value === 'boolean') {
+      resolvedType = 'BOOLEAN';
+      resolvedValue = value;
+    } else {
+      resolvedType = 'STRING';
+      resolvedValue = String(value);
+    }
+    
+    variables.push({
+      id: variableId,
+      name,
+      resolvedType,
+      valuesByMode: {
+        [modeId]: resolvedValue,
+      },
+      remote: false,
+      description: '',
+      hiddenFromPublishing: false,
+      scopes: ['ALL_SCOPES'],
+      codeSyntax: {},
+    });
+  };
+  
+  const traverse = (obj: any, path: string[] = []) => {
+    for (const [key, value] of Object.entries(obj)) {
+      const currentPath = [...path, key];
+      
+      if (value && typeof value === 'object') {
+        if ('$value' in value) {
+          const tokenObj = value as { $value: any; $type?: string };
+          addVariable(currentPath, tokenObj.$value, tokenObj.$type || '');
+        } else {
+          traverse(value, currentPath);
+        }
+      } else {
+        addVariable(currentPath, value, '');
+      }
+    }
+  };
+  
+  traverse(tokens);
+  
+  const figmaExport = {
+    version: '1.0',
+    meta: {
+      name: styleName,
+      generator: 'Visual DNA',
+      exportedAt: new Date().toISOString(),
+    },
+    variableCollections: collections,
+    variables,
+  };
+  
+  return JSON.stringify(figmaExport, null, 2);
+}
+
+function hexToFigmaColor(color: string): { r: number; g: number; b: number; a: number } {
+  let r = 0, g = 0, b = 0, a = 1;
+  
+  if (color.startsWith('#')) {
+    const hex = color.slice(1);
+    if (hex.length === 3) {
+      r = parseInt(hex[0] + hex[0], 16) / 255;
+      g = parseInt(hex[1] + hex[1], 16) / 255;
+      b = parseInt(hex[2] + hex[2], 16) / 255;
+    } else if (hex.length === 6) {
+      r = parseInt(hex.slice(0, 2), 16) / 255;
+      g = parseInt(hex.slice(2, 4), 16) / 255;
+      b = parseInt(hex.slice(4, 6), 16) / 255;
+    } else if (hex.length === 8) {
+      r = parseInt(hex.slice(0, 2), 16) / 255;
+      g = parseInt(hex.slice(2, 4), 16) / 255;
+      b = parseInt(hex.slice(4, 6), 16) / 255;
+      a = parseInt(hex.slice(6, 8), 16) / 255;
+    }
+  } else if (color.startsWith('rgb')) {
+    const match = color.match(/[\d.]+/g);
+    if (match) {
+      r = parseFloat(match[0]) / 255;
+      g = parseFloat(match[1]) / 255;
+      b = parseFloat(match[2]) / 255;
+      if (match[3]) a = parseFloat(match[3]);
+    }
+  }
+  
+  return { r, g, b, a };
+}
+
+export function exportToAdobeXD(tokens: Record<string, any>, styleName: string): string {
+  const assets: any = {
+    version: 1,
+    meta: {
+      name: styleName,
+      generator: 'Visual DNA',
+      exportedAt: new Date().toISOString(),
+    },
+    colors: [],
+    characterStyles: [],
+    components: [],
+  };
+  
+  const colorTokens = tokens.color || {};
+  const typographyTokens = tokens.typography || {};
+  
+  const extractColors = (obj: any, prefix = '') => {
+    for (const [key, value] of Object.entries(obj)) {
+      const name = prefix ? `${prefix}/${key}` : key;
+      
+      if (value && typeof value === 'object') {
+        if ('$value' in value && typeof value.$value === 'string') {
+          const colorValue = value.$value;
+          const rgba = parseColorToRGBA(colorValue);
+          if (rgba) {
+            assets.colors.push({
+              name,
+              value: {
+                mode: 'RGB',
+                value: rgba,
+                alpha: rgba.a,
+              },
+            });
+          }
+        } else {
+          extractColors(value, name);
+        }
+      }
+    }
+  };
+  
+  const extractTypography = (obj: any, prefix = '') => {
+    for (const [key, value] of Object.entries(obj)) {
+      const name = prefix ? `${prefix}/${key}` : key;
+      
+      if (value && typeof value === 'object') {
+        if ('$value' in value) {
+          const tokenObj = value as { $value: any; $type?: string };
+          const type = tokenObj.$type;
+          const val = tokenObj.$value;
+          
+          if (type === 'fontFamily' || key.toLowerCase().includes('family')) {
+            assets.characterStyles.push({
+              name,
+              style: {
+                fontFamily: String(val),
+              },
+            });
+          }
+        } else {
+          extractTypography(value, name);
+        }
+      }
+    }
+  };
+  
+  extractColors(colorTokens);
+  extractTypography(typographyTokens);
+  
+  return JSON.stringify(assets, null, 2);
+}
+
+function parseColorToRGBA(color: string): { r: number; g: number; b: number; a: number } | null {
+  if (color.startsWith('#')) {
+    const hex = color.slice(1);
+    let r = 0, g = 0, b = 0, a = 255;
+    
+    if (hex.length === 3) {
+      r = parseInt(hex[0] + hex[0], 16);
+      g = parseInt(hex[1] + hex[1], 16);
+      b = parseInt(hex[2] + hex[2], 16);
+    } else if (hex.length === 6) {
+      r = parseInt(hex.slice(0, 2), 16);
+      g = parseInt(hex.slice(2, 4), 16);
+      b = parseInt(hex.slice(4, 6), 16);
+    } else if (hex.length === 8) {
+      r = parseInt(hex.slice(0, 2), 16);
+      g = parseInt(hex.slice(2, 4), 16);
+      b = parseInt(hex.slice(4, 6), 16);
+      a = parseInt(hex.slice(6, 8), 16);
+    }
+    
+    return { r, g, b, a: a / 255 };
+  } else if (color.startsWith('rgb')) {
+    const match = color.match(/[\d.]+/g);
+    if (match) {
+      return {
+        r: parseInt(match[0]),
+        g: parseInt(match[1]),
+        b: parseInt(match[2]),
+        a: match[3] ? parseFloat(match[3]) : 1,
+      };
+    }
+  }
+  
+  return null;
+}
+
 export function exportToFlutter(tokens: Record<string, any>, styleName: string): string {
   const className = toPascalCase(sanitizeJsName(styleName)) || 'AppTheme';
   const colors = extractColorTokens(tokens);
@@ -425,6 +655,10 @@ export function exportTokens(tokens: Record<string, any>, styleName: string, for
       return exportToTailwind(tokens, styleName);
     case 'flutter':
       return exportToFlutter(tokens, styleName);
+    case 'figma':
+      return exportToFigma(tokens, styleName);
+    case 'adobe-xd':
+      return exportToAdobeXD(tokens, styleName);
     default:
       return exportToJSON(tokens, styleName);
   }

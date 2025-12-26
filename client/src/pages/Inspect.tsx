@@ -744,6 +744,130 @@ export default ${safeName};`;
     return lines.join('\n');
   };
 
+  const convertTokensToFigma = (tokens: any, styleName: string): string => {
+    const variables: any[] = [];
+    const safeStyleName = styleName.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    const collectionId = `collection_${safeStyleName}`;
+    const modeId = `mode_${safeStyleName}_default`;
+    
+    const hexToFigmaColor = (color: string): { r: number; g: number; b: number; a: number } => {
+      let r = 0, g = 0, b = 0, a = 1;
+      if (color.startsWith('#')) {
+        const hex = color.slice(1);
+        if (hex.length === 3) {
+          r = parseInt(hex[0] + hex[0], 16) / 255;
+          g = parseInt(hex[1] + hex[1], 16) / 255;
+          b = parseInt(hex[2] + hex[2], 16) / 255;
+        } else if (hex.length >= 6) {
+          r = parseInt(hex.slice(0, 2), 16) / 255;
+          g = parseInt(hex.slice(2, 4), 16) / 255;
+          b = parseInt(hex.slice(4, 6), 16) / 255;
+          if (hex.length === 8) a = parseInt(hex.slice(6, 8), 16) / 255;
+        }
+      }
+      return { r, g, b, a };
+    };
+    
+    const addVariable = (path: string[], value: any, type: string) => {
+      const name = path.join('/');
+      const varId = `var_${path.join('_').replace(/[^a-z0-9_]/gi, '_')}`;
+      let resolvedType = 'STRING';
+      let resolvedValue: any = value;
+      
+      if (type === 'color' || (typeof value === 'string' && /^#|^rgb/.test(value))) {
+        resolvedType = 'COLOR';
+        resolvedValue = hexToFigmaColor(String(value));
+      } else if (type === 'dimension' || type === 'spacing' || type === 'borderRadius') {
+        resolvedType = 'FLOAT';
+        resolvedValue = parseFloat(String(value).replace(/[^\d.-]/g, '')) || 0;
+      } else if (typeof value === 'number') {
+        resolvedType = 'FLOAT';
+        resolvedValue = value;
+      } else if (typeof value === 'boolean') {
+        resolvedType = 'BOOLEAN';
+        resolvedValue = value;
+      } else {
+        resolvedType = 'STRING';
+        resolvedValue = String(value);
+      }
+      
+      variables.push({ id: varId, name, resolvedType, valuesByMode: { [modeId]: resolvedValue } });
+    };
+    
+    const traverse = (obj: any, path: string[] = []) => {
+      for (const [key, value] of Object.entries(obj)) {
+        if (value && typeof value === 'object') {
+          if ('$value' in value) {
+            addVariable([...path, key], (value as any).$value, (value as any).$type || '');
+          } else {
+            traverse(value, [...path, key]);
+          }
+        }
+      }
+    };
+    traverse(tokens);
+    
+    return JSON.stringify({
+      version: '1.0',
+      meta: { name: styleName, generator: 'Visual DNA' },
+      variableCollections: [{ id: collectionId, name: styleName, modes: [{ modeId, name: 'Default' }], defaultModeId: modeId }],
+      variables,
+    }, null, 2);
+  };
+
+  const convertTokensToAdobeXD = (tokens: any, styleName: string): string => {
+    const assets: any = { version: 1, meta: { name: styleName, generator: 'Visual DNA' }, colors: [], characterStyles: [] };
+    
+    const parseColorToRGBA = (color: string) => {
+      if (!color.startsWith('#')) return null;
+      const hex = color.slice(1);
+      let r = 0, g = 0, b = 0, a = 255;
+      if (hex.length === 6) { r = parseInt(hex.slice(0,2),16); g = parseInt(hex.slice(2,4),16); b = parseInt(hex.slice(4,6),16); }
+      else if (hex.length === 8) { r = parseInt(hex.slice(0,2),16); g = parseInt(hex.slice(2,4),16); b = parseInt(hex.slice(4,6),16); a = parseInt(hex.slice(6,8),16); }
+      return { r, g, b, a: a/255 };
+    };
+    
+    const extractColors = (obj: any, prefix = '') => {
+      for (const [key, value] of Object.entries(obj)) {
+        const name = prefix ? `${prefix}/${key}` : key;
+        if (value && typeof value === 'object') {
+          if ('$value' in value && typeof (value as any).$value === 'string') {
+            const rgba = parseColorToRGBA((value as any).$value);
+            if (rgba) assets.colors.push({ name, value: { mode: 'RGB', value: rgba, alpha: rgba.a } });
+          } else { extractColors(value, name); }
+        }
+      }
+    };
+    if (tokens.color) extractColors(tokens.color);
+    
+    const extractTypography = (obj: any, prefix = '') => {
+      for (const [key, value] of Object.entries(obj)) {
+        const name = prefix ? `${prefix}/${key}` : key;
+        if (value && typeof value === 'object') {
+          if ('$value' in value) {
+            const tokenObj = value as { $value: any; $type?: string };
+            const type = tokenObj.$type || '';
+            const val = tokenObj.$value;
+            
+            if (type === 'fontFamily' || key.toLowerCase().includes('family')) {
+              assets.characterStyles.push({ name, style: { fontFamily: String(val) } });
+            } else if (type === 'fontSize' || key.toLowerCase().includes('size')) {
+              const sizeVal = parseFloat(String(val).replace(/[^\d.]/g, '')) || 16;
+              assets.characterStyles.push({ name, style: { fontSize: sizeVal } });
+            } else if (type === 'fontWeight' || key.toLowerCase().includes('weight')) {
+              assets.characterStyles.push({ name, style: { fontWeight: val } });
+            }
+          } else {
+            extractTypography(value, name);
+          }
+        }
+      }
+    };
+    if (tokens.typography) extractTypography(tokens.typography);
+    
+    return JSON.stringify(assets, null, 2);
+  };
+
   const downloadFile = (content: string, filename: string, mimeType: string) => {
     const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
@@ -756,7 +880,7 @@ export default ${safeName};`;
     URL.revokeObjectURL(url);
   };
 
-  const handleExport = (format: 'json' | 'css' | 'scss' | 'tailwind' | 'react' | 'flutter') => {
+  const handleExport = (format: 'json' | 'css' | 'scss' | 'tailwind' | 'react' | 'flutter' | 'figma' | 'adobe-xd') => {
     if (!summary) return;
     const baseName = summary.name.toLowerCase().replace(/\s+/g, "-");
     
@@ -778,6 +902,12 @@ export default ${safeName};`;
         break;
       case 'flutter':
         downloadFile(convertTokensToFlutter(summary.tokens, summary.name), `${baseName}_theme.dart`, 'text/x-dart');
+        break;
+      case 'figma':
+        downloadFile(convertTokensToFigma(summary.tokens, summary.name), `${baseName}-figma-variables.json`, 'application/json');
+        break;
+      case 'adobe-xd':
+        downloadFile(convertTokensToAdobeXD(summary.tokens, summary.name), `${baseName}-adobe-xd.json`, 'application/json');
         break;
     }
   };
@@ -1114,6 +1244,15 @@ export default ${safeName};`;
               <DropdownMenuItem onClick={() => handleExport('tailwind')} className="cursor-pointer">
                 <Paintbrush size={16} className="mr-2 text-cyan-500" />
                 <span>Tailwind Config</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => handleExport('figma')} className="cursor-pointer">
+                <FileJson size={16} className="mr-2 text-purple-500" />
+                <span>Figma Variables</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExport('adobe-xd')} className="cursor-pointer">
+                <FileJson size={16} className="mr-2 text-pink-500" />
+                <span>Adobe XD</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
