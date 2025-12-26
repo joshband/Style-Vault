@@ -57,12 +57,12 @@ Preferred communication style: Simple, everyday language.
 - **Architecture**: Modular pipeline with normalization → alias resolution → transformation stages.
 - **Core File**: `client/src/lib/token-pipeline.ts` - Pipeline types, normalization, alias resolution, shared utilities.
 - **Exporter Registry**: Plugin-style registration pattern in `client/src/lib/exporters/`.
-- **Exporters** (13 formats):
-  - **Code**: W3C DTCG JSON (.tokens.json), CSS Variables, SCSS Variables, React/TypeScript, Tailwind Config
-  - **Mobile**: Flutter/Dart, React Native, Swift/iOS (SwiftUI + UIKit)
-  - **Design Tools**: Figma Variables JSON
+- **Exporters** (18 formats):
+  - **Code**: W3C DTCG JSON (.tokens.json), CSS Variables, SCSS Variables, React/TypeScript, Tailwind Config, Next.js Theme
+  - **Mobile**: Flutter/Dart, React Native, Swift/iOS (SwiftUI + UIKit), Android XML (colors.xml/dimens.xml)
+  - **Design Tools**: Figma Variables JSON, Adobe ASE Swatches (binary), Sketch Palette
   - **Frameworks**: Material UI theme, Web Components
-  - **Game/Audio**: Unity C# ScriptableObject, JUCE C++ header
+  - **Game/Audio**: Unity C# ScriptableObject, JUCE C++ header, Unreal Engine DataAsset
 - **Features**: Alias resolution ({} syntax), type inference, color format conversion, dimension parsing.
 - **UI**: Multi-target export dialog with category grouping, sub-options per format, toast notifications.
 
