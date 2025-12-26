@@ -66,6 +66,11 @@ Preferred communication style: Simple, everyday language.
 - **Features**: Alias resolution ({} syntax), type inference, color format conversion, dimension parsing.
 - **UI**: Multi-target export dialog with category grouping, sub-options per format, toast notifications.
 
+### One-Click Deploy
+- **Platforms**: Vercel and Netlify support via DeployDialog component.
+- **Bundle Contents**: Single ZIP archive containing tokens.css, tokens.json, theme.ts, platform config (vercel.json or netlify.toml), package.json, and README.md.
+- **Features**: Platform-specific configuration generation, copy-to-clipboard commands, quick start instructions, and single-file download.
+
 ### Async Job Orchestration
 - **Engine**: `server/job-runner.ts` manages all long-running operations.
 - **Features**: Persistent job tracking, configurable timeouts, max retries, exponential backoff, and polling.

@@ -11,6 +11,7 @@ import { Link } from "wouter";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { AiMoodBoard } from "@/components/ai-mood-board";
 import { ExportDialog } from "@/components/export-dialog";
+import { DeployDialog } from "@/components/deploy-dialog";
 import { useAuth } from "@/hooks/use-auth";
 
 interface StyleSummary {
@@ -1233,6 +1234,24 @@ export default ${safeName};`;
                 <Download size={16} />
                 Export
                 <ChevronDown size={14} />
+              </button>
+            }
+          />
+          
+          {/* Deploy */}
+          <DeployDialog 
+            tokens={summary.tokens} 
+            styleName={summary.name}
+            trigger={
+              <button 
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 border border-border bg-muted/50 hover:bg-muted rounded-lg text-sm font-medium transition-colors"
+                data-testid="button-deploy-primary"
+              >
+                <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M8 2L14 8L8 14" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M2 8H13" strokeLinecap="round" />
+                </svg>
+                Deploy
               </button>
             }
           />
