@@ -811,25 +811,20 @@ export default ${safeName};`;
 
   const previews = assets?.previews || {};
 
-  // Extract vibe tags from metadata for Quick Read
-  const vibeTags = summary?.metadataTags?.objective?.visualMood || 
-                   summary?.metadataTags?.subjective?.emotionalImpact || 
-                   [];
-  
-  // Extract primary colors for Quick Read (first 6)
+  // Extract primary colors for Quick Read (first 6) - visual only
   const getPrimaryColors = () => {
     if (!summary?.tokens?.color) return [];
-    const colors: { name: string; value: string }[] = [];
+    const colors: string[] = [];
     const colorTokens = summary.tokens.color;
     
-    const extractColors = (obj: any, prefix = '') => {
+    const extractColors = (obj: any) => {
       for (const key in obj) {
         if (colors.length >= 6) break;
         const val = obj[key];
         if (val?.$value && typeof val.$value === 'string') {
-          colors.push({ name: prefix + key, value: val.$value });
+          colors.push(val.$value);
         } else if (typeof val === 'object' && !val.$value) {
-          extractColors(val, prefix + key + '.');
+          extractColors(val);
         }
       }
     };
@@ -838,6 +833,89 @@ export default ${safeName};`;
   };
   
   const primaryColors = getPrimaryColors();
+  
+  // Derive human-readable traits from tokens
+  const getHumanTraits = () => {
+    const traits: { contrast: string; density: string; vibe: string } = {
+      contrast: 'Medium',
+      density: 'Balanced',
+      vibe: ''
+    };
+    
+    // Derive Contrast from color luminance range
+    if (primaryColors.length >= 2) {
+      const getLuminance = (color: string): number => {
+        // Simple luminance estimation from hex/rgb
+        let r = 0, g = 0, b = 0;
+        if (color.startsWith('#')) {
+          const hex = color.slice(1);
+          r = parseInt(hex.slice(0, 2), 16) / 255;
+          g = parseInt(hex.slice(2, 4), 16) / 255;
+          b = parseInt(hex.slice(4, 6), 16) / 255;
+        } else if (color.startsWith('rgb')) {
+          const match = color.match(/\d+/g);
+          if (match) {
+            r = parseInt(match[0]) / 255;
+            g = parseInt(match[1]) / 255;
+            b = parseInt(match[2]) / 255;
+          }
+        } else if (color.startsWith('oklch')) {
+          // Extract lightness from oklch
+          const match = color.match(/oklch\(\s*([\d.]+)/);
+          if (match) return parseFloat(match[1]);
+        }
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      };
+      
+      const luminances = primaryColors.map(getLuminance);
+      const range = Math.max(...luminances) - Math.min(...luminances);
+      
+      if (range < 0.3) traits.contrast = 'Low';
+      else if (range > 0.6) traits.contrast = 'High';
+      else traits.contrast = 'Medium';
+    }
+    
+    // Derive Density from spacing tokens
+    if (summary?.tokens?.spacing) {
+      const spacingTokens = summary.tokens.spacing;
+      const spacingValues: number[] = [];
+      
+      const extractSpacing = (obj: any) => {
+        for (const key in obj) {
+          const val = obj[key];
+          if (val?.$value) {
+            const numMatch = String(val.$value).match(/[\d.]+/);
+            if (numMatch) spacingValues.push(parseFloat(numMatch[0]));
+          } else if (typeof val === 'object') {
+            extractSpacing(val);
+          }
+        }
+      };
+      extractSpacing(spacingTokens);
+      
+      if (spacingValues.length > 0) {
+        const avgSpacing = spacingValues.reduce((a, b) => a + b, 0) / spacingValues.length;
+        if (avgSpacing < 8) traits.density = 'Tight';
+        else if (avgSpacing > 20) traits.density = 'Airy';
+        else traits.density = 'Balanced';
+      }
+    }
+    
+    // Derive Vibe from metadata
+    const vibeTags = summary?.metadataTags?.subjective?.emotionalImpact || 
+                     summary?.metadataTags?.objective?.visualMood || 
+                     [];
+    if (vibeTags.length > 0) {
+      traits.vibe = vibeTags[0];
+    } else if (summary?.description) {
+      // Fallback: use first few words of description
+      traits.vibe = summary.description.split(/[,.]/).at(0)?.trim() || '';
+    }
+    
+    return traits;
+  };
+  
+  const humanTraits = getHumanTraits();
 
   return (
     <Layout>
@@ -965,35 +1043,33 @@ export default ${safeName};`;
         </section>
 
         {/* === SECTION 3: QUICK READ === */}
-        <section className="space-y-3">
-          {/* Color Palette */}
+        <section className="space-y-4">
+          {/* Palette Strip - Visual only */}
           {primaryColors.length > 0 && (
-            <div className="flex items-center gap-2 overflow-x-auto py-1">
+            <div className="flex items-center gap-1.5">
               {primaryColors.map((color, i) => (
-                <button
+                <div
                   key={i}
-                  onClick={() => {
-                    navigator.clipboard.writeText(color.value);
-                  }}
-                  className="flex-shrink-0 w-10 h-10 rounded-lg border border-border shadow-sm hover:scale-105 transition-transform"
-                  style={{ backgroundColor: color.value }}
-                  title={`${color.name}: ${color.value}`}
+                  className="flex-shrink-0 w-10 h-10 rounded-lg shadow-sm"
+                  style={{ backgroundColor: color }}
                   data-testid={`color-swatch-${i}`}
                 />
               ))}
             </div>
           )}
           
-          {/* Vibe Tags */}
-          {vibeTags.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {vibeTags.slice(0, 5).map((tag: string, i: number) => (
-                <span key={i} className="px-2 py-1 bg-muted text-xs rounded-full text-muted-foreground">
-                  {tag}
-                </span>
-              ))}
-            </div>
-          )}
+          {/* Human Traits - No technical language, no numbers */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
+            <span><span className="text-foreground font-medium">Contrast</span> {humanTraits.contrast}</span>
+            <span className="text-border">•</span>
+            <span><span className="text-foreground font-medium">Density</span> {humanTraits.density}</span>
+            {humanTraits.vibe && (
+              <>
+                <span className="text-border">•</span>
+                <span><span className="text-foreground font-medium">Vibe</span> {humanTraits.vibe}</span>
+              </>
+            )}
+          </div>
         </section>
 
         {/* === SECTION 4: PRIMARY ACTIONS CTA === */}
