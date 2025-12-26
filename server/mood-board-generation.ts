@@ -235,62 +235,65 @@ Buttons should show only icons or colored shapes, not text labels.
 
 The interface should look like a real, polished SaaS application wireframe that immediately showcases how this style applies to everyday web components.`,
 
-    softwareApp: `Create a beautiful software application interface mockup for "${styleName}" - this will be used as the primary thumbnail/preview for this visual style.
+    softwareApp: `Create a PHOTOREALISTIC, high-fidelity software application interface mockup for "${styleName}" - this will be the primary thumbnail/preview for this visual style.
+
+================================================================================
+RENDER STYLE: PHOTOREALISTIC 3D UI MOCKUP
+================================================================================
+This must look like a REAL SOFTWARE APPLICATION screenshot, not vector art or flat illustration.
+
+RENDERING REQUIREMENTS:
+- Photorealistic materials: glass panels, brushed metal, glossy buttons, matte surfaces
+- Realistic lighting with soft shadows, ambient occlusion, and subtle reflections
+- Depth and dimensionality through proper perspective and layering
+- High-fidelity details: subtle gradients, realistic button bevels, proper drop shadows
+- Professional Dribbble/Behance quality presentation
 
 ================================================================================
 PRIMARY DIRECTIVE: DESIGN TOKENS (HIGHEST PRIORITY)
 ================================================================================
-The following Design Tokens were extracted from the source image. These are the AUTHORITATIVE visual specifications:
-
 MANDATORY COLOR PALETTE - Use ONLY these exact hex values:
 ${summary.colors.map((c) => `  ${c.name}: ${c.hex} (EXACT - no substitution)`).join("\n")}
 
 TOKEN-DEFINED PROPERTIES:
-- Typography: serif="${summary.typography.serif}", sans="${summary.typography.sans}", mono="${summary.typography.mono}"
 - Surface Texture: grain="${summary.texture.grain}", finish="${summary.texture.finish}"
 - Lighting: type="${summary.lighting.type}", direction="${summary.lighting.direction}", intensity="${summary.lighting.intensity}"
 - Mood: tone="${summary.mood.tone}", saturation=${summary.mood.saturation}, contrast=${summary.mood.contrast}
 
 ================================================================================
-SECONDARY: SEMANTIC CONTEXT (Use to Inform Composition)
+SECONDARY: SEMANTIC CONTEXT
 ================================================================================
 Style Description: ${styleDescription}
 Visual Era: ${eraKeywords}
 Mood Keywords: ${moodKeywords}
 
 ================================================================================
-UI LAYOUT & ELEMENTS (16:9 Landscape Format for Thumbnail)
+UI LAYOUT & ELEMENTS (16:9 Landscape Format)
 ================================================================================
-Create a visually striking, LANDSCAPE (16:9 aspect ratio) software interface that immediately conveys this style's unique aesthetic. This is the PRIMARY PREVIEW IMAGE for browsing styles.
+Create a DETAILED, COMPLEX software interface with multiple UI layers and components.
 
-COMPOSITION REQUIREMENTS:
-- Single unified interface view (not a collage)
-- Clean, modern software application feel
-- Prominent use of the token color palette
-- Clear visual hierarchy that reads well at small sizes
+REQUIRED COMPLEXITY:
+- Multi-panel layout with sidebar, header, and main content area
+- Nested cards and widgets with visible depth
+- Rich data visualizations: charts, graphs, progress indicators, gauges
+- Interactive controls: sliders, toggles, dropdown indicators, icon buttons
+- Status indicators, notification badges, avatar placeholders
+- Layered panels with frosted glass or translucent effects where appropriate
 
-SUGGESTED ELEMENTS (choose what fits the style mood):
-- A header/title bar with navigation or menu elements
-- Central content area with cards, panels, or widgets
-- Interactive elements: buttons, toggles, or icons
-- Data visualization elements if appropriate (charts, graphs, meters)
-- Subtle depth through shadows or layering
-
-VISUAL PRIORITIES:
-- The color palette should be immediately recognizable
-- Strong contrast for thumbnail legibility
-- Professional, polished application appearance
-- Evocative of the style's mood: ${moodKeywords}
+VISUAL FIDELITY:
+- Realistic button states with proper highlights and shadows
+- Glass morphism or neumorphism effects matching the style mood
+- Proper UI spacing and grid alignment
+- Rich visual texture and material definition
 
 ================================================================================
 CRITICAL: NO TEXT OR LABELS
 ================================================================================
-DO NOT include any text, words, labels, numbers, or letters in the image.
-Use only abstract placeholder shapes, icons, and visual patterns - no readable characters.
-Represent any headings or labels as simple horizontal lines or blocks.
-Buttons and controls should show only icons or colored shapes, not text.
+DO NOT include any text, words, labels, numbers, or letters.
+Use colored bars/lines for text placeholders, icons for navigation, abstract shapes for content.
+All controls should use icons or geometric shapes only.
 
-ALL elements MUST use the exact hex colors from the Design Tokens above. This image will represent this style in gallery views, so it must be visually distinctive and showcase the color palette prominently.`,
+ALL elements MUST use the exact hex colors from Design Tokens. Create a visually rich, detailed interface that showcases the style's color palette in a complex, realistic software environment.`,
   };
 
   return conceptPrompts[conceptType];
