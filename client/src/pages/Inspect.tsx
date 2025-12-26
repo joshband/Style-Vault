@@ -882,18 +882,21 @@ export default ${safeName};`;
             )}
           </div>
           
-          {(summary.imageIds?.reference || (summary.referenceImages && summary.referenceImages.length > 0)) && (
+          {/* Hero: Software App UI (preferred) or Reference Image */}
+          {(summary.imageIds?.ui_software_app || summary.imageIds?.reference || (summary.referenceImages && summary.referenceImages.length > 0)) && (
             <div className="w-full">
-              <div className="rounded-lg overflow-hidden border border-border">
+              <div className="rounded-lg overflow-hidden border border-border bg-muted">
                 <img 
-                  src={summary.imageIds?.reference 
-                    ? `/api/images/${summary.imageIds.reference}?size=medium`
-                    : summary.referenceImages[0]
+                  src={summary.imageIds?.ui_software_app
+                    ? `/api/images/${summary.imageIds.ui_software_app}?size=large`
+                    : summary.imageIds?.reference 
+                      ? `/api/images/${summary.imageIds.reference}?size=medium`
+                      : summary.referenceImages[0]
                   } 
                   alt={summary.name}
                   className="w-full h-auto object-contain"
-                  loading="lazy"
-                  data-testid="img-reference-main"
+                  loading="eager"
+                  data-testid="img-hero-main"
                 />
               </div>
             </div>
@@ -1073,96 +1076,200 @@ export default ${safeName};`;
           </div>
         </div>
 
-        {/* Gallery */}
+        {/* Canonical Previews - Visual comparison suite */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <SectionHeader
+              title="Canonical Previews"
+              description="Standardized images for cross-style comparison"
+            />
+          </div>
+          
+          <div className="grid grid-cols-3 gap-3">
+            {assetsLoading ? (
+              <>
+                <PreviewSkeleton aspect="aspect-video" />
+                <PreviewSkeleton aspect="aspect-[3/4]" />
+                <PreviewSkeleton aspect="aspect-square" />
+              </>
+            ) : (
+              <>
+                <div className="aspect-video bg-muted rounded-lg overflow-hidden border border-border relative group">
+                  {(summary.imageIds?.preview_landscape || previews.landscape) ? (
+                    <>
+                      <img 
+                        src={summary.imageIds?.preview_landscape 
+                          ? `/api/images/${summary.imageIds.preview_landscape}?size=medium`
+                          : previews.landscape
+                        } 
+                        alt="Landscape preview" 
+                        className="absolute inset-0 w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                      <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 text-white text-[10px] font-mono rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                        Landscape
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
+                      Landscape
+                    </div>
+                  )}
+                </div>
+                <div className="aspect-[3/4] bg-muted rounded-lg overflow-hidden border border-border relative group">
+                  {(summary.imageIds?.preview_portrait || previews.portrait) ? (
+                    <>
+                      <img 
+                        src={summary.imageIds?.preview_portrait
+                          ? `/api/images/${summary.imageIds.preview_portrait}?size=medium`
+                          : previews.portrait
+                        } 
+                        alt="Portrait preview" 
+                        className="absolute inset-0 w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                      <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 text-white text-[10px] font-mono rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                        Portrait
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
+                      Portrait
+                    </div>
+                  )}
+                </div>
+                <div className="aspect-square bg-muted rounded-lg overflow-hidden border border-border relative group">
+                  {(summary.imageIds?.preview_still_life || previews.stillLife) ? (
+                    <>
+                      <img 
+                        src={summary.imageIds?.preview_still_life
+                          ? `/api/images/${summary.imageIds.preview_still_life}?size=medium`
+                          : previews.stillLife
+                        } 
+                        alt="Still life preview" 
+                        className="absolute inset-0 w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                      <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 text-white text-[10px] font-mono rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                        Still Life
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
+                      Still Life
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </section>
+
+        {/* Export the DNA - Success moment */}
+        <section className="space-y-4">
+          <SectionHeader
+            title="Export the DNA"
+            description="Portable design tokens for any platform"
+          />
+          
+          <div className="p-6 bg-gradient-to-br from-muted/50 to-background rounded-xl border border-border">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">
+                  Take this style anywhere. W3C DTCG-compliant tokens ready for your design system.
+                </p>
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button 
+                    data-testid="button-export-dna"
+                    className="flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity shadow-sm"
+                  >
+                    <Download size={18} />
+                    Export Tokens
+                    <ChevronDown size={14} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem 
+                    onClick={() => handleExport('json')}
+                    className="cursor-pointer"
+                    data-testid="export-dna-json"
+                  >
+                    <FileJson size={16} className="mr-2 text-blue-500" />
+                    <div>
+                      <div className="font-medium">JSON (W3C DTCG)</div>
+                      <div className="text-xs text-muted-foreground">Standards-compliant tokens</div>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => handleExport('css')}
+                    className="cursor-pointer"
+                    data-testid="export-dna-css"
+                  >
+                    <FileCode size={16} className="mr-2 text-orange-500" />
+                    <div>
+                      <div className="font-medium">CSS Variables</div>
+                      <div className="text-xs text-muted-foreground">Custom properties for web</div>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => handleExport('scss')}
+                    className="cursor-pointer"
+                    data-testid="export-dna-scss"
+                  >
+                    <FileCode size={16} className="mr-2 text-pink-500" />
+                    <div>
+                      <div className="font-medium">SCSS Variables</div>
+                      <div className="text-xs text-muted-foreground">Sass/SCSS $variables</div>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    onClick={() => handleExport('tailwind')}
+                    className="cursor-pointer"
+                    data-testid="export-dna-tailwind"
+                  >
+                    <Paintbrush size={16} className="mr-2 text-cyan-500" />
+                    <div>
+                      <div className="font-medium">Tailwind Config</div>
+                      <div className="text-xs text-muted-foreground">theme.extend snippet</div>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => handleExport('react')}
+                    className="cursor-pointer"
+                    data-testid="export-dna-react"
+                  >
+                    <FileCode size={16} className="mr-2 text-blue-400" />
+                    <div>
+                      <div className="font-medium">React/TypeScript</div>
+                      <div className="text-xs text-muted-foreground">Typed theme object</div>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => handleExport('flutter')}
+                    className="cursor-pointer"
+                    data-testid="export-dna-flutter"
+                  >
+                    <FileCode size={16} className="mr-2 text-sky-500" />
+                    <div>
+                      <div className="font-medium">Flutter/Dart</div>
+                      <div className="text-xs text-muted-foreground">Static class with constants</div>
+                    </div>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+        </section>
+
+        {/* Gallery - Mood Board & UI Concepts */}
         <section className="space-y-0">
           <SectionHeader
             title="Gallery"
           />
-          
-          {/* Previews */}
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 sm:grid-rows-[auto_auto]">
-              {assetsLoading ? (
-                <>
-                  <PreviewSkeleton aspect="col-span-1 sm:col-span-4 aspect-video" />
-                  <PreviewSkeleton aspect="sm:col-span-2 sm:row-span-2 aspect-[3/4]" />
-                  <PreviewSkeleton aspect="sm:col-span-2 sm:row-span-2 aspect-square sm:aspect-auto" />
-                </>
-              ) : (
-                <>
-                  <div className="col-span-1 sm:col-span-4 aspect-video bg-muted rounded-lg overflow-hidden border border-border relative group">
-                    {(summary.imageIds?.preview_landscape || previews.landscape) ? (
-                      <>
-                        <img 
-                          src={summary.imageIds?.preview_landscape 
-                            ? `/api/images/${summary.imageIds.preview_landscape}?size=medium`
-                            : previews.landscape
-                          } 
-                          alt="Landscape preview" 
-                          className="absolute inset-0 w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                        <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 text-white text-xs font-mono rounded">
-                          Landscape
-                        </div>
-                      </>
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                        No landscape preview
-                      </div>
-                    )}
-                  </div>
-                  <div className="sm:col-span-2 sm:row-span-2 aspect-[3/4] bg-muted rounded-lg overflow-hidden border border-border relative">
-                    {(summary.imageIds?.preview_portrait || previews.portrait) ? (
-                      <>
-                        <img 
-                          src={summary.imageIds?.preview_portrait
-                            ? `/api/images/${summary.imageIds.preview_portrait}?size=medium`
-                            : previews.portrait
-                          } 
-                          alt="Portrait preview" 
-                          className="absolute inset-0 w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                        <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 text-white text-xs font-mono rounded">
-                          Portrait
-                        </div>
-                      </>
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                        No portrait preview
-                      </div>
-                    )}
-                  </div>
-                  <div className="sm:col-span-2 sm:row-span-2 aspect-square sm:aspect-auto bg-muted rounded-lg overflow-hidden border border-border relative">
-                    {(summary.imageIds?.preview_still_life || previews.stillLife) ? (
-                      <>
-                        <img 
-                          src={summary.imageIds?.preview_still_life
-                            ? `/api/images/${summary.imageIds.preview_still_life}?size=medium`
-                            : previews.stillLife
-                          } 
-                          alt="Still life preview" 
-                          className="absolute inset-0 w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                        <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 text-white text-xs font-mono rounded">
-                          Still Life
-                        </div>
-                      </>
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                        No still life preview
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Mood Board & UI Concepts */}
-          <div className="pt-6">
+          <div>
             {assetsLoading ? (
               <div className="flex items-center justify-center py-12 bg-muted/30 rounded-lg border border-border">
                 <div className="flex items-center gap-2 text-muted-foreground">
@@ -1194,114 +1301,23 @@ export default ${safeName};`;
         <section className="space-y-0">
           <SectionHeader
             title="Design Tokens"
+            description="W3C DTCG-compliant token structure"
           />
 
-          <div className="space-y-4">
-            {/* Export */}
-            <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg border border-border">
-              <div>
-                <p className="text-sm font-medium text-foreground">Export</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Download for your project</p>
+          <div className="border border-border rounded-lg overflow-hidden">
+            <button
+              onClick={() => setTokensExpanded(!tokensExpanded)}
+              className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
+              data-testid="toggle-token-viewer"
+            >
+              <span className="text-sm font-medium text-foreground">View Token Structure</span>
+              {tokensExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+            </button>
+            {tokensExpanded && (
+              <div className="p-4 pt-0 border-t border-border animate-in fade-in duration-200">
+                <TokenViewer tokens={summary.tokens} />
               </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button 
-                    data-testid="button-export-tokens"
-                    className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
-                  >
-                    <Download size={16} />
-                    Export
-                    <ChevronDown size={14} />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuItem 
-                    onClick={() => handleExport('json')}
-                    className="cursor-pointer"
-                    data-testid="export-json"
-                  >
-                    <FileJson size={16} className="mr-2 text-blue-500" />
-                    <div>
-                      <div className="font-medium">JSON (W3C DTCG)</div>
-                      <div className="text-xs text-muted-foreground">Standards-compliant tokens</div>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={() => handleExport('css')}
-                    className="cursor-pointer"
-                    data-testid="export-css"
-                  >
-                    <FileCode size={16} className="mr-2 text-orange-500" />
-                    <div>
-                      <div className="font-medium">CSS Variables</div>
-                      <div className="text-xs text-muted-foreground">Custom properties for web</div>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={() => handleExport('scss')}
-                    className="cursor-pointer"
-                    data-testid="export-scss"
-                  >
-                    <FileCode size={16} className="mr-2 text-pink-500" />
-                    <div>
-                      <div className="font-medium">SCSS Variables</div>
-                      <div className="text-xs text-muted-foreground">Sass/SCSS $variables</div>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem 
-                    onClick={() => handleExport('tailwind')}
-                    className="cursor-pointer"
-                    data-testid="export-tailwind"
-                  >
-                    <Paintbrush size={16} className="mr-2 text-cyan-500" />
-                    <div>
-                      <div className="font-medium">Tailwind Config</div>
-                      <div className="text-xs text-muted-foreground">theme.extend snippet</div>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={() => handleExport('react')}
-                    className="cursor-pointer"
-                    data-testid="export-react"
-                  >
-                    <FileCode size={16} className="mr-2 text-blue-400" />
-                    <div>
-                      <div className="font-medium">React/TypeScript</div>
-                      <div className="text-xs text-muted-foreground">Typed theme object</div>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={() => handleExport('flutter')}
-                    className="cursor-pointer"
-                    data-testid="export-flutter"
-                  >
-                    <FileCode size={16} className="mr-2 text-sky-500" />
-                    <div>
-                      <div className="font-medium">Flutter/Dart</div>
-                      <div className="text-xs text-muted-foreground">Static class with constants</div>
-                    </div>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
-            {/* Collapsible Token Viewer */}
-            <div className="border border-border rounded-lg overflow-hidden">
-              <button
-                onClick={() => setTokensExpanded(!tokensExpanded)}
-                className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
-                data-testid="toggle-token-viewer"
-              >
-                <span className="text-sm font-medium text-foreground">View Token Structure</span>
-                {tokensExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-              </button>
-              {tokensExpanded && (
-                <div className="p-4 pt-0 border-t border-border animate-in fade-in duration-200">
-                  <TokenViewer tokens={summary.tokens} />
-                </div>
-              )}
-            </div>
+            )}
           </div>
         </section>
 
