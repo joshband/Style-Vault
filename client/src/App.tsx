@@ -18,6 +18,7 @@ const SavedStyles = lazy(() => import("@/pages/SavedStyles"));
 const Remix = lazy(() => import("@/pages/Remix"));
 const Creator = lazy(() => import("@/pages/Creator"));
 const Compare = lazy(() => import("@/pages/Compare"));
+const Analytics = lazy(() => import("@/pages/Analytics"));
 
 function PageLoader() {
   return (
@@ -41,6 +42,7 @@ function Router() {
         <Route path="/remix" component={Remix} />
         <Route path="/creator/:creatorId" component={Creator} />
         <Route path="/compare" component={Compare} />
+        <Route path="/analytics" component={Analytics} />
         <Route component={NotFound} />
       </Switch>
     </Suspense>
