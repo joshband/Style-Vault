@@ -16,12 +16,14 @@ interface PaginatedResponse {
   nextCursor: string | null;
 }
 
-const PAGE_SIZE = 6;
+const PAGE_SIZE = 12;
+const CARD_MIN_WIDTH = 280;
 
 export default function Explore() {
   const queryClient = useQueryClient();
   const sentinelRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const preloadedImages = useRef<Set<string>>(new Set());
   
   const {
     data,
@@ -55,6 +57,18 @@ export default function Explore() {
   }, [data]);
 
   const totalCount = data?.pages[0]?.total ?? 0;
+
+  useEffect(() => {
+    const stylesToPreload = allStyles.slice(-PAGE_SIZE);
+    stylesToPreload.forEach((style) => {
+      const imageUrl = style.previews?.landscape;
+      if (imageUrl && !preloadedImages.current.has(imageUrl)) {
+        const img = new Image();
+        img.src = imageUrl;
+        preloadedImages.current.add(imageUrl);
+      }
+    });
+  }, [allStyles]);
 
   const deleteMutation = useMutation({
     mutationFn: deleteStyleApi,
@@ -97,9 +111,15 @@ export default function Explore() {
               </p>
             </div>
           </div>
-          <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+          <div 
+            className="grid gap-6"
+            style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${CARD_MIN_WIDTH}px, 1fr))` }}
+          >
+            <StyleCardSkeleton />
+            <StyleCardSkeleton />
             <StyleCardSkeleton />
             <StyleCardSkeleton className="hidden sm:block" />
+            <StyleCardSkeleton className="hidden md:block" />
             <StyleCardSkeleton className="hidden lg:block" />
           </div>
         </div>
@@ -172,7 +192,10 @@ export default function Explore() {
 
         {!isError && allStyles.length > 0 && (
           <>
-            <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            <div 
+              className="grid gap-6"
+              style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${CARD_MIN_WIDTH}px, 1fr))` }}
+            >
               <AnimatePresence mode="popLayout">
                 {allStyles.map((style, index) => (
                   <motion.div

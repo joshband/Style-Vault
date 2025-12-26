@@ -14,6 +14,8 @@ import { cache, CACHE_KEYS } from "./cache";
 import type { MetadataTags } from "@shared/schema";
 import { getJobProgress, startJobInBackground } from "./job-runner";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
+import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
+import { getCacheStats } from "./token-cache";
 
 function getDefaultMetadataTags(): MetadataTags {
   return {
@@ -48,6 +50,9 @@ export async function registerRoutes(
   // Setup authentication BEFORE other routes
   await setupAuth(app);
   registerAuthRoutes(app);
+  
+  // Register object storage routes for App Storage
+  registerObjectStorageRoutes(app);
 
   // Health check endpoint for diagnosing database connectivity
   app.get("/api/health", async (req, res) => {

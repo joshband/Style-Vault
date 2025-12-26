@@ -8,9 +8,15 @@
 import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { computeImageHash, getCachedTokens, setCachedTokens } from './token-cache';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const getModuleDir = (): string => {
+  if (typeof import.meta.url !== 'undefined') {
+    return path.dirname(fileURLToPath(import.meta.url));
+  }
+  return process.cwd();
+};
+const __dirname = getModuleDir();
 
 export interface CVColorToken {
   space: string;
@@ -96,10 +102,24 @@ export function isCVExtractionEnabled(): boolean {
  * Extract design tokens from an image using Python CV
  * 
  * @param imageBase64 - Base64 encoded image data (with or without data URL prefix)
+ * @param useCache - Whether to use caching (default: true)
  * @returns Extracted tokens or error
  */
-export async function extractTokensWithCV(imageBase64: string): Promise<CVExtractionResult> {
+export async function extractTokensWithCV(imageBase64: string, useCache: boolean = true): Promise<CVExtractionResult> {
   const startTime = Date.now();
+  
+  const imageHash = computeImageHash(imageBase64);
+  
+  if (useCache) {
+    const cached = await getCachedTokens(imageHash);
+    if (cached) {
+      return {
+        success: true,
+        tokens: cached as CVExtractedTokens,
+        processingTimeMs: Date.now() - startTime,
+      };
+    }
+  }
   
   return new Promise((resolve) => {
     const scriptPath = path.join(__dirname, 'cv', 'extract_tokens.py');
@@ -120,7 +140,7 @@ export async function extractTokensWithCV(imageBase64: string): Promise<CVExtrac
       stderr += data.toString();
     });
 
-    pythonProcess.on('close', (code) => {
+    pythonProcess.on('close', async (code) => {
       const processingTimeMs = Date.now() - startTime;
 
       if (code !== 0) {
@@ -135,6 +155,11 @@ export async function extractTokensWithCV(imageBase64: string): Promise<CVExtrac
 
       try {
         const tokens = JSON.parse(stdout) as CVExtractedTokens;
+        
+        if (useCache) {
+          await setCachedTokens(imageHash, tokens, processingTimeMs);
+        }
+        
         resolve({
           success: true,
           tokens,
