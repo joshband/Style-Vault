@@ -773,74 +773,67 @@ export async function registerRoutes(
     }
   });
 
-  // Regenerate softwareApp UI for all styles (admin endpoint)
+  // Regenerate softwareApp UI for all styles (admin endpoint) - runs async in background
   app.post("/api/admin/regenerate-software-app", async (req, res) => {
     try {
-      const { generateSingleUiConcept } = await import("./mood-board-generation");
-      const { storeImage } = await import("./image-service");
       const allStyles = await storage.getStyles();
       
-      const results: { styleId: string; styleName: string; success: boolean; error?: string }[] = [];
-      
-      for (const style of allStyles) {
-        try {
-          const softwareApp = await generateSingleUiConcept({
-            styleName: style.name,
-            styleDescription: style.description,
-            tokens: style.tokens,
-            metadataTags: style.metadataTags || getDefaultMetadataTags(),
-          }, "softwareApp");
-          
-          if (softwareApp) {
-            // Store the image in image_assets table
-            await storeImage(softwareApp, "ui_software_app", style.id);
+      // Start async regeneration in background (don't await)
+      (async () => {
+        const { generateSingleUiConcept } = await import("./mood-board-generation");
+        const { storeImage } = await import("./image-service");
+        
+        console.log(`[AdminRegenerate] Starting softwareApp regeneration for ${allStyles.length} styles...`);
+        let successCount = 0;
+        let errorCount = 0;
+        
+        for (const style of allStyles) {
+          try {
+            console.log(`[AdminRegenerate] Generating softwareApp for "${style.name}" (${style.id})...`);
+            const softwareApp = await generateSingleUiConcept({
+              styleName: style.name,
+              styleDescription: style.description,
+              tokens: style.tokens,
+              metadataTags: style.metadataTags || getDefaultMetadataTags(),
+            }, "softwareApp");
             
-            // Re-fetch the style to get current state
-            const freshStyle = await storage.getStyleById(style.id);
-            if (!freshStyle) {
-              results.push({ styleId: style.id, styleName: style.name, success: false, error: "Style not found after generation" });
-              continue;
+            if (softwareApp) {
+              await storeImage(softwareApp, "ui_software_app", style.id);
+              
+              const freshStyle = await storage.getStyleById(style.id);
+              if (freshStyle) {
+                const existingMoodBoard = freshStyle.moodBoard as any || { status: "complete", history: [] };
+                const existingUiConcepts = freshStyle.uiConcepts as any || { status: "pending", history: [] };
+                const updatedUiConcepts = {
+                  ...existingUiConcepts,
+                  softwareApp,
+                  status: "complete",
+                };
+                
+                await storage.updateStyleMoodBoard(style.id, existingMoodBoard, updatedUiConcepts);
+                cache.delete(CACHE_KEYS.STYLE_DETAIL(style.id));
+              }
+              
+              successCount++;
+              console.log(`[AdminRegenerate] ✓ Completed "${style.name}" (${successCount}/${allStyles.length})`);
+            } else {
+              errorCount++;
+              console.log(`[AdminRegenerate] ✗ Failed "${style.name}" - null result`);
             }
-            
-            // Update style uiConcepts with the new softwareApp, preserving existing data
-            const existingMoodBoard = freshStyle.moodBoard as any || { status: "complete", history: [] };
-            const existingUiConcepts = freshStyle.uiConcepts as any || { status: "pending", history: [] };
-            const updatedUiConcepts = {
-              ...existingUiConcepts,
-              softwareApp,
-              status: "complete",
-            };
-            
-            await storage.updateStyleMoodBoard(
-              style.id,
-              existingMoodBoard,
-              updatedUiConcepts
-            );
-            
-            // Invalidate cache for this specific style
-            cache.delete(CACHE_KEYS.STYLE_DETAIL(style.id));
-            
-            results.push({ styleId: style.id, styleName: style.name, success: true });
-          } else {
-            results.push({ styleId: style.id, styleName: style.name, success: false, error: "Generation returned null" });
+          } catch (err) {
+            errorCount++;
+            console.error(`[AdminRegenerate] ✗ Error for "${style.name}":`, err);
           }
-        } catch (err) {
-          results.push({
-            styleId: style.id,
-            styleName: style.name,
-            success: false,
-            error: err instanceof Error ? err.message : "Unknown error",
-          });
         }
-      }
+        
+        cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
+        console.log(`[AdminRegenerate] Complete! ${successCount} succeeded, ${errorCount} failed.`);
+      })();
       
-      // Invalidate the style summaries cache so fresh imageIds are fetched
-      cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
-      
-      const successCount = results.filter(r => r.success).length;
+      // Return immediately - regeneration continues in background
       res.json({
-        message: `Regenerated softwareApp for ${successCount}/${results.length} styles`,
-        results,
+        message: `Started regeneration for ${allStyles.length} styles in background. Check server logs for progress.`,
+        styleCount: allStyles.length,
       });
     } catch (error) {
       console.error("Software app regeneration error:", error);
