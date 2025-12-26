@@ -173,6 +173,19 @@ Preferred communication style: Simple, everyday language.
 - **UI**: Share button on Inspect page with copy-to-clipboard functionality
 - **Public Page**: `/shared/:code` displays style details for external viewing
 
+### Style Versioning
+- **Database Table**: `style_versions` - Stores snapshots of style state
+- **Version Data**: Includes tokens, promptScaffolding, metadataTags, change type, and description
+- **Change Types**: `created`, `tokens_updated`, `manual_save`, `reverted`
+- **API Endpoints**:
+  - `GET /api/styles/:id/versions` - List all versions for a style
+  - `GET /api/styles/:id/versions/:versionId` - Get specific version details
+  - `POST /api/styles/:id/versions` - Create manual snapshot (owner only)
+  - `POST /api/styles/:id/versions/:versionId/revert` - Revert to previous version (owner only)
+- **Security**: Only style creators can save snapshots and revert; legacy styles without creators cannot be reverted
+- **UI**: Version History section on Inspect page with expandable timeline and revert buttons
+- **Revert Behavior**: Current state is automatically saved before reverting to preserve history
+
 ### Key Design Decisions
 
 **Tokens as Source of Truth**: The application enforces that no style can exist without a complete token definition. This ensures styles are portable, comparable, and can be applied consistently.
