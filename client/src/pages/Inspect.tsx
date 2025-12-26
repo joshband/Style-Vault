@@ -4,7 +4,7 @@ import { Layout } from "@/components/layout";
 import { TokenViewer } from "@/components/token-viewer";
 import { ColorPaletteSwatches } from "@/components/color-palette-swatches";
 import { StyleSpecEditor } from "@/components/style-spec-editor";
-import { ArrowLeft, Download, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Palette, MessageSquare, Share2, Check, Copy, Droplets, FileEdit, Bookmark, Star, User, FolderPlus, Folder, Plus, FileCode, FileJson, Paintbrush, History, RotateCcw, Save } from "lucide-react";
+import { ArrowLeft, Download, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Palette, MessageSquare, Share2, Check, Copy, Droplets, FileEdit, Bookmark, Star, User, FolderPlus, Folder, Plus, FileCode, FileJson, Paintbrush, History, RotateCcw, Save, Sparkles, X } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
@@ -131,8 +131,43 @@ export default function Inspect() {
   const [revertingVersion, setRevertingVersion] = useState<string | null>(null);
   const [savingVersion, setSavingVersion] = useState(false);
   
+  // Try It Now - Image Generation
+  const [tryItOpen, setTryItOpen] = useState(false);
+  const [tryItPrompt, setTryItPrompt] = useState("");
+  const [tryItGenerating, setTryItGenerating] = useState(false);
+  const [tryItImage, setTryItImage] = useState<string | null>(null);
+  const [tryItError, setTryItError] = useState<string | null>(null);
+  
   // Check if current user is the creator
   const isOwner = isAuthenticated && user?.id === summary?.creatorId;
+
+  // Handle Try It Now image generation
+  const handleTryItGenerate = useCallback(async () => {
+    if (!id || !tryItPrompt.trim()) return;
+    setTryItGenerating(true);
+    setTryItError(null);
+    setTryItImage(null);
+    
+    try {
+      const res = await fetch("/api/generate-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: tryItPrompt, styleId: id }),
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setTryItImage(`data:image/jpeg;base64,${data.imageBase64}`);
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        setTryItError(errorData.error || "Failed to generate image");
+      }
+    } catch (error) {
+      setTryItError("Network error. Please try again.");
+    } finally {
+      setTryItGenerating(false);
+    }
+  }, [id, tryItPrompt]);
 
   const handleShare = useCallback(async () => {
     if (!id) return;
@@ -1094,11 +1129,30 @@ module.exports = ${JSON.stringify(config, null, 2)}`;
 
         {/* Section 4: Prompt Scaffolding */}
         <section className="space-y-0">
-          <SectionHeader
-            icon={<MessageSquare size={20} />}
-            title="Prompt Scaffolding"
-            description="Ready-to-use prompts for applying this style in AI tools"
-          />
+          <div className="flex items-start justify-between gap-4 mb-6">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-muted flex items-center justify-center text-muted-foreground">
+                <MessageSquare size={20} />
+              </div>
+              <div>
+                <h2 className="text-lg font-serif font-medium text-foreground">Prompt Scaffolding</h2>
+                <p className="text-sm text-muted-foreground mt-0.5">Ready-to-use prompts for applying this style in AI tools</p>
+              </div>
+            </div>
+            <Button
+              onClick={() => {
+                setTryItOpen(true);
+                setTryItImage(null);
+                setTryItError(null);
+                setTryItPrompt("");
+              }}
+              className="flex items-center gap-2"
+              data-testid="button-try-it-now"
+            >
+              <Sparkles size={16} />
+              Try it Now
+            </Button>
+          </div>
           
           <div className="space-y-6">
             {summary.promptScaffolding && (
@@ -1135,6 +1189,83 @@ module.exports = ${JSON.stringify(config, null, 2)}`;
             )}
           </div>
         </section>
+
+        {/* Try It Now Dialog */}
+        {tryItOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="bg-background border border-border rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between p-4 border-b border-border">
+                <div className="flex items-center gap-2">
+                  <Sparkles size={20} className="text-primary" />
+                  <h3 className="text-lg font-medium">Generate with {summary.name}</h3>
+                </div>
+                <button
+                  onClick={() => setTryItOpen(false)}
+                  className="p-1 rounded-md hover:bg-muted transition-colors"
+                  data-testid="button-close-try-it"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <div className="p-4 space-y-4 overflow-y-auto flex-1">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">What would you like to create?</label>
+                  <textarea
+                    value={tryItPrompt}
+                    onChange={(e) => setTryItPrompt(e.target.value)}
+                    placeholder="Describe the image you want to generate... (e.g., 'a cozy coffee shop interior', 'a futuristic cityscape at sunset')"
+                    className="w-full h-24 px-3 py-2 text-sm border border-border rounded-lg bg-background resize-none focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    disabled={tryItGenerating}
+                    data-testid="input-try-it-prompt"
+                  />
+                </div>
+                
+                <Button
+                  onClick={handleTryItGenerate}
+                  disabled={tryItGenerating || !tryItPrompt.trim()}
+                  className="w-full"
+                  data-testid="button-generate-image"
+                >
+                  {tryItGenerating ? (
+                    <>
+                      <Loader2 size={16} className="mr-2 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={16} className="mr-2" />
+                      Generate Image
+                    </>
+                  )}
+                </Button>
+                
+                {tryItError && (
+                  <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-600">
+                    {tryItError}
+                  </div>
+                )}
+                
+                {tryItImage && (
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium text-muted-foreground">Generated Image</h4>
+                    <div className="rounded-lg overflow-hidden border border-border">
+                      <img 
+                        src={tryItImage} 
+                        alt="Generated image"
+                        className="w-full h-auto"
+                        data-testid="img-generated-result"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground text-center">
+                      Image generated using the "{summary.name}" style with Design Token colors
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Section 5: Style Specification */}
         <section className="space-y-0">
