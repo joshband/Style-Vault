@@ -25,11 +25,18 @@ export interface PaginatedStyleSummaries {
   nextCursor: string | null;
 }
 
+export interface StyleFilters {
+  search?: string;
+  mood?: string[];
+  colorFamily?: string[];
+  sortBy?: "newest" | "oldest" | "name";
+}
+
 export interface IStorage {
   // Style operations
   getStyles(): Promise<Style[]>;
   getStyleSummaries(): Promise<StyleSummary[]>;
-  getStyleSummariesPaginated(limit: number, cursor?: string): Promise<PaginatedStyleSummaries>;
+  getStyleSummariesPaginated(limit: number, cursor?: string, filters?: StyleFilters): Promise<PaginatedStyleSummaries>;
   getStyleCount(): Promise<number>;
   getStyleById(id: string): Promise<Style | undefined>;
   getStyleByShareCode(shareCode: string): Promise<Style | undefined>;
@@ -159,7 +166,7 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async getStyleSummariesPaginated(limit: number, cursor?: string): Promise<PaginatedStyleSummaries> {
+  async getStyleSummariesPaginated(limit: number, cursor?: string, filters?: StyleFilters): Promise<PaginatedStyleSummaries> {
     const queryLimit = Math.min(limit, 50);
     
     const selectFields = {
@@ -168,27 +175,70 @@ export class DatabaseStorage implements IStorage {
       description: styles.description,
       createdAt: styles.createdAt,
       referenceImages: styles.referenceImages,
+      metadataTags: styles.metadataTags,
       creatorId: styles.creatorId,
       isPublic: styles.isPublic,
       creatorFirstName: users.firstName,
       creatorLastName: users.lastName,
     };
     
-    let results;
+    const conditions: any[] = [];
+    
     if (cursor) {
-      const cursorDate = new Date(cursor);
-      results = await db
-        .select(selectFields)
-        .from(styles)
-        .leftJoin(users, eq(styles.creatorId, users.id))
-        .where(sql`${styles.createdAt} < ${cursorDate}`)
-        .orderBy(desc(styles.createdAt))
+      const sortBy = filters?.sortBy || "newest";
+      if (sortBy === "oldest") {
+        const cursorDate = new Date(cursor);
+        conditions.push(sql`${styles.createdAt} > ${cursorDate}`);
+      } else if (sortBy === "name") {
+        const [cursorName, cursorDate, cursorId] = cursor.split("|||");
+        conditions.push(sql`(${styles.name} > ${cursorName} OR (${styles.name} = ${cursorName} AND ${styles.createdAt} < ${new Date(cursorDate)}) OR (${styles.name} = ${cursorName} AND ${styles.createdAt} = ${new Date(cursorDate)} AND ${styles.id} > ${cursorId}))`);
+      } else {
+        const cursorDate = new Date(cursor);
+        conditions.push(sql`${styles.createdAt} < ${cursorDate}`);
+      }
+    }
+    
+    if (filters?.search) {
+      const searchTerm = `%${filters.search.toLowerCase()}%`;
+      conditions.push(sql`(LOWER(${styles.name}) LIKE ${searchTerm} OR LOWER(${styles.description}) LIKE ${searchTerm})`);
+    }
+    
+    if (filters?.mood && filters.mood.length > 0) {
+      const moodConditions = filters.mood.map(m => 
+        sql`EXISTS (SELECT 1 FROM jsonb_array_elements_text(${styles.metadataTags}->'mood') AS elem WHERE elem ILIKE ${'%' + m + '%'})`
+      );
+      conditions.push(sql`(${sql.join(moodConditions, sql` OR `)})`);
+    }
+    
+    if (filters?.colorFamily && filters.colorFamily.length > 0) {
+      const colorConditions = filters.colorFamily.map(c => 
+        sql`EXISTS (SELECT 1 FROM jsonb_array_elements_text(${styles.metadataTags}->'colorFamily') AS elem WHERE elem ILIKE ${'%' + c + '%'})`
+      );
+      conditions.push(sql`(${sql.join(colorConditions, sql` OR `)})`);
+    }
+    
+    const sortBy = filters?.sortBy || "newest";
+    
+    let query = db
+      .select(selectFields)
+      .from(styles)
+      .leftJoin(users, eq(styles.creatorId, users.id));
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as typeof query;
+    }
+    
+    let results;
+    if (sortBy === "oldest") {
+      results = await query
+        .orderBy(styles.createdAt)
+        .limit(queryLimit + 1);
+    } else if (sortBy === "name") {
+      results = await query
+        .orderBy(styles.name, desc(styles.createdAt), styles.id)
         .limit(queryLimit + 1);
     } else {
-      results = await db
-        .select(selectFields)
-        .from(styles)
-        .leftJoin(users, eq(styles.creatorId, users.id))
+      results = await query
         .orderBy(desc(styles.createdAt))
         .limit(queryLimit + 1);
     }
@@ -196,10 +246,43 @@ export class DatabaseStorage implements IStorage {
     const hasMore = results.length > queryLimit;
     const items = hasMore ? results.slice(0, queryLimit) : results;
     
-    const total = await this.getStyleCount();
-    const nextCursor = hasMore && items.length > 0 
-      ? items[items.length - 1].createdAt.toISOString() 
-      : null;
+    let total: number;
+    if (filters?.search || filters?.mood?.length || filters?.colorFamily?.length) {
+      const countConditions: any[] = [];
+      if (filters.search) {
+        const searchTerm = `%${filters.search.toLowerCase()}%`;
+        countConditions.push(sql`(LOWER(${styles.name}) LIKE ${searchTerm} OR LOWER(${styles.description}) LIKE ${searchTerm})`);
+      }
+      if (filters.mood && filters.mood.length > 0) {
+        const moodConditions = filters.mood.map(m => 
+          sql`EXISTS (SELECT 1 FROM jsonb_array_elements_text(${styles.metadataTags}->'mood') AS elem WHERE elem ILIKE ${'%' + m + '%'})`
+        );
+        countConditions.push(sql`(${sql.join(moodConditions, sql` OR `)})`);
+      }
+      if (filters.colorFamily && filters.colorFamily.length > 0) {
+        const colorConditions = filters.colorFamily.map(c => 
+          sql`EXISTS (SELECT 1 FROM jsonb_array_elements_text(${styles.metadataTags}->'colorFamily') AS elem WHERE elem ILIKE ${'%' + c + '%'})`
+        );
+        countConditions.push(sql`(${sql.join(colorConditions, sql` OR `)})`);
+      }
+      const countResult = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(styles)
+        .where(and(...countConditions));
+      total = countResult[0]?.count ?? 0;
+    } else {
+      total = await this.getStyleCount();
+    }
+    
+    let nextCursor: string | null = null;
+    if (hasMore && items.length > 0) {
+      const lastItem = items[items.length - 1];
+      if (sortBy === "name") {
+        nextCursor = `${lastItem.name}|||${lastItem.createdAt.toISOString()}|||${lastItem.id}`;
+      } else {
+        nextCursor = lastItem.createdAt.toISOString();
+      }
+    }
     
     return {
       items: items.map(s => {
@@ -210,7 +293,7 @@ export class DatabaseStorage implements IStorage {
           name: s.name,
           description: s.description,
           createdAt: s.createdAt,
-          metadataTags: null,
+          metadataTags: s.metadataTags,
           moodBoardStatus: "complete",
           uiConceptsStatus: "complete",
           thumbnailPreview: thumbnail,
