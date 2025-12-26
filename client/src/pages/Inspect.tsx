@@ -4,7 +4,7 @@ import { Layout } from "@/components/layout";
 import { TokenViewer } from "@/components/token-viewer";
 import { ColorPaletteSwatches } from "@/components/color-palette-swatches";
 import { StyleSpecEditor } from "@/components/style-spec-editor";
-import { ArrowLeft, Download, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Palette, MessageSquare, Share2, Check, Copy, Droplets, FileEdit, Bookmark, Star, User, FolderPlus, Folder, Plus } from "lucide-react";
+import { ArrowLeft, Download, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Palette, MessageSquare, Share2, Check, Copy, Droplets, FileEdit, Bookmark, Star, User, FolderPlus, Folder, Plus, FileCode, FileJson, Paintbrush } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
@@ -335,18 +335,187 @@ export default function Inspect() {
     }
   }, [id, moodBoardStatus, uiConceptsStatus, refetchAssets]);
 
-  const handleDownloadTokens = () => {
-    if (!summary) return;
-    const tokensJson = JSON.stringify(summary.tokens, null, 2);
-    const blob = new Blob([tokensJson], { type: "application/json" });
+  const convertTokensToCSS = (tokens: any): string => {
+    const lines: string[] = [
+      `/* ${summary?.name || 'Style'} - CSS Custom Properties */`,
+      `/* Generated from W3C DTCG Design Tokens */`,
+      '',
+      ':root {'
+    ];
+    
+    const processTokenTree = (obj: any, prefix: string = '') => {
+      if (!obj || typeof obj !== 'object') return;
+      
+      for (const [key, value] of Object.entries(obj)) {
+        if (key.startsWith('$')) continue;
+        
+        if (value && typeof value === 'object') {
+          if ('$value' in value) {
+            const rawName = `${prefix}${key}`
+              .replace(/\./g, '-')
+              .replace(/([A-Z])/g, '-$1')
+              .toLowerCase()
+              .replace(/-+/g, '-')
+              .replace(/^-/, '');
+            const cssVarName = `--${rawName}`;
+            lines.push(`  ${cssVarName}: ${(value as any).$value};`);
+          } else {
+            processTokenTree(value, prefix ? `${prefix}${key}-` : `${key}-`);
+          }
+        }
+      }
+    };
+    
+    processTokenTree(tokens);
+    
+    lines.push('}');
+    return lines.join('\n');
+  };
+
+  const convertTokensToSCSS = (tokens: any): string => {
+    const lines: string[] = [
+      `// ${summary?.name || 'Style'} - SCSS Variables`,
+      `// Generated from W3C DTCG Design Tokens`,
+      ''
+    ];
+    
+    const categoryLabels: Record<string, string> = {
+      color: 'Colors',
+      spacing: 'Spacing', 
+      borderRadius: 'Border Radius',
+      typography: 'Typography',
+      shadow: 'Shadows',
+      elevation: 'Elevation',
+      strokeWidth: 'Stroke Width',
+      size: 'Sizes',
+      lineHeight: 'Line Height',
+      fontWeight: 'Font Weight',
+      opacity: 'Opacity',
+      border: 'Borders',
+    };
+    
+    const processTokenTree = (obj: any, prefix: string = '') => {
+      if (!obj || typeof obj !== 'object') return;
+      
+      for (const [key, value] of Object.entries(obj)) {
+        if (key.startsWith('$')) continue;
+        
+        if (value && typeof value === 'object') {
+          if ('$value' in value) {
+            const scssVarName = `$${prefix}${key}`
+              .replace(/\./g, '-')
+              .replace(/([A-Z])/g, '-$1')
+              .toLowerCase()
+              .replace(/-+/g, '-');
+            lines.push(`${scssVarName}: ${(value as any).$value};`);
+          } else {
+            processTokenTree(value, prefix ? `${prefix}${key}-` : `${key}-`);
+          }
+        }
+      }
+    };
+    
+    for (const [category, group] of Object.entries(tokens)) {
+      if (category.startsWith('$') || !group || typeof group !== 'object') continue;
+      
+      const label = categoryLabels[category] || category.charAt(0).toUpperCase() + category.slice(1);
+      lines.push(`// ${label}`);
+      processTokenTree(group, `${category}-`);
+      lines.push('');
+    }
+    
+    return lines.join('\n');
+  };
+
+  const convertTokensToTailwind = (tokens: any): string => {
+    const config: any = {
+      theme: {
+        extend: {
+          colors: {},
+          spacing: {},
+          borderRadius: {},
+          boxShadow: {},
+          fontSize: {},
+          fontWeight: {},
+          lineHeight: {},
+          opacity: {},
+          borderWidth: {},
+        }
+      }
+    };
+    
+    const flattenTokens = (obj: any, prefix: string = ''): Record<string, string> => {
+      const result: Record<string, string> = {};
+      if (!obj || typeof obj !== 'object') return result;
+      
+      for (const [key, value] of Object.entries(obj)) {
+        if (key.startsWith('$')) continue;
+        
+        if (value && typeof value === 'object') {
+          if ('$value' in value) {
+            const flatKey = prefix ? `${prefix}-${key}` : key;
+            result[flatKey] = (value as any).$value;
+          } else {
+            const nested = flattenTokens(value, prefix ? `${prefix}-${key}` : key);
+            Object.assign(result, nested);
+          }
+        }
+      }
+      return result;
+    };
+    
+    if (tokens.color) config.theme.extend.colors = flattenTokens(tokens.color);
+    if (tokens.spacing) config.theme.extend.spacing = flattenTokens(tokens.spacing);
+    if (tokens.borderRadius) config.theme.extend.borderRadius = flattenTokens(tokens.borderRadius);
+    if (tokens.shadow) config.theme.extend.boxShadow = flattenTokens(tokens.shadow);
+    if (tokens.typography) config.theme.extend.fontSize = flattenTokens(tokens.typography);
+    if (tokens.fontWeight) config.theme.extend.fontWeight = flattenTokens(tokens.fontWeight);
+    if (tokens.lineHeight) config.theme.extend.lineHeight = flattenTokens(tokens.lineHeight);
+    if (tokens.opacity) config.theme.extend.opacity = flattenTokens(tokens.opacity);
+    if (tokens.border) config.theme.extend.borderWidth = flattenTokens(tokens.border);
+    
+    for (const key of Object.keys(config.theme.extend)) {
+      if (Object.keys(config.theme.extend[key]).length === 0) {
+        delete config.theme.extend[key];
+      }
+    }
+    
+    return `// ${summary?.name || 'Style'} - Tailwind Config Extension
+// Add this to your tailwind.config.js theme.extend section
+
+module.exports = ${JSON.stringify(config, null, 2)}`;
+  };
+
+  const downloadFile = (content: string, filename: string, mimeType: string) => {
+    const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${summary.name.toLowerCase().replace(/\s+/g, "-")}-tokens.json`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const handleExport = (format: 'json' | 'css' | 'scss' | 'tailwind') => {
+    if (!summary) return;
+    const baseName = summary.name.toLowerCase().replace(/\s+/g, "-");
+    
+    switch (format) {
+      case 'json':
+        downloadFile(JSON.stringify(summary.tokens, null, 2), `${baseName}-tokens.json`, 'application/json');
+        break;
+      case 'css':
+        downloadFile(convertTokensToCSS(summary.tokens), `${baseName}-tokens.css`, 'text/css');
+        break;
+      case 'scss':
+        downloadFile(convertTokensToSCSS(summary.tokens), `${baseName}-tokens.scss`, 'text/scss');
+        break;
+      case 'tailwind':
+        downloadFile(convertTokensToTailwind(summary.tokens), `${baseName}-tailwind.config.js`, 'text/javascript');
+        break;
+    }
   };
 
   const handleSpecUpdate = useCallback((newSpec: StyleSpec) => {
@@ -752,20 +921,71 @@ export default function Inspect() {
           />
 
           <div className="space-y-4">
-            {/* Download CTA */}
+            {/* Export CTA */}
             <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg border border-border">
               <div>
-                <p className="text-sm font-medium text-foreground">W3C DTCG Token File</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Standards-compliant JSON for design tools</p>
+                <p className="text-sm font-medium text-foreground">Export Design Tokens</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Download in multiple formats for your workflow</p>
               </div>
-              <button 
-                onClick={handleDownloadTokens}
-                data-testid="button-download-tokens"
-                className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
-              >
-                <Download size={16} />
-                Download JSON
-              </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button 
+                    data-testid="button-export-tokens"
+                    className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+                  >
+                    <Download size={16} />
+                    Export
+                    <ChevronDown size={14} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem 
+                    onClick={() => handleExport('json')}
+                    className="cursor-pointer"
+                    data-testid="export-json"
+                  >
+                    <FileJson size={16} className="mr-2 text-blue-500" />
+                    <div>
+                      <div className="font-medium">JSON (W3C DTCG)</div>
+                      <div className="text-xs text-muted-foreground">Standards-compliant tokens</div>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => handleExport('css')}
+                    className="cursor-pointer"
+                    data-testid="export-css"
+                  >
+                    <FileCode size={16} className="mr-2 text-orange-500" />
+                    <div>
+                      <div className="font-medium">CSS Variables</div>
+                      <div className="text-xs text-muted-foreground">Custom properties for web</div>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => handleExport('scss')}
+                    className="cursor-pointer"
+                    data-testid="export-scss"
+                  >
+                    <FileCode size={16} className="mr-2 text-pink-500" />
+                    <div>
+                      <div className="font-medium">SCSS Variables</div>
+                      <div className="text-xs text-muted-foreground">Sass/SCSS $variables</div>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    onClick={() => handleExport('tailwind')}
+                    className="cursor-pointer"
+                    data-testid="export-tailwind"
+                  >
+                    <Paintbrush size={16} className="mr-2 text-cyan-500" />
+                    <div>
+                      <div className="font-medium">Tailwind Config</div>
+                      <div className="text-xs text-muted-foreground">theme.extend snippet</div>
+                    </div>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
 
             {/* Collapsible Token Viewer */}
