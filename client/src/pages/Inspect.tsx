@@ -811,689 +811,506 @@ export default ${safeName};`;
 
   const previews = assets?.previews || {};
 
+  // Extract vibe tags from metadata for Quick Read
+  const vibeTags = summary?.metadataTags?.objective?.visualMood || 
+                   summary?.metadataTags?.subjective?.emotionalImpact || 
+                   [];
+  
+  // Extract primary colors for Quick Read (first 6)
+  const getPrimaryColors = () => {
+    if (!summary?.tokens?.color) return [];
+    const colors: { name: string; value: string }[] = [];
+    const colorTokens = summary.tokens.color;
+    
+    const extractColors = (obj: any, prefix = '') => {
+      for (const key in obj) {
+        if (colors.length >= 6) break;
+        const val = obj[key];
+        if (val?.$value && typeof val.$value === 'string') {
+          colors.push({ name: prefix + key, value: val.$value });
+        } else if (typeof val === 'object' && !val.$value) {
+          extractColors(val, prefix + key + '.');
+        }
+      }
+    };
+    extractColors(colorTokens);
+    return colors;
+  };
+  
+  const primaryColors = getPrimaryColors();
+
   return (
     <Layout>
-      <div ref={containerRef} className="max-w-4xl mx-auto space-y-8 md:space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        {/* Header with Navigation */}
-        <div className="space-y-4">
+      <div ref={containerRef} className="max-w-4xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        
+        {/* === SECTION 1: HERO === */}
+        <header className="space-y-3">
+          {/* Nav bar */}
           <div className="flex items-center justify-between">
-            <Link href="/" className="inline-flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors uppercase tracking-wider font-mono">
-              <ArrowLeft size={12} /> Back to Vault
+            <Link href="/" className="inline-flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+              <ArrowLeft size={12} /> Back
             </Link>
-            
-            {/* Style Navigation */}
-            {summary?.neighbors && (summary.neighbors.prevId || summary.neighbors.nextId) && (
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => summary.neighbors?.prevId && navigate(`/style/${summary.neighbors.prevId}`)}
-                  disabled={!summary.neighbors.prevId}
-                  className="p-2 rounded-lg border border-border hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                  data-testid="button-prev-style"
-                  title="Previous style"
-                >
-                  <ChevronLeft size={16} />
-                </button>
-                <button
-                  onClick={() => summary.neighbors?.nextId && navigate(`/style/${summary.neighbors.nextId}`)}
-                  disabled={!summary.neighbors.nextId}
-                  className="p-2 rounded-lg border border-border hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                  data-testid="button-next-style"
-                  title="Next style"
-                >
-                  <ChevronRight size={16} />
-                </button>
-              </div>
-            )}
-          </div>
-          
-          <div className="space-y-2">
-            <div className="flex items-start justify-between gap-4">
-              <h1 className="text-3xl md:text-4xl font-serif font-medium text-foreground">{summary.name}</h1>
+            <div className="flex items-center gap-2">
+              {summary?.neighbors && (summary.neighbors.prevId || summary.neighbors.nextId) && (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => summary.neighbors?.prevId && navigate(`/style/${summary.neighbors.prevId}`)}
+                    disabled={!summary.neighbors.prevId}
+                    className="p-1.5 rounded border border-border hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    data-testid="button-prev-style"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+                  <button
+                    onClick={() => summary.neighbors?.nextId && navigate(`/style/${summary.neighbors.nextId}`)}
+                    disabled={!summary.neighbors.nextId}
+                    className="p-1.5 rounded border border-border hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    data-testid="button-next-style"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+              )}
               {isOwner && (
                 <button
                   onClick={handleToggleVisibility}
                   disabled={visibilityLoading}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border border-border hover:bg-muted transition-colors"
+                  className="p-1.5 rounded border border-border hover:bg-muted transition-colors"
                   data-testid="button-toggle-visibility"
+                  title={isPublic ? "Public" : "Private"}
                 >
-                  {visibilityLoading ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : isPublic ? (
-                    <Eye size={14} />
-                  ) : (
-                    <EyeOff size={14} />
-                  )}
-                  <span>{isPublic ? "Public" : "Private"}</span>
+                  {visibilityLoading ? <Loader2 size={14} className="animate-spin" /> : isPublic ? <Eye size={14} /> : <EyeOff size={14} />}
                 </button>
               )}
             </div>
-            <p className="text-muted-foreground text-lg font-light leading-relaxed max-w-2xl">
-              {summary.description}
-            </p>
-            {summary.creatorName && summary.creatorId && (
-              <Link 
-                href={`/creator/${summary.creatorId}`}
-                className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
-                data-testid={`link-creator-${summary.creatorId}`}
-              >
-                <User size={14} />
-                <span>by {summary.creatorName}</span>
-              </Link>
+          </div>
+          
+          {/* Title + Vibe */}
+          <div className="space-y-1">
+            <h1 className="text-2xl md:text-3xl font-serif font-medium text-foreground leading-tight">{summary.name}</h1>
+            <p className="text-muted-foreground text-base font-light leading-relaxed">{summary.description}</p>
+          </div>
+          
+          {/* Subtle metadata row: creator + rating */}
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-3">
+              {summary.creatorName && summary.creatorId && (
+                <Link 
+                  href={`/creator/${summary.creatorId}`}
+                  className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
+                  data-testid={`link-creator-${summary.creatorId}`}
+                >
+                  <User size={12} />
+                  <span className="text-xs">{summary.creatorName}</span>
+                </Link>
+              )}
+              {avgRating.count > 0 && (
+                <div className="flex items-center gap-1 text-muted-foreground">
+                  <Star size={12} className="fill-yellow-400 text-yellow-400" />
+                  <span className="text-xs">{avgRating.average.toFixed(1)}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </header>
+
+        {/* === SECTION 2: VISUAL TRUST STRIP === */}
+        <section className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Source Image - Trust Signal */}
+          <div className="relative aspect-square rounded-lg overflow-hidden border border-border bg-muted">
+            {(summary.imageIds?.reference || (summary.referenceImages && summary.referenceImages.length > 0)) ? (
+              <>
+                <img 
+                  src={summary.imageIds?.reference 
+                    ? `/api/images/${summary.imageIds.reference}?size=medium`
+                    : summary.referenceImages[0]
+                  } 
+                  alt="Source reference"
+                  className="absolute inset-0 w-full h-full object-cover"
+                  loading="eager"
+                  data-testid="img-source-reference"
+                />
+                <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/70 text-white text-[10px] font-mono rounded">
+                  Source
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
+                No source image
+              </div>
             )}
           </div>
           
-          {/* Hero: Software App UI (preferred) or Reference Image */}
-          {(summary.imageIds?.ui_software_app || summary.imageIds?.reference || (summary.referenceImages && summary.referenceImages.length > 0)) && (
-            <div className="w-full">
-              <div className="rounded-lg overflow-hidden border border-border bg-muted">
+          {/* Software App UI - Style Output */}
+          <div className="relative aspect-square rounded-lg overflow-hidden border border-border bg-muted">
+            {summary.imageIds?.ui_software_app ? (
+              <>
                 <img 
-                  src={summary.imageIds?.ui_software_app
-                    ? `/api/images/${summary.imageIds.ui_software_app}?size=large`
-                    : summary.imageIds?.reference 
-                      ? `/api/images/${summary.imageIds.reference}?size=medium`
-                      : summary.referenceImages[0]
-                  } 
-                  alt={summary.name}
-                  className="w-full h-auto object-contain"
+                  src={`/api/images/${summary.imageIds.ui_software_app}?size=medium`}
+                  alt="Applied UI"
+                  className="absolute inset-0 w-full h-full object-cover"
                   loading="eager"
-                  data-testid="img-hero-main"
+                  data-testid="img-applied-ui"
                 />
+                <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/70 text-white text-[10px] font-mono rounded">
+                  Applied
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
+                Generating...
               </div>
+            )}
+          </div>
+        </section>
+
+        {/* === SECTION 3: QUICK READ === */}
+        <section className="space-y-3">
+          {/* Color Palette */}
+          {primaryColors.length > 0 && (
+            <div className="flex items-center gap-2 overflow-x-auto py-1">
+              {primaryColors.map((color, i) => (
+                <button
+                  key={i}
+                  onClick={() => {
+                    navigator.clipboard.writeText(color.value);
+                  }}
+                  className="flex-shrink-0 w-10 h-10 rounded-lg border border-border shadow-sm hover:scale-105 transition-transform"
+                  style={{ backgroundColor: color.value }}
+                  title={`${color.name}: ${color.value}`}
+                  data-testid={`color-swatch-${i}`}
+                />
+              ))}
             </div>
           )}
           
-          <div className="flex items-center justify-between pt-2">
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              <time dateTime={summary.createdAt}>
-                {(() => {
-                  const date = new Date(summary.createdAt);
-                  const displayDate = isNaN(date.getTime()) ? new Date() : date;
-                  return displayDate.toLocaleDateString(undefined, { 
-                    month: 'long', 
-                    day: 'numeric', 
-                    year: 'numeric' 
-                  });
-                })()}
-              </time>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              {/* Bookmark button */}
-              {isAuthenticated && (
-                <button
-                  onClick={handleToggleBookmark}
-                  disabled={bookmarkLoading}
-                  className={`inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors disabled:opacity-50 ${
-                    isBookmarked 
-                      ? "border-yellow-500 bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20" 
-                      : "border-border bg-muted/50 hover:bg-muted"
-                  }`}
-                  data-testid="button-bookmark-style"
-                >
-                  {bookmarkLoading ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <Bookmark size={14} className={isBookmarked ? "fill-current" : ""} />
-                  )}
-                  <span>{isBookmarked ? "Saved" : "Save"}</span>
-                </button>
-              )}
-              
-              {/* Add to Collection button */}
-              {isAuthenticated && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      disabled={collectionsLoading}
-                      className={`inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors disabled:opacity-50 ${
-                        styleCollections.size > 0
-                          ? "border-blue-500 bg-blue-500/10 text-blue-600 hover:bg-blue-500/20"
-                          : "border-border bg-muted/50 hover:bg-muted"
-                      }`}
-                      data-testid="button-add-to-collection"
-                    >
-                      {collectionsLoading ? (
-                        <Loader2 size={14} className="animate-spin" />
-                      ) : (
-                        <FolderPlus size={14} />
-                      )}
-                      <span>{styleCollections.size > 0 ? `In ${styleCollections.size}` : "Collect"}</span>
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    {collections.length === 0 ? (
-                      <div className="px-2 py-3 text-center">
-                        <p className="text-xs text-muted-foreground mb-2">No collections yet</p>
-                        <Link href="/saved" className="text-xs text-blue-500 hover:underline">
-                          Create your first collection
-                        </Link>
-                      </div>
-                    ) : (
-                      <>
-                        {collections.map((collection) => (
-                          <DropdownMenuItem
-                            key={collection.id}
-                            onClick={() => handleToggleCollection(collection.id)}
-                            className="cursor-pointer"
-                            data-testid={`collection-option-${collection.id}`}
-                          >
-                            <div className="flex items-center gap-2 w-full">
-                              {styleCollections.has(collection.id) ? (
-                                <Check size={14} className="text-green-500" />
-                              ) : (
-                                <Folder size={14} className="text-muted-foreground" />
-                              )}
-                              <span className="flex-1 truncate">{collection.name}</span>
-                            </div>
-                          </DropdownMenuItem>
-                        ))}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem asChild>
-                          <Link href="/saved" className="flex items-center gap-2 cursor-pointer" data-testid="link-manage-collections">
-                            <Plus size={14} />
-                            <span>Manage Collections</span>
-                          </Link>
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-              
-              {/* Share button */}
-              {shareCode ? (
-                <button
-                  onClick={handleCopyLink}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-muted/50 hover:bg-muted transition-colors"
-                  data-testid="button-copy-share-link"
-                >
-                  {copied ? (
-                    <>
-                      <Check size={14} className="text-green-500" />
-                      <span>Copied!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy size={14} />
-                      <span className="font-mono">{shareCode}</span>
-                    </>
-                  )}
-                </button>
-              ) : (
-                <button
-                  onClick={handleShare}
-                  disabled={shareLoading}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-muted/50 hover:bg-muted transition-colors disabled:opacity-50"
-                  data-testid="button-share-style"
-                >
-                  {shareLoading ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <Share2 size={14} />
-                  )}
-                  <span>Share</span>
-                </button>
-              )}
-            </div>
-          </div>
-          
-          {/* Rating Section */}
-          <div className="flex items-center gap-4 pt-2 border-t border-border mt-4">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Rating:</span>
-              <div className="flex items-center gap-0.5">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <button
-                    key={star}
-                    onClick={() => isAuthenticated && handleSubmitRating(star)}
-                    onMouseEnter={() => isAuthenticated && setHoveredStar(star)}
-                    onMouseLeave={() => setHoveredStar(0)}
-                    disabled={ratingLoading || !isAuthenticated}
-                    className={`p-0.5 transition-colors disabled:cursor-default ${
-                      isAuthenticated ? "cursor-pointer hover:scale-110" : ""
-                    }`}
-                    data-testid={`button-rate-${star}`}
-                    title={isAuthenticated ? `Rate ${star} star${star > 1 ? 's' : ''}` : "Sign in to rate"}
-                  >
-                    <Star 
-                      size={18} 
-                      className={`transition-colors ${
-                        star <= (hoveredStar || userRating)
-                          ? "fill-yellow-400 text-yellow-400"
-                          : "text-muted-foreground/40"
-                      }`}
-                    />
-                  </button>
-                ))}
-              </div>
-              {avgRating.count > 0 && (
-                <span className="text-xs text-muted-foreground ml-2">
-                  {avgRating.average.toFixed(1)} ({avgRating.count} {avgRating.count === 1 ? 'rating' : 'ratings'})
+          {/* Vibe Tags */}
+          {vibeTags.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {vibeTags.slice(0, 5).map((tag: string, i: number) => (
+                <span key={i} className="px-2 py-1 bg-muted text-xs rounded-full text-muted-foreground">
+                  {tag}
                 </span>
-              )}
-              {ratingLoading && <Loader2 size={14} className="animate-spin ml-2" />}
+              ))}
             </div>
-          </div>
-        </div>
+          )}
+        </section>
 
-        {/* Canonical Previews - Visual comparison suite */}
-        <section className="space-y-4">
-          <SectionHeader
-            title="Canonical Previews"
-            description="Standardized images for cross-style comparison"
-          />
+        {/* === SECTION 4: PRIMARY ACTIONS CTA === */}
+        <section className="flex flex-col sm:flex-row gap-2">
+          {/* Save */}
+          <button
+            onClick={isAuthenticated ? handleToggleBookmark : undefined}
+            disabled={bookmarkLoading || !isAuthenticated}
+            className={`flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium rounded-lg border transition-colors disabled:opacity-50 ${
+              isBookmarked 
+                ? "border-yellow-500 bg-yellow-500/10 text-yellow-600" 
+                : "border-border bg-muted/50 hover:bg-muted"
+            }`}
+            data-testid="button-save-style"
+            title={!isAuthenticated ? "Sign in to save" : undefined}
+          >
+            {bookmarkLoading ? <Loader2 size={16} className="animate-spin" /> : <Bookmark size={16} className={isBookmarked ? "fill-current" : ""} />}
+            {isBookmarked ? "Saved" : "Save"}
+          </button>
           
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {assetsLoading ? (
-              <>
-                <PreviewSkeleton aspect="aspect-square" />
-                <PreviewSkeleton aspect="aspect-square" />
-                <PreviewSkeleton aspect="aspect-square" />
-              </>
-            ) : (
-              <>
-                <div className="aspect-square bg-muted rounded-lg overflow-hidden border border-border relative group">
-                  {(summary.imageIds?.preview_landscape || previews.landscape) ? (
-                    <>
-                      <img 
-                        src={summary.imageIds?.preview_landscape 
-                          ? `/api/images/${summary.imageIds.preview_landscape}?size=medium`
-                          : previews.landscape
-                        } 
-                        alt="Landscape preview" 
-                        className="absolute inset-0 w-full h-full object-cover"
-                        loading="lazy"
-                      />
-                      <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 text-white text-[10px] font-mono rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                        Landscape
-                      </div>
-                    </>
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
-                      Landscape
-                    </div>
-                  )}
-                </div>
-                <div className="aspect-square bg-muted rounded-lg overflow-hidden border border-border relative group">
-                  {(summary.imageIds?.preview_portrait || previews.portrait) ? (
-                    <>
-                      <img 
-                        src={summary.imageIds?.preview_portrait
-                          ? `/api/images/${summary.imageIds.preview_portrait}?size=medium`
-                          : previews.portrait
-                        } 
-                        alt="Portrait preview" 
-                        className="absolute inset-0 w-full h-full object-cover"
-                        loading="lazy"
-                      />
-                      <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 text-white text-[10px] font-mono rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                        Portrait
-                      </div>
-                    </>
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
-                      Portrait
-                    </div>
-                  )}
-                </div>
-                <div className="aspect-square bg-muted rounded-lg overflow-hidden border border-border relative group">
-                  {(summary.imageIds?.preview_still_life || previews.stillLife) ? (
-                    <>
-                      <img 
-                        src={summary.imageIds?.preview_still_life
-                          ? `/api/images/${summary.imageIds.preview_still_life}?size=medium`
-                          : previews.stillLife
-                        } 
-                        alt="Still life preview" 
-                        className="absolute inset-0 w-full h-full object-cover"
-                        loading="lazy"
-                      />
-                      <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 text-white text-[10px] font-mono rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                        Still Life
-                      </div>
-                    </>
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
-                      Still Life
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-        </section>
-
-        {/* Export the DNA - Success moment */}
-        <section className="space-y-4">
-          <SectionHeader
-            title="Export the DNA"
-            description="Portable design tokens for any platform"
-          />
-          
-          <div className="p-6 bg-gradient-to-br from-muted/50 to-background rounded-xl border border-border">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">
-                  Take this style anywhere. W3C DTCG-compliant tokens ready for your design system.
-                </p>
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button 
-                    data-testid="button-export-dna"
-                    className="flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity shadow-sm"
-                  >
-                    <Download size={18} />
-                    Export Tokens
-                    <ChevronDown size={14} />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuItem 
-                    onClick={() => handleExport('json')}
-                    className="cursor-pointer"
-                    data-testid="export-dna-json"
-                  >
-                    <FileJson size={16} className="mr-2 text-blue-500" />
-                    <div>
-                      <div className="font-medium">JSON (W3C DTCG)</div>
-                      <div className="text-xs text-muted-foreground">Standards-compliant tokens</div>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={() => handleExport('css')}
-                    className="cursor-pointer"
-                    data-testid="export-dna-css"
-                  >
-                    <FileCode size={16} className="mr-2 text-orange-500" />
-                    <div>
-                      <div className="font-medium">CSS Variables</div>
-                      <div className="text-xs text-muted-foreground">Custom properties for web</div>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={() => handleExport('scss')}
-                    className="cursor-pointer"
-                    data-testid="export-dna-scss"
-                  >
-                    <FileCode size={16} className="mr-2 text-pink-500" />
-                    <div>
-                      <div className="font-medium">SCSS Variables</div>
-                      <div className="text-xs text-muted-foreground">Sass/SCSS $variables</div>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem 
-                    onClick={() => handleExport('tailwind')}
-                    className="cursor-pointer"
-                    data-testid="export-dna-tailwind"
-                  >
-                    <Paintbrush size={16} className="mr-2 text-cyan-500" />
-                    <div>
-                      <div className="font-medium">Tailwind Config</div>
-                      <div className="text-xs text-muted-foreground">theme.extend snippet</div>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={() => handleExport('react')}
-                    className="cursor-pointer"
-                    data-testid="export-dna-react"
-                  >
-                    <FileCode size={16} className="mr-2 text-blue-400" />
-                    <div>
-                      <div className="font-medium">React/TypeScript</div>
-                      <div className="text-xs text-muted-foreground">Typed theme object</div>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={() => handleExport('flutter')}
-                    className="cursor-pointer"
-                    data-testid="export-dna-flutter"
-                  >
-                    <FileCode size={16} className="mr-2 text-sky-500" />
-                    <div>
-                      <div className="font-medium">Flutter/Dart</div>
-                      <div className="text-xs text-muted-foreground">Static class with constants</div>
-                    </div>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-        </section>
-
-        {/* Gallery - Mood Board & UI Concepts */}
-        <section className="space-y-0">
-          <SectionHeader
-            title="Gallery"
-          />
-          <div>
-            {assetsLoading ? (
-              <div className="flex items-center justify-center py-12 bg-muted/30 rounded-lg border border-border">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span className="text-sm">Loading mood board...</span>
-                </div>
-              </div>
-            ) : (
-              <AiMoodBoard
-                styleId={summary.id}
-                styleName={summary.name}
-                moodBoard={assets?.moodBoard}
-                uiConcepts={assets?.uiConcepts}
-              />
-            )}
-          </div>
-        </section>
-
-        {/* Colors */}
-        <section className="space-y-0">
-          <SectionHeader
-            title="Colors"
-            description="Click any swatch to copy"
-          />
-          <ColorPaletteSwatches tokens={summary.tokens} />
-        </section>
-
-        {/* Design Tokens */}
-        <section className="space-y-0">
-          <SectionHeader
-            title="Design Tokens"
-            description="W3C DTCG-compliant token structure"
-          />
-
-          <div className="border border-border rounded-lg overflow-hidden">
-            <button
-              onClick={() => setTokensExpanded(!tokensExpanded)}
-              className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
-              data-testid="toggle-token-viewer"
-            >
-              <span className="text-sm font-medium text-foreground">View Token Structure</span>
-              {tokensExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-            </button>
-            {tokensExpanded && (
-              <div className="p-4 pt-0 border-t border-border animate-in fade-in duration-200">
-                <TokenViewer tokens={summary.tokens} />
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* Create - Accordion with Try It Now action */}
-        <section className="space-y-0">
-          <SectionHeader
-            title="Create"
-            description="Generate new images using this style"
-          />
-          
-          <div className="border border-border rounded-lg overflow-hidden divide-y divide-border">
-            {/* Try It Now - Primary action */}
-            <div className="p-4 bg-muted/30">
-              <Button
-                onClick={() => {
-                  setTryItOpen(true);
-                  setTryItImage(null);
-                  setTryItError(null);
-                  setTryItPrompt("");
-                }}
-                className="w-full sm:w-auto flex items-center justify-center gap-2"
-                data-testid="button-try-it-now"
+          {/* Export */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button 
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+                data-testid="button-export-primary"
               >
-                <Sparkles size={16} />
-                Try it Now
-              </Button>
-            </div>
-            
-            {/* Style Description - Collapsible */}
-            {summary.promptScaffolding?.base && (
-              <details className="group">
-                <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
-                  <span className="text-sm font-medium text-foreground">Style Description</span>
-                  <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
-                </summary>
-                <div className="px-4 pb-4">
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{summary.promptScaffolding.base}</p>
-                </div>
-              </details>
-            )}
-            
-            {/* Characteristics - Collapsible */}
-            {summary.promptScaffolding?.modifiers && summary.promptScaffolding.modifiers.length > 0 && (
-              <details className="group">
-                <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
-                  <span className="text-sm font-medium text-foreground">Characteristics</span>
-                  <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
-                </summary>
-                <div className="px-4 pb-4">
-                  <div className="flex flex-wrap gap-2">
-                    {summary.promptScaffolding.modifiers.map((mod: string, i: number) => (
-                      <span key={i} className="px-2 py-1 bg-muted text-xs rounded-md text-muted-foreground">
-                        {mod}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </details>
-            )}
-            
-            {/* Avoid - Collapsible */}
-            {summary.promptScaffolding?.negative && (
-              <details className="group">
-                <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
-                  <span className="text-sm font-medium text-foreground">Avoid</span>
-                  <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
-                </summary>
-                <div className="px-4 pb-4">
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{summary.promptScaffolding.negative}</p>
-                </div>
-              </details>
-            )}
-
-            {/* Usage Notes - Nested */}
-            <details className="group">
-              <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
-                <span className="text-sm font-medium text-foreground">Usage Notes</span>
-                <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
-              </summary>
-              <div className="px-4 pb-4">
-                <StyleSpecEditor 
-                  styleId={summary.id} 
-                  styleSpec={summary.styleSpec}
-                  createdAt={summary.createdAt}
-                  updatedAt={summary.updatedAt}
-                  onUpdate={handleSpecUpdate}
-                />
-              </div>
-            </details>
-
-            {/* Revisions - Nested */}
-            <details 
-              className="group"
-              onToggle={(e) => {
-                if ((e.target as HTMLDetailsElement).open && !versionsExpanded) {
-                  setVersionsExpanded(true);
-                }
-              }}
-            >
-              <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
-                <span className="text-sm font-medium text-foreground">Revisions</span>
-                <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
-              </summary>
-              <div className="px-4 pb-4 space-y-4">
-                {isOwner && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleSaveVersion}
-                    disabled={savingVersion}
-                    data-testid="save-version-btn"
-                  >
-                    {savingVersion ? (
-                      <>
-                        <Loader2 size={14} className="mr-2 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save size={14} className="mr-2" />
-                        Save Snapshot
-                      </>
-                    )}
-                  </Button>
-                )}
-                
-                {versionsLoading ? (
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Loader2 size={14} className="animate-spin" />
-                    <span className="text-sm">Loading versions...</span>
-                  </div>
-                ) : versions.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No revision history yet</p>
-                ) : (
-                  <div className="space-y-2">
-                    {versions.map((version) => (
-                      <div 
-                        key={version.id} 
-                        className="flex items-center justify-between p-3 bg-muted/30 rounded-lg text-sm"
-                      >
-                        <div className="flex items-center gap-3">
-                          <History size={14} className="text-muted-foreground" />
-                          <div>
-                            <span className="font-medium">v{version.versionNumber}</span>
-                            <span className="text-muted-foreground ml-2">
-                              {version.changeType}
-                              {version.changeDescription && ` — ${version.changeDescription}`}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(version.createdAt).toLocaleDateString()}
-                          </span>
-                          {isOwner && (
-                            <button
-                              onClick={() => handleRevertToVersion(version.id)}
-                              disabled={revertingVersion === version.id}
-                              className="p-1 hover:bg-muted rounded transition-colors"
-                              title="Revert to this version"
-                              data-testid={`revert-version-${version.id}`}
-                            >
-                              {revertingVersion === version.id ? (
-                                <Loader2 size={14} className="animate-spin" />
-                              ) : (
-                                <RotateCcw size={14} />
-                              )}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </details>
-          </div>
+                <Download size={16} />
+                Export
+                <ChevronDown size={14} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center" className="w-56">
+              <DropdownMenuItem onClick={() => handleExport('json')} className="cursor-pointer">
+                <FileJson size={16} className="mr-2 text-blue-500" />
+                <span>JSON (W3C DTCG)</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExport('css')} className="cursor-pointer">
+                <FileCode size={16} className="mr-2 text-orange-500" />
+                <span>CSS Variables</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExport('tailwind')} className="cursor-pointer">
+                <Paintbrush size={16} className="mr-2 text-cyan-500" />
+                <span>Tailwind Config</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          
+          {/* Remix / Apply */}
+          <Button
+            onClick={() => {
+              setTryItOpen(true);
+              setTryItImage(null);
+              setTryItError(null);
+              setTryItPrompt("");
+            }}
+            variant="outline"
+            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3"
+            data-testid="button-remix-style"
+          >
+            <Sparkles size={16} />
+            Remix
+          </Button>
         </section>
+
+        {/* === COLLAPSED SECTIONS === */}
+        <div className="border border-border rounded-lg divide-y divide-border">
+          
+          {/* Gallery - Mood Board & UI Concepts */}
+          <details className="group">
+            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+              <span className="text-sm font-medium text-foreground">Gallery</span>
+              <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="p-4 pt-0">
+              {assetsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <AiMoodBoard
+                  styleId={summary.id}
+                  styleName={summary.name}
+                  moodBoard={assets?.moodBoard}
+                  uiConcepts={assets?.uiConcepts}
+                />
+              )}
+            </div>
+          </details>
+
+          {/* Canonical Previews */}
+          <details className="group">
+            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+              <span className="text-sm font-medium text-foreground">Canonical Previews</span>
+              <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="p-4 pt-0">
+              <div className="grid grid-cols-3 gap-2">
+                {['landscape', 'portrait', 'stillLife'].map((type) => {
+                  const key = type === 'stillLife' ? 'preview_still_life' : `preview_${type}`;
+                  const imgSrc = summary.imageIds?.[key] 
+                    ? `/api/images/${summary.imageIds[key]}?size=medium`
+                    : (previews as any)[type];
+                  return (
+                    <div key={type} className="aspect-square bg-muted rounded-lg overflow-hidden border border-border relative">
+                      {imgSrc ? (
+                        <img src={imgSrc} alt={type} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+                      ) : (
+                        <div className="flex items-center justify-center h-full text-muted-foreground text-xs capitalize">{type}</div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </details>
+
+          {/* Colors */}
+          <details className="group">
+            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+              <span className="text-sm font-medium text-foreground">Colors</span>
+              <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="p-4 pt-0">
+              <ColorPaletteSwatches tokens={summary.tokens} />
+            </div>
+          </details>
+
+          {/* Design Tokens */}
+          <details className="group" onToggle={(e) => { if ((e.target as HTMLDetailsElement).open) setTokensExpanded(true); }}>
+            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+              <span className="text-sm font-medium text-foreground">Design Tokens</span>
+              <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="p-4 pt-0">
+              {tokensExpanded && <TokenViewer tokens={summary.tokens} />}
+            </div>
+          </details>
+
+          {/* Create / Prompt Details */}
+          <details className="group">
+            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+              <span className="text-sm font-medium text-foreground">Style Guide</span>
+              <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="p-4 pt-0 space-y-4">
+              {summary.promptScaffolding?.base && (
+                <div>
+                  <h4 className="text-xs font-medium text-muted-foreground mb-1">Description</h4>
+                  <p className="text-sm text-foreground">{summary.promptScaffolding.base}</p>
+                </div>
+              )}
+              {summary.promptScaffolding?.modifiers?.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-medium text-muted-foreground mb-1">Characteristics</h4>
+                  <div className="flex flex-wrap gap-1">
+                    {summary.promptScaffolding.modifiers.map((mod: string, i: number) => (
+                      <span key={i} className="px-2 py-0.5 bg-muted text-xs rounded">{mod}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {summary.promptScaffolding?.negative && (
+                <div>
+                  <h4 className="text-xs font-medium text-muted-foreground mb-1">Avoid</h4>
+                  <p className="text-sm text-muted-foreground">{summary.promptScaffolding.negative}</p>
+                </div>
+              )}
+            </div>
+          </details>
+
+          {/* Usage Notes */}
+          <details className="group">
+            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+              <span className="text-sm font-medium text-foreground">Usage Notes</span>
+              <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="p-4 pt-0">
+              <StyleSpecEditor 
+                styleId={summary.id} 
+                styleSpec={summary.styleSpec}
+                createdAt={summary.createdAt}
+                updatedAt={summary.updatedAt}
+                onUpdate={handleSpecUpdate}
+              />
+            </div>
+          </details>
+
+          {/* Revisions */}
+          <details 
+            className="group"
+            onToggle={(e) => {
+              if ((e.target as HTMLDetailsElement).open && !versionsExpanded) {
+                setVersionsExpanded(true);
+              }
+            }}
+          >
+            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+              <span className="text-sm font-medium text-foreground">Revisions</span>
+              <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="p-4 pt-0 space-y-3">
+              {isOwner && (
+                <Button variant="outline" size="sm" onClick={handleSaveVersion} disabled={savingVersion}>
+                  {savingVersion ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Save size={14} className="mr-2" />}
+                  Save Snapshot
+                </Button>
+              )}
+              {versionsLoading ? (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 size={14} className="animate-spin" />
+                  <span className="text-sm">Loading...</span>
+                </div>
+              ) : versions.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No revisions yet</p>
+              ) : (
+                <div className="space-y-2">
+                  {versions.map((version) => (
+                    <div key={version.id} className="flex items-center justify-between p-2 bg-muted/30 rounded text-sm">
+                      <span>v{version.versionNumber} — {version.changeType}</span>
+                      {isOwner && (
+                        <button
+                          onClick={() => handleRevertToVersion(version.id)}
+                          disabled={revertingVersion === version.id}
+                          className="p-1 hover:bg-muted rounded"
+                        >
+                          {revertingVersion === version.id ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </details>
+
+          {/* Share & Rate */}
+          <details className="group">
+            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+              <span className="text-sm font-medium text-foreground">Share & Rate</span>
+              <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="p-4 pt-0 space-y-4">
+              {/* Share */}
+              <div className="flex items-center gap-2">
+                {shareCode ? (
+                  <button
+                    onClick={handleCopyLink}
+                    className="inline-flex items-center gap-2 px-3 py-2 text-sm rounded-lg border border-border hover:bg-muted transition-colors"
+                  >
+                    {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+                    <span className="font-mono">{shareCode}</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleShare}
+                    disabled={shareLoading}
+                    className="inline-flex items-center gap-2 px-3 py-2 text-sm rounded-lg border border-border hover:bg-muted transition-colors"
+                  >
+                    {shareLoading ? <Loader2 size={14} className="animate-spin" /> : <Share2 size={14} />}
+                    Generate Share Link
+                  </button>
+                )}
+              </div>
+              
+              {/* Rating */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Your rating:</span>
+                <div className="flex items-center gap-0.5">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      onClick={() => isAuthenticated && handleSubmitRating(star)}
+                      onMouseEnter={() => isAuthenticated && setHoveredStar(star)}
+                      onMouseLeave={() => setHoveredStar(0)}
+                      disabled={ratingLoading || !isAuthenticated}
+                      className="p-0.5 disabled:cursor-default"
+                      title={isAuthenticated ? `Rate ${star}` : "Sign in to rate"}
+                    >
+                      <Star size={16} className={star <= (hoveredStar || userRating) ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/40"} />
+                    </button>
+                  ))}
+                </div>
+                {ratingLoading && <Loader2 size={14} className="animate-spin" />}
+              </div>
+
+              {/* Collections */}
+              {isAuthenticated && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Collections:</span>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg border border-border hover:bg-muted">
+                        <FolderPlus size={14} />
+                        {styleCollections.size > 0 ? `In ${styleCollections.size}` : "Add"}
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-48">
+                      {collections.length === 0 ? (
+                        <div className="px-2 py-2 text-center text-xs text-muted-foreground">
+                          <Link href="/saved" className="text-blue-500 hover:underline">Create collection</Link>
+                        </div>
+                      ) : (
+                        collections.map((c) => (
+                          <DropdownMenuItem key={c.id} onClick={() => handleToggleCollection(c.id)} className="cursor-pointer">
+                            {styleCollections.has(c.id) ? <Check size={14} className="mr-2 text-green-500" /> : <Folder size={14} className="mr-2" />}
+                            {c.name}
+                          </DropdownMenuItem>
+                        ))
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              )}
+            </div>
+          </details>
+        </div>
 
         {/* Try It Now Dialog */}
         {tryItOpen && (
