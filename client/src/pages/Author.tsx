@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Upload, Wand2, ArrowRight, ArrowLeft, Loader2, X, Layers, Check, Sparkles, AlertCircle, RefreshCw, FileJson } from "lucide-react";
+import { Upload, Wand2, ArrowRight, ArrowLeft, Loader2, X, Layers, Check, Sparkles, AlertCircle, RefreshCw, FileJson, ChevronDown } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { createStyle, SAMPLE_TOKENS } from "@/lib/store";
 import { useToast } from "@/hooks/use-toast";
@@ -779,48 +779,60 @@ export default function Author() {
                           <div className="mt-2 space-y-2">
                             <div className="flex items-center gap-2 text-sm text-green-600">
                               <Check size={14} />
-                              Tokens parsed successfully
-                            </div>
-                            <div className="flex flex-wrap gap-2 mt-2">
-                              {importStats && importStats.colorCount > 0 && (
-                                <span className="px-2 py-1 bg-background border border-border rounded text-xs">
-                                  {importStats.colorCount} colors
-                                </span>
-                              )}
-                              {importStats && importStats.spacingCount > 0 && (
-                                <span className="px-2 py-1 bg-background border border-border rounded text-xs">
-                                  {importStats.spacingCount} spacing
-                                </span>
-                              )}
-                              {importStats && importStats.typographyCount > 0 && (
-                                <span className="px-2 py-1 bg-background border border-border rounded text-xs">
-                                  {importStats.typographyCount} typography
-                                </span>
-                              )}
-                              {importStats && importStats.otherCount > 0 && (
-                                <span className="px-2 py-1 bg-background border border-border rounded text-xs">
-                                  {importStats.otherCount} other
+                              Tokens ready
+                              {importStats && (
+                                <span className="text-muted-foreground font-normal">
+                                  ({importStats.colorCount + importStats.spacingCount + importStats.typographyCount + importStats.otherCount} tokens)
                                 </span>
                               )}
                             </div>
-                            {/* Color preview swatches */}
-                            {importedTokens.color && (
-                              <div className="flex flex-wrap gap-1 mt-3">
-                                {extractColorSwatches(importedTokens.color).slice(0, 8).map(({ key, color }) => (
-                                  <div
-                                    key={key}
-                                    className="w-6 h-6 rounded border border-border"
-                                    style={{ backgroundColor: color }}
-                                    title={key}
-                                  />
-                                ))}
-                                {importStats && importStats.colorCount > 8 && (
-                                  <div className="w-6 h-6 rounded border border-border bg-muted flex items-center justify-center text-xs text-muted-foreground">
-                                    +{importStats.colorCount - 8}
+                            <details className="group">
+                              <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors list-none flex items-center gap-1">
+                                <ChevronDown size={12} className="group-open:rotate-180 transition-transform" />
+                                View details
+                              </summary>
+                              <div className="mt-2 space-y-2">
+                                <div className="flex flex-wrap gap-2">
+                                  {importStats && importStats.colorCount > 0 && (
+                                    <span className="px-2 py-1 bg-background border border-border rounded text-xs">
+                                      {importStats.colorCount} colors
+                                    </span>
+                                  )}
+                                  {importStats && importStats.spacingCount > 0 && (
+                                    <span className="px-2 py-1 bg-background border border-border rounded text-xs">
+                                      {importStats.spacingCount} spacing
+                                    </span>
+                                  )}
+                                  {importStats && importStats.typographyCount > 0 && (
+                                    <span className="px-2 py-1 bg-background border border-border rounded text-xs">
+                                      {importStats.typographyCount} typography
+                                    </span>
+                                  )}
+                                  {importStats && importStats.otherCount > 0 && (
+                                    <span className="px-2 py-1 bg-background border border-border rounded text-xs">
+                                      {importStats.otherCount} other
+                                    </span>
+                                  )}
+                                </div>
+                                {importedTokens.color && (
+                                  <div className="flex flex-wrap gap-1">
+                                    {extractColorSwatches(importedTokens.color).slice(0, 8).map(({ key, color }) => (
+                                      <div
+                                        key={key}
+                                        className="w-5 h-5 rounded border border-border"
+                                        style={{ backgroundColor: color }}
+                                        title={key}
+                                      />
+                                    ))}
+                                    {importStats && importStats.colorCount > 8 && (
+                                      <div className="w-5 h-5 rounded border border-border bg-muted flex items-center justify-center text-[10px] text-muted-foreground">
+                                        +{importStats.colorCount - 8}
+                                      </div>
+                                    )}
                                   </div>
                                 )}
                               </div>
-                            )}
+                            </details>
                           </div>
                         ) : (
                           <div className="mt-2 text-sm text-muted-foreground">Parsing file...</div>
