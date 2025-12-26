@@ -9,6 +9,7 @@ export interface StyleSummary {
   description: string;
   createdAt: Date;
   metadataTags: any;
+  keywords: string[];
   moodBoardStatus: string;
   uiConceptsStatus: string;
   thumbnailPreview: string | null;
@@ -154,12 +155,14 @@ export class DatabaseStorage implements IStorage {
       const uiConceptsData = s.uiConcepts as UiConceptAssets | null;
       const uiDashboard = uiConceptsData?.dashboard;
       const fallbackThumbnail = (s.previews as any)?.landscape || (s.previews as any)?.portrait || null;
+      const tags = s.metadataTags as MetadataTags | null;
       return {
         id: s.id,
         name: s.name,
         description: s.description,
         createdAt: s.createdAt,
         metadataTags: s.metadataTags,
+        keywords: tags?.keywords || [],
         moodBoardStatus: (s.moodBoard as any)?.status || "pending",
         uiConceptsStatus: uiConceptsData?.status || "pending",
         thumbnailPreview: uiDashboard || fallbackThumbnail,
@@ -207,7 +210,7 @@ export class DatabaseStorage implements IStorage {
     
     if (filters?.search) {
       const searchTerm = `%${filters.search.toLowerCase()}%`;
-      conditions.push(sql`(LOWER(${styles.name}) LIKE ${searchTerm} OR LOWER(${styles.description}) LIKE ${searchTerm})`);
+      conditions.push(sql`(LOWER(${styles.name}) LIKE ${searchTerm} OR LOWER(${styles.description}) LIKE ${searchTerm} OR EXISTS (SELECT 1 FROM jsonb_array_elements_text(${styles.metadataTags}->'keywords') AS kw WHERE LOWER(kw) LIKE ${searchTerm}))`);
     }
     
     if (filters?.mood && filters.mood.length > 0) {
@@ -258,7 +261,7 @@ export class DatabaseStorage implements IStorage {
       const countConditions: any[] = [];
       if (filters.search) {
         const searchTerm = `%${filters.search.toLowerCase()}%`;
-        countConditions.push(sql`(LOWER(${styles.name}) LIKE ${searchTerm} OR LOWER(${styles.description}) LIKE ${searchTerm})`);
+        countConditions.push(sql`(LOWER(${styles.name}) LIKE ${searchTerm} OR LOWER(${styles.description}) LIKE ${searchTerm} OR EXISTS (SELECT 1 FROM jsonb_array_elements_text(${styles.metadataTags}->'keywords') AS kw WHERE LOWER(kw) LIKE ${searchTerm}))`);
       }
       if (filters.mood && filters.mood.length > 0) {
         const moodConditions = filters.mood.map(m => 
@@ -297,12 +300,14 @@ export class DatabaseStorage implements IStorage {
         const uiConceptsData = s.uiConcepts as UiConceptAssets | null;
         const uiDashboard = uiConceptsData?.dashboard;
         const fallbackThumbnail = refImages && refImages.length > 0 ? refImages[0] : null;
+        const tags = s.metadataTags as MetadataTags | null;
         return {
           id: s.id,
           name: s.name,
           description: s.description,
           createdAt: s.createdAt,
           metadataTags: s.metadataTags,
+          keywords: tags?.keywords || [],
           moodBoardStatus: "complete",
           uiConceptsStatus: uiConceptsData?.status || "pending",
           thumbnailPreview: uiDashboard || fallbackThumbnail,
@@ -836,12 +841,14 @@ export class DatabaseStorage implements IStorage {
       const uiConceptsData = s.uiConcepts as UiConceptAssets | null;
       const uiDashboard = uiConceptsData?.dashboard;
       const fallbackThumbnail = (s.previews as any)?.landscape || (s.previews as any)?.portrait || null;
+      const tags = s.metadataTags as MetadataTags | null;
       return {
         id: s.id,
         name: s.name,
         description: s.description,
         createdAt: s.createdAt,
         metadataTags: s.metadataTags,
+        keywords: tags?.keywords || [],
         moodBoardStatus: (s.moodBoard as any)?.status || "pending",
         uiConceptsStatus: uiConceptsData?.status || "pending",
         thumbnailPreview: uiDashboard || fallbackThumbnail,
@@ -879,12 +886,14 @@ export class DatabaseStorage implements IStorage {
       const uiConceptsData = s.uiConcepts as UiConceptAssets | null;
       const uiDashboard = uiConceptsData?.dashboard;
       const fallbackThumbnail = (s.previews as any)?.landscape || (s.previews as any)?.portrait || null;
+      const tags = s.metadataTags as MetadataTags | null;
       return {
         id: s.id,
         name: s.name,
         description: s.description,
         createdAt: s.createdAt,
         metadataTags: s.metadataTags,
+        keywords: tags?.keywords || [],
         moodBoardStatus: (s.moodBoard as any)?.status || "pending",
         uiConceptsStatus: uiConceptsData?.status || "pending",
         thumbnailPreview: uiDashboard || fallbackThumbnail,
@@ -967,12 +976,14 @@ export class DatabaseStorage implements IStorage {
       const uiConceptsData = s.uiConcepts as UiConceptAssets | null;
       const uiDashboard = uiConceptsData?.dashboard;
       const fallbackThumbnail = (s.previews as any)?.landscape || (s.previews as any)?.portrait || null;
+      const tags = s.metadataTags as MetadataTags | null;
       return {
         id: s.id,
         name: s.name,
         description: s.description,
         createdAt: s.createdAt,
         metadataTags: s.metadataTags,
+        keywords: tags?.keywords || [],
         moodBoardStatus: (s.moodBoard as any)?.status || "pending",
         uiConceptsStatus: uiConceptsData?.status || "pending",
         thumbnailPreview: uiDashboard || fallbackThumbnail,
@@ -1119,12 +1130,14 @@ export class DatabaseStorage implements IStorage {
       const uiConceptsData = s.uiConcepts as UiConceptAssets | null;
       const uiDashboard = uiConceptsData?.dashboard;
       const fallbackThumbnail = (s.previews as any)?.landscape || null;
+      const tags = s.metadataTags as MetadataTags | null;
       return {
         id: s.id,
         name: s.name,
         description: s.description,
         createdAt: s.createdAt,
         metadataTags: s.metadataTags,
+        keywords: tags?.keywords || [],
         moodBoardStatus: (s.moodBoard as MoodBoardAssets)?.status || "pending",
         uiConceptsStatus: uiConceptsData?.status || "pending",
         thumbnailPreview: uiDashboard || fallbackThumbnail,
