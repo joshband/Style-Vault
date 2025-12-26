@@ -85,7 +85,7 @@ export interface IStorage {
   getStylesByCreator(creatorId: string): Promise<StyleSummary[]>;
   getPublicStyleSummaries(): Promise<StyleSummary[]>;
   updateStyleVisibility(id: string, isPublic: boolean): Promise<Style | undefined>;
-  getCreatorInfo(userId: string): Promise<{ id: string; name: string } | undefined>;
+  getCreatorInfo(userId: string): Promise<{ id: string; name: string; profileImageUrl: string | null; createdAt: Date | null } | undefined>;
 
   // Bookmark operations
   getBookmarksByUser(userId: string): Promise<Bookmark[]>;
@@ -908,7 +908,7 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async getCreatorInfo(userId: string): Promise<{ id: string; name: string } | undefined> {
+  async getCreatorInfo(userId: string): Promise<{ id: string; name: string; profileImageUrl: string | null; createdAt: Date | null } | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, userId));
     if (!user) return undefined;
     return {
@@ -916,6 +916,8 @@ export class DatabaseStorage implements IStorage {
       name: user.firstName && user.lastName 
         ? `${user.firstName} ${user.lastName}` 
         : user.firstName || user.email || "Unknown",
+      profileImageUrl: user.profileImageUrl || null,
+      createdAt: user.createdAt || null,
     };
   }
 
