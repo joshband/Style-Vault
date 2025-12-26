@@ -4,13 +4,12 @@ import { Layout } from "@/components/layout";
 import { TokenViewer } from "@/components/token-viewer";
 import { ColorPaletteSwatches } from "@/components/color-palette-swatches";
 import { StyleSpecEditor } from "@/components/style-spec-editor";
-import { ArrowLeft, Download, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Palette, MessageSquare, Share2, Check, Copy, Droplets, FileEdit, Bookmark, Star, User, FolderPlus, Folder, Plus, FileCode, FileJson, Paintbrush, History, RotateCcw, Save, Sparkles, X } from "lucide-react";
+import { ArrowLeft, Download, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Share2, Check, Copy, Bookmark, Star, User, FolderPlus, Folder, Plus, FileCode, FileJson, Paintbrush, History, RotateCcw, Save, Sparkles, X } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { useState, useEffect, useCallback, type ReactNode } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { AiMoodBoard } from "@/components/ai-mood-board";
-import { ActiveJobsIndicator } from "@/components/active-jobs-indicator";
 import { useAuth } from "@/hooks/use-auth";
 
 interface StyleSummary {
@@ -56,22 +55,11 @@ interface StyleVersion {
   createdAt: string;
 }
 
-interface SectionHeaderProps {
-  icon: ReactNode;
-  title: string;
-  description: string;
-}
-
-function SectionHeader({ icon, title, description }: SectionHeaderProps) {
+function SectionHeader({ title, description }: { title: string; description?: string }) {
   return (
-    <div className="flex items-start gap-3 mb-6">
-      <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-muted flex items-center justify-center text-muted-foreground">
-        {icon}
-      </div>
-      <div>
-        <h2 className="text-lg font-serif font-medium text-foreground">{title}</h2>
-        <p className="text-sm text-muted-foreground mt-0.5">{description}</p>
-      </div>
+    <div className="mb-6">
+      <h2 className="text-lg font-serif font-medium text-foreground">{title}</h2>
+      {description && <p className="text-sm text-muted-foreground mt-0.5">{description}</p>}
     </div>
   );
 }
@@ -866,23 +854,18 @@ export default ${safeName};`;
           </div>
           
           {(summary.imageIds?.reference || (summary.referenceImages && summary.referenceImages.length > 0)) && (
-            <div className="space-y-2">
-              <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Source Image
-              </h3>
-              <div className="w-full">
-                <div className="rounded-lg overflow-hidden border border-border bg-muted/30">
-                  <img 
-                    src={summary.imageIds?.reference 
-                      ? `/api/images/${summary.imageIds.reference}?size=medium`
-                      : summary.referenceImages[0]
-                    } 
-                    alt="Source image" 
-                    className="w-full h-auto object-contain"
-                    loading="lazy"
-                    data-testid="img-reference-main"
-                  />
-                </div>
+            <div className="w-full">
+              <div className="rounded-lg overflow-hidden border border-border">
+                <img 
+                  src={summary.imageIds?.reference 
+                    ? `/api/images/${summary.imageIds.reference}?size=medium`
+                    : summary.referenceImages[0]
+                  } 
+                  alt={summary.name}
+                  className="w-full h-auto object-contain"
+                  loading="lazy"
+                  data-testid="img-reference-main"
+                />
               </div>
             </div>
           )}
@@ -890,7 +873,7 @@ export default ${safeName};`;
           <div className="flex items-center justify-between pt-2">
             <div className="flex items-center gap-4 text-xs text-muted-foreground">
               <time dateTime={summary.createdAt}>
-                Created {(() => {
+                {(() => {
                   const date = new Date(summary.createdAt);
                   const displayDate = isNaN(date.getTime()) ? new Date() : date;
                   return displayDate.toLocaleDateString(undefined, { 
@@ -900,7 +883,6 @@ export default ${safeName};`;
                   });
                 })()}
               </time>
-              <ActiveJobsIndicator styleId={id} />
             </div>
             
             <div className="flex items-center gap-2">
@@ -1062,19 +1044,14 @@ export default ${safeName};`;
           </div>
         </div>
 
-        {/* Section 1: Visual Identity */}
+        {/* Gallery */}
         <section className="space-y-0">
           <SectionHeader
-            icon={<Eye size={20} />}
-            title="Visual Identity"
-            description="How this style looks and feels across different compositions"
+            title="Gallery"
           />
           
-          {/* Canonical Previews */}
+          {/* Previews */}
           <div className="space-y-4">
-            <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Canonical Previews
-            </h3>
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 sm:grid-rows-[auto_auto]">
               {assetsLoading ? (
                 <>
@@ -1175,30 +1152,27 @@ export default ${safeName};`;
           </div>
         </section>
 
-        {/* Section 2: Color Palette */}
+        {/* Colors */}
         <section className="space-y-0">
           <SectionHeader
-            icon={<Droplets size={20} />}
-            title="Color Palette"
-            description="Click any swatch to copy the hex code"
+            title="Colors"
+            description="Click any swatch to copy"
           />
           <ColorPaletteSwatches tokens={summary.tokens} />
         </section>
 
-        {/* Section 3: Design Tokens */}
+        {/* Visual Vocabulary */}
         <section className="space-y-0">
           <SectionHeader
-            icon={<Palette size={20} />}
-            title="Design Tokens"
-            description="The technical DNA behind this visual language"
+            title="Visual Vocabulary"
           />
 
           <div className="space-y-4">
-            {/* Export CTA */}
+            {/* Export */}
             <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg border border-border">
               <div>
-                <p className="text-sm font-medium text-foreground">Export Design Tokens</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Download in multiple formats for your workflow</p>
+                <p className="text-sm font-medium text-foreground">Export</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Download for your project</p>
               </div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -1302,17 +1276,12 @@ export default ${safeName};`;
           </div>
         </section>
 
-        {/* Section 4: Prompt Scaffolding */}
+        {/* Create */}
         <section className="space-y-0">
           <div className="flex items-start justify-between gap-4 mb-6">
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-muted flex items-center justify-center text-muted-foreground">
-                <MessageSquare size={20} />
-              </div>
-              <div>
-                <h2 className="text-lg font-serif font-medium text-foreground">Prompt Scaffolding</h2>
-                <p className="text-sm text-muted-foreground mt-0.5">Ready-to-use prompts for applying this style in AI tools</p>
-              </div>
+            <div>
+              <h2 className="text-lg font-serif font-medium text-foreground">Create</h2>
+              <p className="text-sm text-muted-foreground mt-0.5">Generate new images using this style</p>
             </div>
             <Button
               onClick={() => {
@@ -1333,18 +1302,18 @@ export default ${safeName};`;
             {summary.promptScaffolding && (
               <>
                 <div className="space-y-2">
-                  <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Base Prompt</h3>
+                  <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Style Description</h3>
                   <div className="p-4 bg-muted/50 rounded-lg border border-border">
-                    <p className="text-sm font-mono text-foreground whitespace-pre-wrap">{summary.promptScaffolding.base}</p>
+                    <p className="text-sm text-foreground whitespace-pre-wrap">{summary.promptScaffolding.base}</p>
                   </div>
                 </div>
                 
                 {summary.promptScaffolding.modifiers && summary.promptScaffolding.modifiers.length > 0 && (
                   <div className="space-y-2">
-                    <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Style Modifiers</h3>
+                    <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Characteristics</h3>
                     <div className="flex flex-wrap gap-2">
                       {summary.promptScaffolding.modifiers.map((mod: string, i: number) => (
-                        <span key={i} className="px-2 py-1 bg-muted/70 text-xs rounded-md font-mono text-muted-foreground">
+                        <span key={i} className="px-2 py-1 bg-muted/70 text-xs rounded-md text-muted-foreground">
                           {mod}
                         </span>
                       ))}
@@ -1354,9 +1323,9 @@ export default ${safeName};`;
                 
                 {summary.promptScaffolding.negative && (
                   <div className="space-y-2">
-                    <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Negative Prompt</h3>
-                    <div className="p-4 bg-red-500/5 rounded-lg border border-red-500/20">
-                      <p className="text-sm font-mono text-muted-foreground whitespace-pre-wrap">{summary.promptScaffolding.negative}</p>
+                    <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Avoid</h3>
+                    <div className="p-4 bg-muted/30 rounded-lg border border-border">
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{summary.promptScaffolding.negative}</p>
                     </div>
                   </div>
                 )}
@@ -1372,7 +1341,7 @@ export default ${safeName};`;
               <div className="flex items-center justify-between p-4 border-b border-border">
                 <div className="flex items-center gap-2">
                   <Sparkles size={20} className="text-primary" />
-                  <h3 className="text-lg font-medium">Generate with {summary.name}</h3>
+                  <h3 className="text-lg font-medium">Create with {summary.name}</h3>
                 </div>
                 <button
                   onClick={() => setTryItOpen(false)}
@@ -1423,17 +1392,16 @@ export default ${safeName};`;
                 
                 {tryItImage && (
                   <div className="space-y-2">
-                    <h4 className="text-sm font-medium text-muted-foreground">Generated Image</h4>
                     <div className="rounded-lg overflow-hidden border border-border">
                       <img 
                         src={tryItImage} 
-                        alt="Generated image"
+                        alt="Created image"
                         className="w-full h-auto"
                         data-testid="img-generated-result"
                       />
                     </div>
                     <p className="text-xs text-muted-foreground text-center">
-                      Image generated using the "{summary.name}" style with Design Token colors
+                      Created using {summary.name}
                     </p>
                   </div>
                 )}
@@ -1442,12 +1410,11 @@ export default ${safeName};`;
           </div>
         )}
 
-        {/* Section 5: Style Specification */}
+        {/* Usage Notes */}
         <section className="space-y-0">
           <SectionHeader
-            icon={<FileEdit size={20} />}
-            title="Style Specification"
-            description="Usage guidelines and design notes for this style"
+            title="Usage Notes"
+            description="Guidelines for applying this style"
           />
           <StyleSpecEditor 
             styleId={summary.id} 
@@ -1458,12 +1425,10 @@ export default ${safeName};`;
           />
         </section>
 
-        {/* Section 6: Version History */}
+        {/* Revisions */}
         <section className="space-y-0">
           <SectionHeader
-            icon={<History size={20} />}
-            title="Version History"
-            description="Track changes and revert to previous versions"
+            title="Revisions"
           />
           
           <div className="space-y-4">
@@ -1505,9 +1470,7 @@ export default ${safeName};`;
                   </div>
                 ) : versions.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
-                    <History size={32} className="mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">No version history yet</p>
-                    <p className="text-xs mt-1">Versions are created when tokens are updated</p>
+                    <p className="text-sm">No revisions yet</p>
                   </div>
                 ) : (
                   <div className="border border-border rounded-lg divide-y divide-border">
