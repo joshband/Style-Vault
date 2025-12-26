@@ -53,6 +53,19 @@ Preferred communication style: Simple, everyday language.
 - **Structure**: Hierarchical JSON with `$type`, `$value`, and `$description`.
 - **Usage**: Defines visual characteristics for consistent application across generated images.
 
+### Token Export Pipeline
+- **Architecture**: Modular pipeline with normalization → alias resolution → transformation stages.
+- **Core File**: `client/src/lib/token-pipeline.ts` - Pipeline types, normalization, alias resolution, shared utilities.
+- **Exporter Registry**: Plugin-style registration pattern in `client/src/lib/exporters/`.
+- **Exporters** (13 formats):
+  - **Code**: W3C DTCG JSON (.tokens.json), CSS Variables, SCSS Variables, React/TypeScript, Tailwind Config
+  - **Mobile**: Flutter/Dart, React Native, Swift/iOS (SwiftUI + UIKit)
+  - **Design Tools**: Figma Variables JSON
+  - **Frameworks**: Material UI theme, Web Components
+  - **Game/Audio**: Unity C# ScriptableObject, JUCE C++ header
+- **Features**: Alias resolution ({} syntax), type inference, color format conversion, dimension parsing.
+- **UI**: Multi-target export dialog with category grouping, sub-options per format, toast notifications.
+
 ### Async Job Orchestration
 - **Engine**: `server/job-runner.ts` manages all long-running operations.
 - **Features**: Persistent job tracking, configurable timeouts, max retries, exponential backoff, and polling.
