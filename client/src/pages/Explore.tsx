@@ -1,10 +1,11 @@
 import { deleteStyleApi, type Style } from "@/lib/store";
 import { StyleCard } from "@/components/style-card";
 import { StyleCardSkeleton } from "@/components/style-card-skeleton";
+import { StyleFilters, DEFAULT_FILTERS, type StyleFiltersState } from "@/components/style-filters";
 import { Layout } from "@/components/layout";
 import { motion, AnimatePresence } from "framer-motion";
-import { RefreshCw, PenTool, Loader2 } from "lucide-react";
-import { useCallback, useRef, useEffect, useMemo } from "react";
+import { RefreshCw, PenTool, Loader2, SearchX } from "lucide-react";
+import { useCallback, useRef, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
@@ -24,7 +25,17 @@ export default function Explore() {
   const sentinelRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const preloadedImages = useRef<Set<string>>(new Set());
+  const [filters, setFilters] = useState<StyleFiltersState>(DEFAULT_FILTERS);
   
+  const filtersQueryKey = useMemo(() => {
+    return JSON.stringify({
+      search: filters.search,
+      mood: [...filters.mood].sort(),
+      colorFamily: [...filters.colorFamily].sort(),
+      sortBy: filters.sortBy,
+    });
+  }, [filters]);
+
   const {
     data,
     isLoading,
@@ -34,11 +45,23 @@ export default function Explore() {
     isFetchingNextPage,
     refetch,
   } = useInfiniteQuery<PaginatedResponse>({
-    queryKey: ["/api/styles", "paginated"],
+    queryKey: ["/api/styles", "paginated", filtersQueryKey],
     queryFn: async ({ pageParam }) => {
       const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
       if (pageParam) {
         params.set("cursor", pageParam as string);
+      }
+      if (filters.search) {
+        params.set("search", filters.search);
+      }
+      if (filters.mood.length > 0) {
+        params.set("mood", filters.mood.join(","));
+      }
+      if (filters.colorFamily.length > 0) {
+        params.set("colorFamily", filters.colorFamily.join(","));
+      }
+      if (filters.sortBy !== "newest") {
+        params.set("sortBy", filters.sortBy);
       }
       const response = await fetch(`/api/styles?${params}`);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -57,6 +80,7 @@ export default function Explore() {
   }, [data]);
 
   const totalCount = data?.pages[0]?.total ?? 0;
+  const hasActiveFilters = filters.search || filters.mood.length > 0 || filters.colorFamily.length > 0;
 
   useEffect(() => {
     const stylesToPreload = allStyles.slice(-PAGE_SIZE);
@@ -82,6 +106,10 @@ export default function Explore() {
   }, [deleteMutation]);
 
   const handleRetry = useCallback(() => refetch(), [refetch]);
+
+  const handleFiltersChange = useCallback((newFilters: StyleFiltersState) => {
+    setFilters(newFilters);
+  }, []);
 
   useEffect(() => {
     if (!sentinelRef.current || !containerRef.current) return;
@@ -111,6 +139,7 @@ export default function Explore() {
               </p>
             </div>
           </div>
+          <StyleFilters filters={filters} onFiltersChange={handleFiltersChange} />
           <div 
             className="grid gap-6"
             style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${CARD_MIN_WIDTH}px, 1fr))` }}
@@ -135,11 +164,17 @@ export default function Explore() {
             <div className="space-y-1">
               <h1 className="text-2xl md:text-3xl font-serif font-medium text-foreground">Style Vault</h1>
               <p className="text-muted-foreground text-sm max-w-xl">
-                {totalCount > 0 ? `${totalCount} styles in your collection` : "Your collection of visual styles"}
+                {totalCount > 0 
+                  ? hasActiveFilters 
+                    ? `${totalCount} styles match your filters`
+                    : `${totalCount} styles in your collection` 
+                  : "Your collection of visual styles"}
               </p>
             </div>
           </div>
         </div>
+
+        <StyleFilters filters={filters} onFiltersChange={handleFiltersChange} />
 
         {isError && (
           <div className="py-16 text-center border border-dashed border-destructive/50 rounded-lg bg-destructive/5">
@@ -158,7 +193,7 @@ export default function Explore() {
           </div>
         )}
 
-        {!isError && allStyles.length === 0 && (
+        {!isError && allStyles.length === 0 && !hasActiveFilters && (
           <motion.div 
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -186,6 +221,32 @@ export default function Explore() {
                   </Button>
                 </Link>
               </div>
+            </div>
+          </motion.div>
+        )}
+
+        {!isError && allStyles.length === 0 && hasActiveFilters && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="py-16 px-6 text-center border border-dashed border-border rounded-xl"
+          >
+            <div className="max-w-md mx-auto space-y-4">
+              <SearchX className="w-12 h-12 mx-auto text-muted-foreground/50" />
+              <h2 className="text-lg font-medium text-foreground">
+                No styles match your filters
+              </h2>
+              <p className="text-muted-foreground text-sm">
+                Try adjusting your search terms or removing some filters to see more results.
+              </p>
+              <Button 
+                variant="outline" 
+                onClick={() => setFilters(DEFAULT_FILTERS)}
+                data-testid="button-clear-all-filters"
+              >
+                Clear all filters
+              </Button>
             </div>
           </motion.div>
         )}

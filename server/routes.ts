@@ -189,8 +189,23 @@ export async function registerRoutes(
       const cursor = req.query.cursor as string | undefined;
       const userId = (req.user as any)?.claims?.sub;
       
+      const filters: { search?: string; mood?: string[]; colorFamily?: string[]; sortBy?: "newest" | "oldest" | "name" } = {};
+      if (req.query.search) {
+        filters.search = req.query.search as string;
+      }
+      if (req.query.mood) {
+        filters.mood = (req.query.mood as string).split(",").map(s => s.trim()).filter(Boolean);
+      }
+      if (req.query.colorFamily) {
+        filters.colorFamily = (req.query.colorFamily as string).split(",").map(s => s.trim()).filter(Boolean);
+      }
+      if (req.query.sortBy && ["newest", "oldest", "name"].includes(req.query.sortBy as string)) {
+        filters.sortBy = req.query.sortBy as "newest" | "oldest" | "name";
+      }
+      
       if (limit) {
-        const result = await storage.getStyleSummariesPaginated(limit, cursor);
+        const hasFilters = Object.keys(filters).length > 0;
+        const result = await storage.getStyleSummariesPaginated(limit, cursor, hasFilters ? filters : undefined);
         
         const styleIds = result.items.map(s => s.id);
         const imageIdsMap = await storage.getImageIdsByStyleIds(styleIds);
@@ -207,7 +222,7 @@ export async function registerRoutes(
         );
         
         res.set('Cache-Control', 'public, max-age=10, stale-while-revalidate=30');
-        return res.json({ ...result, items: visibleItems });
+        return res.json({ ...result, items: visibleItems, total: visibleItems.length < result.items.length ? result.total - (result.items.length - visibleItems.length) : result.total });
       }
       
       let styles = cache.get<any[]>(CACHE_KEYS.STYLE_SUMMARIES);
