@@ -252,6 +252,53 @@ function normalizeOklchColor(color: CVColorToken): CVColorToken {
 }
 
 /**
+ * Convert OKLCH to linear sRGB
+ * Based on CSS Color Level 4 specification
+ */
+function oklchToLinearSrgb(l: number, c: number, h: number): [number, number, number] {
+  const hRad = (h * Math.PI) / 180;
+  const a = c * Math.cos(hRad);
+  const b = c * Math.sin(hRad);
+
+  const l_ = l + 0.3963377774 * a + 0.2158037573 * b;
+  const m_ = l - 0.1055613458 * a - 0.0638541728 * b;
+  const s_ = l - 0.0894841775 * a - 1.2914855480 * b;
+
+  const lCubed = l_ * l_ * l_;
+  const mCubed = m_ * m_ * m_;
+  const sCubed = s_ * s_ * s_;
+
+  const r = +4.0767416621 * lCubed - 3.3077115913 * mCubed + 0.2309699292 * sCubed;
+  const g = -1.2684380046 * lCubed + 2.6097574011 * mCubed - 0.3413193965 * sCubed;
+  const bOut = -0.0041960863 * lCubed - 0.7034186147 * mCubed + 1.7076147010 * sCubed;
+
+  return [r, g, bOut];
+}
+
+/**
+ * Apply sRGB gamma correction (linear to sRGB)
+ */
+function linearToSrgb(c: number): number {
+  if (c <= 0.0031308) {
+    return 12.92 * c;
+  }
+  return 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+}
+
+/**
+ * Convert OKLCH color to hex string
+ */
+function oklchToHex(l: number, c: number, h: number): string {
+  const [rLin, gLin, bLin] = oklchToLinearSrgb(l, c, h);
+  
+  const r = Math.round(Math.max(0, Math.min(1, linearToSrgb(rLin))) * 255);
+  const g = Math.round(Math.max(0, Math.min(1, linearToSrgb(gLin))) * 255);
+  const b = Math.round(Math.max(0, Math.min(1, linearToSrgb(bLin))) * 255);
+  
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+
+/**
  * Validate extracted tokens and log any issues
  * Returns true if tokens are valid enough to use
  */
@@ -304,9 +351,10 @@ export function convertToDTCG(cvTokens: CVExtractedTokens): Record<string, any> 
   colors.forEach((color, index) => {
     const name = colorNames[index] || `color-${index + 1}`;
     const normalized = normalizeOklchColor(color);
+    const hexValue = oklchToHex(normalized.l, normalized.c, normalized.h);
     dtcg.color.palette[name] = {
       $type: "color",
-      $value: `oklch(${normalized.l.toFixed(3)} ${normalized.c.toFixed(3)} ${normalized.h.toFixed(1)})`,
+      $value: hexValue,
       $description: `Extracted via CV analysis (${cvTokens.meta.method})`,
     };
   });
