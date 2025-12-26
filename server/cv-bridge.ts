@@ -8,7 +8,15 @@
 import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { computeImageHash, getCachedTokens, setCachedTokens } from './token-cache';
+import { 
+  computeImageHash, 
+  getCachedTokens, 
+  setCachedTokens,
+  getCachedStep,
+  setCachedStep,
+  type CVCacheType,
+  type AnalysisSettings 
+} from './token-cache';
 
 const getModuleDir = (): string => {
   if (typeof import.meta.url !== 'undefined') {

@@ -15,7 +15,7 @@ import type { MetadataTags } from "@shared/schema";
 import { getJobProgress, startJobInBackground } from "./job-runner";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
-import { getCacheStats } from "./token-cache";
+import { getCacheStats, getCacheMetrics, resetCacheMetrics } from "./token-cache";
 
 function getDefaultMetadataTags(): MetadataTags {
   return {
@@ -136,6 +136,9 @@ export async function registerRoutes(
         })),
       };
 
+      const tokenCacheStats = await getCacheStats();
+      const cacheMetrics = getCacheMetrics();
+      
       res.json({
         timestamp: new Date().toISOString(),
         environment: process.env.NODE_ENV || "unknown",
@@ -144,6 +147,13 @@ export async function registerRoutes(
           enabled: cvEnabled,
         },
         jobs: jobStats,
+        tokenCache: {
+          ...tokenCacheStats,
+          metrics: cacheMetrics,
+          hitRate: cacheMetrics.hits + cacheMetrics.misses > 0 
+            ? ((cacheMetrics.hits / (cacheMetrics.hits + cacheMetrics.misses)) * 100).toFixed(1) + '%'
+            : 'N/A',
+        },
       });
     } catch (error) {
       console.error("Diagnostics error:", error);
@@ -152,6 +162,43 @@ export async function registerRoutes(
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
+  });
+
+  // Cache metrics endpoint - for debugging and monitoring cache performance
+  app.get("/api/cache/metrics", async (req, res) => {
+    try {
+      const stats = await getCacheStats();
+      const metrics = getCacheMetrics();
+      
+      const totalRequests = metrics.hits + metrics.misses;
+      const hitRate = totalRequests > 0 
+        ? ((metrics.hits / totalRequests) * 100).toFixed(1)
+        : 0;
+      
+      res.json({
+        database: stats,
+        runtime: metrics,
+        summary: {
+          hitRate: `${hitRate}%`,
+          totalRequests,
+          stepBreakdown: Object.entries(metrics.stepHits).map(([step, hits]) => ({
+            step,
+            hits,
+            misses: metrics.stepMisses[step as keyof typeof metrics.stepMisses],
+          })),
+        },
+      });
+    } catch (error) {
+      console.error("Cache metrics error:", error);
+      res.status(500).json({ error: "Failed to get cache metrics" });
+    }
+  });
+
+  // Reset cache metrics - for debugging
+  app.post("/api/cache/metrics/reset", (req, res) => {
+    resetCacheMetrics();
+    console.log("[CV Cache] Metrics reset");
+    res.json({ message: "Cache metrics reset successfully" });
   });
 
   // Get all style summaries (simple list for remix/select UIs)
