@@ -139,6 +139,7 @@ export interface UiConceptAssets {
   audioPlugin?: string;
   dashboard?: string;
   componentLibrary?: string;
+  softwareApp?: string;
   history: UiConceptEntry[];
 }
 
@@ -215,7 +216,7 @@ export type InsertStyle = z.infer<typeof insertStyleSchema>;
 export type Style = typeof styles.$inferSelect;
 
 // Image assets table - stores images with size variants for optimized loading
-export type ImageAssetType = "reference" | "preview_portrait" | "preview_landscape" | "preview_still_life" | "mood_board" | "ui_audio_plugin" | "ui_dashboard" | "ui_component_library" | "generated";
+export type ImageAssetType = "reference" | "preview_portrait" | "preview_landscape" | "preview_still_life" | "mood_board" | "ui_audio_plugin" | "ui_dashboard" | "ui_component_library" | "ui_software_app" | "generated";
 
 export const imageAssets = pgTable("image_assets", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

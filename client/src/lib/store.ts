@@ -76,6 +76,7 @@ export interface UiConceptAssets {
   audioPlugin?: string;
   dashboard?: string;
   componentLibrary?: string;
+  softwareApp?: string;
   history: UiConceptEntry[];
 }
 
