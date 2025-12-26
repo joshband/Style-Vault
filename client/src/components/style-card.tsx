@@ -168,11 +168,11 @@ const StyleCardComponent = memo(function StyleCard({ style, className, onDelete 
                 <img 
                   src={
                     style.imageIds?.ui_software_app
-                      ? `/api/images/${style.imageIds.ui_software_app}?size=thumb`
+                      ? `/api/images/${style.imageIds.ui_software_app}?size=medium`
                       : style.imageIds?.preview_landscape 
-                      ? `/api/images/${style.imageIds.preview_landscape}?size=thumb`
+                      ? `/api/images/${style.imageIds.preview_landscape}?size=medium`
                       : style.imageIds?.reference
-                      ? `/api/images/${style.imageIds.reference}?size=thumb`
+                      ? `/api/images/${style.imageIds.reference}?size=medium`
                       : style.thumbnailPreview!
                   } 
                   alt={style.name}
@@ -180,8 +180,8 @@ const StyleCardComponent = memo(function StyleCard({ style, className, onDelete 
                   draggable={false}
                   loading="lazy"
                   decoding="async"
-                  width={400}
-                  height={250}
+                  width={640}
+                  height={400}
                 />
               ) : (
                 <div className="flex-1 h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted/50">
