@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Compass, PenTool, Search, Menu, X, Eye, Wand2, LogIn, LogOut, User, Bookmark, Sparkles } from "lucide-react";
+import { Compass, PenTool, Search, Menu, X, Eye, Wand2, LogIn, LogOut, User, Bookmark, Sparkles, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { ActiveJobsIndicator } from "./active-jobs-indicator";
@@ -178,6 +178,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       <Link href="/saved" className="flex items-center gap-2 cursor-pointer" data-testid="library-link">
                         <Bookmark size={14} />
                         My Library
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/analytics" className="flex items-center gap-2 cursor-pointer" data-testid="analytics-link">
+                        <BarChart3 size={14} />
+                        Analytics
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />

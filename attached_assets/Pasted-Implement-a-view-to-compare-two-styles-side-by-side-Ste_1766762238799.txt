@@ -1,0 +1,11 @@
+Implement a view to compare two styles side by side.
+Steps:
+1. **UI Layout**: Create a new React component, e.g. `StyleCompareView`, that takes two style token sets as props and displays them in a side-by-side comparison. The comparison could show, for example, two columns of token values (colors, typography, etc.) for Style A and Style B.
+2. Add a UI control to trigger comparison. For instance, in the collections or gallery list, allow the user to select two styles (maybe checkboxes or a "compare" button on each style card that then prompts to pick another style).
+3. When two styles are selected, show the StyleCompareView. This could be a modal or a dedicated page/route (e.g., `/compare?style1=XYZ&style2=ABC`).
+4. In StyleCompareView, highlight differences. Perhaps mark tokens that differ in value between the two styles. If a token exists in one style and not the other, indicate that. This is mostly UI logic (you can compare the JSON objects of tokens).
+5. **Data Fetching**: Ensure you can fetch the token details for each style by ID. Likely you have an API like GET `/api/v1/styles/{id}` (if not, implement it: returns full token JSON for that style). Use that to get data for both styles to compare.
+6. Make the comparison UI user-friendly: show color swatches side by side for color tokens, text samples for typography tokens, numeric values for spacing, etc. Possibly use visual indicators (e.g., green highlight for a token that is larger in one style, etc., if meaningful).
+7. **Responsive design**: Ensure that on smaller screens the two columns either stack or scroll horizontally.
+8. **Testing**: Manually create two distinct styles (perhaps by uploading two different design images), save them, then use the compare feature to verify that all token categories show up correctly and differences are clearly indicated.
+9. This feature doesn’t affect backend beyond possibly needing an endpoint to fetch style details by ID (if not already available). Focus on front-end presentation and UX.

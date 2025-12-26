@@ -120,7 +120,7 @@ The resulting image MUST visually match the extracted Design Tokens. Colors shou
 function buildUiConceptPrompt(
   request: MoodBoardRequest,
   summary: TokenSummary,
-  conceptType: "audioPlugin" | "dashboard"
+  conceptType: "audioPlugin" | "dashboard" | "softwareApp"
 ): string {
   const { styleName, styleDescription, metadataTags } = request;
   const colorList = summary.colors.map((c) => `${c.name}: ${c.hex}`).join(", ");
@@ -162,11 +162,17 @@ A 16:9 landscape interface with:
 - Grid of buttons or sequencer pads in token colors
 - Sliders and faders matching token aesthetic
 - VU meters using token accent colors
-- Plugin name header in token typography style
+
+================================================================================
+CRITICAL: NO TEXT OR LABELS
+================================================================================
+DO NOT include any text, words, labels, numbers, or letters in the image.
+Use only abstract symbols, icons, and visual patterns - no readable characters.
+Any buttons or controls should be represented by shapes/icons only, not text.
 
 ALL elements MUST use the exact hex colors from the Design Tokens above. The interface should be immediately recognizable as using this specific color palette.`,
 
-    dashboard: `Create a modern data dashboard interface for "${styleName}".
+    dashboard: `Create a modern web application user interface mockup for "${styleName}".
 
 ================================================================================
 PRIMARY DIRECTIVE: DESIGN TOKENS (HIGHEST PRIORITY)
@@ -192,15 +198,102 @@ Mood Keywords: ${moodKeywords}
 ================================================================================
 UI LAYOUT & ELEMENTS
 ================================================================================
-A 16:9 landscape dashboard with:
-- Sidebar navigation using token colors
-- 2-3 data visualization panels with charts using ONLY token palette colors
-- Metric cards with KPIs in token colors
-- Header bar styled with token typography
-- Tables and list components using token colors
-- Progress indicators using token accent colors
+Create a clean, professional web application interface in 16:9 landscape format showcasing standard UI components:
 
-ALL charts, graphs, and UI elements MUST use the exact hex colors from the Design Tokens. The dashboard should be immediately recognizable as using this specific color palette.`,
+NAVIGATION:
+- Top navigation bar with logo area and menu items using token colors
+- Clear active state highlighting with token accent colors
+
+MAIN CONTENT AREA:
+- Hero section with heading, subheading, and call-to-action button
+- Card grid showing 2-3 content cards with shadows and rounded corners
+- Each card has an image placeholder, title, description, and action button
+
+UI COMPONENTS SHOWCASE:
+- Primary and secondary buttons in token colors
+- Form inputs (text field, dropdown, toggle switch)
+- Badge/tag elements
+- Avatar/profile indicators
+- Progress or loading indicators
+
+FOOTER OR SIDEBAR:
+- Secondary navigation or additional links
+
+DESIGN REQUIREMENTS:
+- Use ample whitespace and modern spacing
+- Apply token colors consistently: primary for CTAs, secondary for backgrounds, accent for highlights
+- Ensure clear visual hierarchy
+- All backgrounds, buttons, and accents MUST use the exact hex colors from Design Tokens above
+
+================================================================================
+CRITICAL: NO TEXT OR LABELS
+================================================================================
+DO NOT include any text, words, labels, numbers, or letters in the image.
+Use only abstract placeholder shapes, icons, and visual patterns - no readable characters.
+Represent headings and body text as simple horizontal lines or blocks of varying widths.
+Buttons should show only icons or colored shapes, not text labels.
+
+The interface should look like a real, polished SaaS application wireframe that immediately showcases how this style applies to everyday web components.`,
+
+    softwareApp: `Create a PHOTOREALISTIC, high-fidelity software application interface mockup for "${styleName}" - this will be the primary thumbnail/preview for this visual style.
+
+================================================================================
+RENDER STYLE: PHOTOREALISTIC 3D UI MOCKUP
+================================================================================
+This must look like a REAL SOFTWARE APPLICATION screenshot, not vector art or flat illustration.
+
+RENDERING REQUIREMENTS:
+- Photorealistic materials: glass panels, brushed metal, glossy buttons, matte surfaces
+- Realistic lighting with soft shadows, ambient occlusion, and subtle reflections
+- Depth and dimensionality through proper perspective and layering
+- High-fidelity details: subtle gradients, realistic button bevels, proper drop shadows
+- Professional Dribbble/Behance quality presentation
+
+================================================================================
+PRIMARY DIRECTIVE: DESIGN TOKENS (HIGHEST PRIORITY)
+================================================================================
+MANDATORY COLOR PALETTE - Use ONLY these exact hex values:
+${summary.colors.map((c) => `  ${c.name}: ${c.hex} (EXACT - no substitution)`).join("\n")}
+
+TOKEN-DEFINED PROPERTIES:
+- Surface Texture: grain="${summary.texture.grain}", finish="${summary.texture.finish}"
+- Lighting: type="${summary.lighting.type}", direction="${summary.lighting.direction}", intensity="${summary.lighting.intensity}"
+- Mood: tone="${summary.mood.tone}", saturation=${summary.mood.saturation}, contrast=${summary.mood.contrast}
+
+================================================================================
+SECONDARY: SEMANTIC CONTEXT
+================================================================================
+Style Description: ${styleDescription}
+Visual Era: ${eraKeywords}
+Mood Keywords: ${moodKeywords}
+
+================================================================================
+UI LAYOUT & ELEMENTS (16:9 Landscape Format)
+================================================================================
+Create a DETAILED, COMPLEX software interface with multiple UI layers and components.
+
+REQUIRED COMPLEXITY:
+- Multi-panel layout with sidebar, header, and main content area
+- Nested cards and widgets with visible depth
+- Rich data visualizations: charts, graphs, progress indicators, gauges
+- Interactive controls: sliders, toggles, dropdown indicators, icon buttons
+- Status indicators, notification badges, avatar placeholders
+- Layered panels with frosted glass or translucent effects where appropriate
+
+VISUAL FIDELITY:
+- Realistic button states with proper highlights and shadows
+- Glass morphism or neumorphism effects matching the style mood
+- Proper UI spacing and grid alignment
+- Rich visual texture and material definition
+
+================================================================================
+CRITICAL: NO TEXT OR LABELS
+================================================================================
+DO NOT include any text, words, labels, numbers, or letters.
+Use colored bars/lines for text placeholders, icons for navigation, abstract shapes for content.
+All controls should use icons or geometric shapes only.
+
+ALL elements MUST use the exact hex colors from Design Tokens. Create a visually rich, detailed interface that showcases the style's color palette in a complex, realistic software environment.`,
   };
 
   return conceptPrompts[conceptType];
@@ -254,12 +347,19 @@ export async function generateMoodBoardCollage(
   }
 }
 
-async function generateSingleUiConcept(
+export async function generateSingleUiConcept(
   request: MoodBoardRequest,
-  conceptType: "audioPlugin" | "dashboard"
+  conceptType: "audioPlugin" | "dashboard" | "softwareApp"
 ): Promise<string | null> {
   const summary = extractTokenSummary(request.tokens);
   const prompt = buildUiConceptPrompt(request, summary, conceptType);
+  
+  // Define aspect ratios for each concept type
+  const aspectRatios: Record<string, string> = {
+    softwareApp: "16:9",   // Landscape for gallery thumbnails (matches 16:10 display)
+    audioPlugin: "16:9",   // Landscape format
+    dashboard: "16:9",     // Landscape format
+  };
   
   try {
     const response = await ai.models.generateContent({
@@ -272,6 +372,10 @@ async function generateSingleUiConcept(
       ],
       config: {
         responseModalities: ["image", "text"],
+        // @ts-ignore - imageConfig is a valid parameter for image generation
+        imageConfig: {
+          aspectRatio: aspectRatios[conceptType] || "16:9",
+        },
       },
     });
 
@@ -287,28 +391,34 @@ export async function generateUiConcepts(
   onProgress?: ProgressCallback
 ): Promise<UiConceptAssets> {
   if (onProgress) {
-    await onProgress(55, "Generating audio plugin UI concept...");
+    await onProgress(50, "Generating software app UI thumbnail...");
+    const softwareApp = await generateSingleUiConcept(request, "softwareApp");
+    
+    await onProgress(65, "Generating audio plugin UI concept...");
     const audioPlugin = await generateSingleUiConcept(request, "audioPlugin");
     
-    await onProgress(75, "Generating dashboard UI concept...");
+    await onProgress(80, "Generating dashboard UI concept...");
     const dashboard = await generateSingleUiConcept(request, "dashboard");
     
     return {
+      softwareApp: softwareApp || undefined,
       audioPlugin: audioPlugin || undefined,
       dashboard: dashboard || undefined,
-      status: audioPlugin || dashboard ? "complete" : "failed",
+      status: softwareApp || audioPlugin || dashboard ? "complete" : "failed",
       history: [],
     };
   } else {
-    const [audioPlugin, dashboard] = await Promise.all([
+    const [softwareApp, audioPlugin, dashboard] = await Promise.all([
+      generateSingleUiConcept(request, "softwareApp"),
       generateSingleUiConcept(request, "audioPlugin"),
       generateSingleUiConcept(request, "dashboard"),
     ]);
 
     return {
+      softwareApp: softwareApp || undefined,
       audioPlugin: audioPlugin || undefined,
       dashboard: dashboard || undefined,
-      status: audioPlugin || dashboard ? "complete" : "failed",
+      status: softwareApp || audioPlugin || dashboard ? "complete" : "failed",
       history: [],
     };
   }
@@ -321,25 +431,30 @@ export async function generateAllMoodBoardAssets(
   
   if (onProgress) {
     await onProgress(5, "Preparing style tokens...");
-    await onProgress(8, "Starting parallel asset generation: mood board, audio plugin, dashboard...");
+    await onProgress(8, "Starting parallel asset generation: mood board, software app, audio plugin, dashboard...");
     
     // Track completion for progress updates
     let completedCount = 0;
-    const totalTasks = 3;
+    const totalTasks = 4;
     
     const updateProgress = async (taskName: string) => {
       completedCount++;
-      // Progress goes from 10 to 90 as tasks complete (10, 37, 63, 90)
       const progress = 10 + Math.floor((completedCount / totalTasks) * 80);
       await onProgress(progress, `Generated ${taskName} (${completedCount}/${totalTasks})`);
     };
     
-    // Run all three image generations in parallel for ~3x speed improvement
-    const [moodBoard, audioPlugin, dashboard] = await Promise.all([
+    // Run all four image generations in parallel
+    const [moodBoard, softwareApp, audioPlugin, dashboard] = await Promise.all([
       (async () => {
         await onProgress(12, "Generating mood board collage...");
         const result = await generateMoodBoardCollage(request);
         await updateProgress("mood board collage");
+        return result;
+      })(),
+      (async () => {
+        await onProgress(13, "Generating software app UI thumbnail...");
+        const result = await generateSingleUiConcept(request, "softwareApp");
+        await updateProgress("software app UI");
         return result;
       })(),
       (async () => {
@@ -359,9 +474,10 @@ export async function generateAllMoodBoardAssets(
     await onProgress(95, "Finalizing assets...");
     
     const uiConcepts: UiConceptAssets = {
+      softwareApp: softwareApp || undefined,
       audioPlugin: audioPlugin || undefined,
       dashboard: dashboard || undefined,
-      status: audioPlugin || dashboard ? "complete" : "failed",
+      status: softwareApp || audioPlugin || dashboard ? "complete" : "failed",
       history: [],
     };
     

@@ -1,10 +1,11 @@
 import { cn } from "@/lib/utils";
 import { Trash2, AlertCircle, Palette } from "lucide-react";
 import { Link, useLocation } from "wouter";
-import { memo, useState, useCallback, useRef } from "react";
+import { memo, useState, useCallback, useRef, useEffect } from "react";
 import { trackStyleView } from "@/lib/suggestions";
 import { motion, AnimatePresence } from "framer-motion";
 import { queryClient } from "@/lib/queryClient";
+import { preloadImage } from "@/lib/image-utils";
 
 interface StyleSummary {
   id: string;
@@ -12,6 +13,7 @@ interface StyleSummary {
   description: string;
   createdAt: string;
   metadataTags?: any;
+  keywords?: string[];
   moodBoardStatus?: string;
   uiConceptsStatus?: string;
   thumbnailPreview?: string | null;
@@ -33,7 +35,40 @@ const StyleCardComponent = memo(function StyleCard({ style, className, onDelete 
   const [dragX, setDragX] = useState(0);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const hasTrackedView = useRef(false);
+  const hasPreloaded = useRef(false);
+  const cardRef = useRef<HTMLDivElement>(null);
   const [, navigate] = useLocation();
+
+  useEffect(() => {
+    const card = cardRef.current;
+    if (!card || hasPreloaded.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && !hasPreloaded.current) {
+            hasPreloaded.current = true;
+            const fullImageUrl = style.imageIds?.ui_software_app
+              ? `/api/images/${style.imageIds.ui_software_app}`
+              : style.imageIds?.preview_landscape 
+              ? `/api/images/${style.imageIds.preview_landscape}`
+              : style.imageIds?.reference
+              ? `/api/images/${style.imageIds.reference}`
+              : null;
+            
+            if (fullImageUrl) {
+              preloadImage(fullImageUrl, 1);
+            }
+            observer.disconnect();
+          }
+        });
+      },
+      { rootMargin: '300px', threshold: 0.1 }
+    );
+
+    observer.observe(card);
+    return () => observer.disconnect();
+  }, [style.imageIds]);
 
   const handlePrefetch = useCallback(() => {
     if (!hasTrackedView.current) {
@@ -84,6 +119,7 @@ const StyleCardComponent = memo(function StyleCard({ style, className, onDelete 
   return (
     <>
       <motion.div
+        ref={cardRef}
         drag="x"
         dragElastic={0.2}
         dragConstraints={{ left: -120, right: 0 }}
@@ -127,15 +163,17 @@ const StyleCardComponent = memo(function StyleCard({ style, className, onDelete 
             }}
             transition={{ duration: 0.2, ease: "easeOut" }}
           >
-            {/* Preview Image */}
+            {/* Preview Image - prioritize ui_software_app as primary thumbnail */}
             <div className="relative aspect-[16/10] bg-muted overflow-hidden">
-              {(style.imageIds?.preview_landscape || style.imageIds?.reference || style.thumbnailPreview) ? (
+              {(style.imageIds?.ui_software_app || style.imageIds?.preview_landscape || style.imageIds?.reference || style.thumbnailPreview) ? (
                 <img 
                   src={
-                    style.imageIds?.preview_landscape 
-                      ? `/api/images/${style.imageIds.preview_landscape}?size=thumb`
+                    style.imageIds?.ui_software_app
+                      ? `/api/images/${style.imageIds.ui_software_app}?size=medium`
+                      : style.imageIds?.preview_landscape 
+                      ? `/api/images/${style.imageIds.preview_landscape}?size=medium`
                       : style.imageIds?.reference
-                      ? `/api/images/${style.imageIds.reference}?size=thumb`
+                      ? `/api/images/${style.imageIds.reference}?size=medium`
                       : style.thumbnailPreview!
                   } 
                   alt={style.name}
@@ -143,8 +181,8 @@ const StyleCardComponent = memo(function StyleCard({ style, className, onDelete 
                   draggable={false}
                   loading="lazy"
                   decoding="async"
-                  width={400}
-                  height={250}
+                  width={640}
+                  height={400}
                 />
               ) : (
                 <div className="flex-1 h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted/50">
@@ -162,6 +200,24 @@ const StyleCardComponent = memo(function StyleCard({ style, className, onDelete 
               <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
                 {style.description}
               </p>
+
+              {style.keywords && style.keywords.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1" data-testid={`tags-style-${style.id}`}>
+                  {style.keywords.slice(0, 4).map((keyword, idx) => (
+                    <span 
+                      key={idx}
+                      className="px-1.5 py-0.5 text-[10px] bg-muted text-muted-foreground rounded-md"
+                    >
+                      {keyword}
+                    </span>
+                  ))}
+                  {style.keywords.length > 4 && (
+                    <span className="px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                      +{style.keywords.length - 4}
+                    </span>
+                  )}
+                </div>
+              )}
 
               <div className="flex items-center justify-between mt-1">
                 <time 

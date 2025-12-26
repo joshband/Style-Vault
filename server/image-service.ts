@@ -125,7 +125,7 @@ export async function migrateStyleImages(styleId: string, styleData: {
   referenceImages?: string[];
   previews?: { portrait?: string; landscape?: string; stillLife?: string };
   moodBoard?: { collage?: string };
-  uiConcepts?: { audioPlugin?: string; dashboard?: string; componentLibrary?: string };
+  uiConcepts?: { softwareApp?: string; audioPlugin?: string; dashboard?: string; componentLibrary?: string };
 }): Promise<Record<string, string>> {
   const imageIds: Record<string, string> = {};
 
@@ -153,6 +153,10 @@ export async function migrateStyleImages(styleId: string, styleData: {
       imageIds.mood_board = id;
     }
 
+    if (styleData.uiConcepts?.softwareApp) {
+      const id = await storeImage(styleData.uiConcepts.softwareApp, "ui_software_app", styleId);
+      imageIds.ui_software_app = id;
+    }
     if (styleData.uiConcepts?.audioPlugin) {
       const id = await storeImage(styleData.uiConcepts.audioPlugin, "ui_audio_plugin", styleId);
       imageIds.ui_audio_plugin = id;

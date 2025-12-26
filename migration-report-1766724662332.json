@@ -1,0 +1,1207 @@
+{
+  "timestamp": "2025-12-26T04:51:01.500Z",
+  "mode": "dry_run",
+  "summary": {
+    "totalUniqueTargets": 119,
+    "totalImageAssets": 119,
+    "migrated": 119,
+    "verified": 0,
+    "regenerated": 0,
+    "skipped": 0,
+    "duplicatesFound": 0,
+    "errors": 0
+  },
+  "results": [
+    {
+      "styleId": "5b397ec2-4253-4bf4-b7b9-f34f5f3cd5f5",
+      "type": "reference",
+      "imageAssetIds": [
+        "4984b9d3-1bae-4858-af47-38943bc16b08"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "5b397ec2-4253-4bf4-b7b9-f34f5f3cd5f5",
+      "type": "preview_portrait",
+      "imageAssetIds": [
+        "1dd43eb5-aa94-469f-8bd9-12053c5a9a8d"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "5b397ec2-4253-4bf4-b7b9-f34f5f3cd5f5",
+      "type": "preview_landscape",
+      "imageAssetIds": [
+        "82e6b1f3-d8d2-4db0-b54c-25a6b135447c"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "5b397ec2-4253-4bf4-b7b9-f34f5f3cd5f5",
+      "type": "preview_still_life",
+      "imageAssetIds": [
+        "e611ad3b-4709-4128-a6b3-b542d05e141b"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "5b397ec2-4253-4bf4-b7b9-f34f5f3cd5f5",
+      "type": "mood_board",
+      "imageAssetIds": [
+        "e34e4ada-0164-4a33-abb5-c768555061e2"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "5b397ec2-4253-4bf4-b7b9-f34f5f3cd5f5",
+      "type": "ui_audio_plugin",
+      "imageAssetIds": [
+        "8d169cc5-70f9-4d7b-907e-87b7cfa29455"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "5b397ec2-4253-4bf4-b7b9-f34f5f3cd5f5",
+      "type": "ui_dashboard",
+      "imageAssetIds": [
+        "bbcc3b07-6e13-4f3b-8b68-7861fff20257"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "ea5901d9-e7d3-42ec-9c80-182c3f3e9db0",
+      "type": "reference",
+      "imageAssetIds": [
+        "accdd601-59b4-4834-be50-cc047dc58708"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "ea5901d9-e7d3-42ec-9c80-182c3f3e9db0",
+      "type": "preview_portrait",
+      "imageAssetIds": [
+        "42a4f2fc-ff42-4f2c-9a75-07b0dc9a2129"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "ea5901d9-e7d3-42ec-9c80-182c3f3e9db0",
+      "type": "preview_landscape",
+      "imageAssetIds": [
+        "942323f1-1df6-4832-80e6-7c43ba8db866"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "ea5901d9-e7d3-42ec-9c80-182c3f3e9db0",
+      "type": "preview_still_life",
+      "imageAssetIds": [
+        "0632a8f7-b9a8-4efc-bbb4-3e29d9240783"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "ea5901d9-e7d3-42ec-9c80-182c3f3e9db0",
+      "type": "mood_board",
+      "imageAssetIds": [
+        "731c1a02-8fce-4a97-b901-be9ff1debbb1"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "ea5901d9-e7d3-42ec-9c80-182c3f3e9db0",
+      "type": "ui_audio_plugin",
+      "imageAssetIds": [
+        "856d7f95-f638-480d-9dec-ec4811169082"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "ea5901d9-e7d3-42ec-9c80-182c3f3e9db0",
+      "type": "ui_dashboard",
+      "imageAssetIds": [
+        "dcf961d4-e890-4f53-8f9b-a52c23a0a2f7"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "64812d1f-f24a-4b16-a41f-c16611d5b31e",
+      "type": "reference",
+      "imageAssetIds": [
+        "751fe0fe-4f9c-4e8f-81c5-0d3edd539496"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "64812d1f-f24a-4b16-a41f-c16611d5b31e",
+      "type": "preview_portrait",
+      "imageAssetIds": [
+        "09fb5241-3403-483b-9fd1-2543078c2a1c"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "64812d1f-f24a-4b16-a41f-c16611d5b31e",
+      "type": "preview_landscape",
+      "imageAssetIds": [
+        "991ad3e8-a2dd-4973-a539-0810db57e841"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "64812d1f-f24a-4b16-a41f-c16611d5b31e",
+      "type": "preview_still_life",
+      "imageAssetIds": [
+        "d1444a82-d4f1-409a-8672-75fc79c58606"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "64812d1f-f24a-4b16-a41f-c16611d5b31e",
+      "type": "mood_board",
+      "imageAssetIds": [
+        "36faa347-930c-429f-9795-8ec8463fce5b"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "64812d1f-f24a-4b16-a41f-c16611d5b31e",
+      "type": "ui_audio_plugin",
+      "imageAssetIds": [
+        "08311c68-2838-4574-afd5-3816ee0b72a7"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "64812d1f-f24a-4b16-a41f-c16611d5b31e",
+      "type": "ui_dashboard",
+      "imageAssetIds": [
+        "b1543418-5b9f-4010-8199-d20cdbff1d4f"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "eecbd01d-d264-485b-870d-9e78025025db",
+      "type": "reference",
+      "imageAssetIds": [
+        "c8135eac-f40e-4b63-a3f6-a8aaf7a84bc0"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "eecbd01d-d264-485b-870d-9e78025025db",
+      "type": "preview_portrait",
+      "imageAssetIds": [
+        "f0d1f2ca-0deb-4fbd-bf3a-de9f222612d6"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "eecbd01d-d264-485b-870d-9e78025025db",
+      "type": "preview_landscape",
+      "imageAssetIds": [
+        "22a58ede-d597-4ce0-b249-40cbcc7885ce"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "eecbd01d-d264-485b-870d-9e78025025db",
+      "type": "preview_still_life",
+      "imageAssetIds": [
+        "fc2bfc75-3b0c-4179-a1c5-f7c5c91fe7f7"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "eecbd01d-d264-485b-870d-9e78025025db",
+      "type": "mood_board",
+      "imageAssetIds": [
+        "8bbc4cf2-7c27-4465-8642-79c533fb45dd"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "eecbd01d-d264-485b-870d-9e78025025db",
+      "type": "ui_audio_plugin",
+      "imageAssetIds": [
+        "30677fba-8df6-42f7-a74b-a93199fa07c1"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "eecbd01d-d264-485b-870d-9e78025025db",
+      "type": "ui_dashboard",
+      "imageAssetIds": [
+        "abb76994-4e2f-471d-8261-79e7c39a1570"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "0c2bcd7c-6e58-429f-9185-1c492d1910db",
+      "type": "reference",
+      "imageAssetIds": [
+        "0e164217-5b72-49e4-9be5-b0d9f2764121"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "0c2bcd7c-6e58-429f-9185-1c492d1910db",
+      "type": "preview_portrait",
+      "imageAssetIds": [
+        "7add198d-f64a-4cb4-885f-635daf6c0e38"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "0c2bcd7c-6e58-429f-9185-1c492d1910db",
+      "type": "preview_landscape",
+      "imageAssetIds": [
+        "a314a1b1-8431-403a-887d-124b93b19493"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "0c2bcd7c-6e58-429f-9185-1c492d1910db",
+      "type": "preview_still_life",
+      "imageAssetIds": [
+        "fd1c6192-474a-4591-af0b-02aa61567970"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "0c2bcd7c-6e58-429f-9185-1c492d1910db",
+      "type": "mood_board",
+      "imageAssetIds": [
+        "1a694fe1-1e72-4cec-98d3-a8808c7d8a67"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "0c2bcd7c-6e58-429f-9185-1c492d1910db",
+      "type": "ui_audio_plugin",
+      "imageAssetIds": [
+        "b3123f36-00d7-4fbd-84d9-8151073774ee"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "0c2bcd7c-6e58-429f-9185-1c492d1910db",
+      "type": "ui_dashboard",
+      "imageAssetIds": [
+        "8c75febe-7768-48e5-a3d9-cf5605ea972f"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "c47cca18-f584-411b-87d1-acea136ed961",
+      "type": "reference",
+      "imageAssetIds": [
+        "bdba43db-38e0-4874-bc23-619cb354da21"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "c47cca18-f584-411b-87d1-acea136ed961",
+      "type": "preview_portrait",
+      "imageAssetIds": [
+        "c092c522-6cf4-4933-86e3-447325e73396"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "c47cca18-f584-411b-87d1-acea136ed961",
+      "type": "preview_landscape",
+      "imageAssetIds": [
+        "e9bb2b20-f739-47d1-863e-794aba3e505d"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "c47cca18-f584-411b-87d1-acea136ed961",
+      "type": "preview_still_life",
+      "imageAssetIds": [
+        "aa3e8289-c126-4924-a1e4-7abcdd0a537a"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "c47cca18-f584-411b-87d1-acea136ed961",
+      "type": "mood_board",
+      "imageAssetIds": [
+        "822e11fe-f89d-49b6-8403-b9f5bd4daf2b"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "c47cca18-f584-411b-87d1-acea136ed961",
+      "type": "ui_audio_plugin",
+      "imageAssetIds": [
+        "59a259a9-29aa-42de-a04a-96fd3a561b61"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "c47cca18-f584-411b-87d1-acea136ed961",
+      "type": "ui_dashboard",
+      "imageAssetIds": [
+        "381a26df-d1b6-432b-9d0b-c3abe2aa08f9"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "7a027d8c-71b0-48a8-89ca-7e85f9767162",
+      "type": "reference",
+      "imageAssetIds": [
+        "6e8544ea-e6b9-4d56-9ebf-151ba4cb10a5"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "7a027d8c-71b0-48a8-89ca-7e85f9767162",
+      "type": "preview_portrait",
+      "imageAssetIds": [
+        "89371fa3-093e-4634-807c-804cdc9407e1"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "7a027d8c-71b0-48a8-89ca-7e85f9767162",
+      "type": "preview_landscape",
+      "imageAssetIds": [
+        "01f591f8-27c5-4a6d-ab3b-0e15ed89f55d"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "7a027d8c-71b0-48a8-89ca-7e85f9767162",
+      "type": "preview_still_life",
+      "imageAssetIds": [
+        "27babdd6-745c-437e-a553-c9965a07bd8b"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "7a027d8c-71b0-48a8-89ca-7e85f9767162",
+      "type": "mood_board",
+      "imageAssetIds": [
+        "ee52eb5d-67e7-46e7-a589-ea8b41363a15"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "7a027d8c-71b0-48a8-89ca-7e85f9767162",
+      "type": "ui_audio_plugin",
+      "imageAssetIds": [
+        "6f1dc338-4658-4caa-b099-cb1c13dba305"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "7a027d8c-71b0-48a8-89ca-7e85f9767162",
+      "type": "ui_dashboard",
+      "imageAssetIds": [
+        "c661e03c-105f-4025-a95f-1cc29d1fd149"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "ca14625e-c4c6-420c-a90c-2a2da69a2f27",
+      "type": "reference",
+      "imageAssetIds": [
+        "f926cfda-f440-476f-8824-c43201ed80ee"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "ca14625e-c4c6-420c-a90c-2a2da69a2f27",
+      "type": "preview_portrait",
+      "imageAssetIds": [
+        "0743490c-73eb-4fe2-94db-4e80f2b7eccc"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "ca14625e-c4c6-420c-a90c-2a2da69a2f27",
+      "type": "preview_landscape",
+      "imageAssetIds": [
+        "d237a796-f189-4626-a6b1-36f8e0ce82c0"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "ca14625e-c4c6-420c-a90c-2a2da69a2f27",
+      "type": "preview_still_life",
+      "imageAssetIds": [
+        "55d604dc-e4f7-4e96-ac11-888febba0e1c"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "ca14625e-c4c6-420c-a90c-2a2da69a2f27",
+      "type": "mood_board",
+      "imageAssetIds": [
+        "5f9c3db5-ce5f-408b-add1-bdcca51daf32"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "ca14625e-c4c6-420c-a90c-2a2da69a2f27",
+      "type": "ui_audio_plugin",
+      "imageAssetIds": [
+        "6db1d217-ee70-4d09-b811-6a7811bc4a44"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "ca14625e-c4c6-420c-a90c-2a2da69a2f27",
+      "type": "ui_dashboard",
+      "imageAssetIds": [
+        "199aa219-1b98-4f6e-a8e0-5c99f70d3837"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "c4c5a05b-9555-4281-9a73-e922956a0a8b",
+      "type": "reference",
+      "imageAssetIds": [
+        "1cf7250e-f7b9-4c1f-bd1a-bf06cb7f253f"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "c4c5a05b-9555-4281-9a73-e922956a0a8b",
+      "type": "preview_portrait",
+      "imageAssetIds": [
+        "08fc5333-d9c6-4263-8ff2-330721a2b6d3"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "c4c5a05b-9555-4281-9a73-e922956a0a8b",
+      "type": "preview_landscape",
+      "imageAssetIds": [
+        "da4dcb57-8d86-4626-ae62-c1e717c2002b"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "c4c5a05b-9555-4281-9a73-e922956a0a8b",
+      "type": "preview_still_life",
+      "imageAssetIds": [
+        "1ed63a79-f5f9-40c0-a38d-c710ba545a27"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "c4c5a05b-9555-4281-9a73-e922956a0a8b",
+      "type": "mood_board",
+      "imageAssetIds": [
+        "e1c54a11-fd93-432e-b393-06b0ed68eff8"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "c4c5a05b-9555-4281-9a73-e922956a0a8b",
+      "type": "ui_audio_plugin",
+      "imageAssetIds": [
+        "2f198131-911f-4192-834f-db9e3d194678"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "c4c5a05b-9555-4281-9a73-e922956a0a8b",
+      "type": "ui_dashboard",
+      "imageAssetIds": [
+        "57eee2ff-3b7e-4a68-acf8-f2dc7b28aabd"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "eaeae09f-dda5-4ce7-810a-79478b419a8b",
+      "type": "reference",
+      "imageAssetIds": [
+        "1c73c9bc-272f-4399-ac0b-38fefea1b740"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "eaeae09f-dda5-4ce7-810a-79478b419a8b",
+      "type": "preview_portrait",
+      "imageAssetIds": [
+        "28070d09-aef4-4a96-8812-50f44fc551a7"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "eaeae09f-dda5-4ce7-810a-79478b419a8b",
+      "type": "preview_landscape",
+      "imageAssetIds": [
+        "a7c68ba8-8a54-49fe-9cab-087e1a868e2c"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "eaeae09f-dda5-4ce7-810a-79478b419a8b",
+      "type": "preview_still_life",
+      "imageAssetIds": [
+        "75c8bcd9-4555-400f-b974-abc1051b9730"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "eaeae09f-dda5-4ce7-810a-79478b419a8b",
+      "type": "mood_board",
+      "imageAssetIds": [
+        "7f9b3711-8070-4867-8b11-20200943080f"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "eaeae09f-dda5-4ce7-810a-79478b419a8b",
+      "type": "ui_audio_plugin",
+      "imageAssetIds": [
+        "67f55c8c-6006-4cfd-a39d-84dde3624172"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "eaeae09f-dda5-4ce7-810a-79478b419a8b",
+      "type": "ui_dashboard",
+      "imageAssetIds": [
+        "8072504c-52fb-4713-a51f-8739ecf04d72"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "d51a48a6-e357-4280-a931-96bd52e97774",
+      "type": "reference",
+      "imageAssetIds": [
+        "e42f9c49-b1ae-46d0-88c7-51d6c762b85c"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "d51a48a6-e357-4280-a931-96bd52e97774",
+      "type": "preview_portrait",
+      "imageAssetIds": [
+        "d7c7d786-fdec-4c2c-8c1d-75271cd8f3b6"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "d51a48a6-e357-4280-a931-96bd52e97774",
+      "type": "preview_landscape",
+      "imageAssetIds": [
+        "0c873d00-22e0-4a63-bb15-5f5aa52d8886"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "d51a48a6-e357-4280-a931-96bd52e97774",
+      "type": "preview_still_life",
+      "imageAssetIds": [
+        "dae83b76-319f-4c94-ba44-c88f4d268b68"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "d51a48a6-e357-4280-a931-96bd52e97774",
+      "type": "mood_board",
+      "imageAssetIds": [
+        "cf92fa8e-0f1d-4500-8a8e-390dafa834e9"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "d51a48a6-e357-4280-a931-96bd52e97774",
+      "type": "ui_audio_plugin",
+      "imageAssetIds": [
+        "aff6e84e-cf76-451f-8a91-a28f46be393f"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "d51a48a6-e357-4280-a931-96bd52e97774",
+      "type": "ui_dashboard",
+      "imageAssetIds": [
+        "48f18a58-e5a9-405b-8a06-22d5b5ba1533"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "be7748f3-e50c-4faf-b2a8-a2acb2bc6745",
+      "type": "reference",
+      "imageAssetIds": [
+        "c6311cbb-810f-438c-82a6-41a97157a874"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "be7748f3-e50c-4faf-b2a8-a2acb2bc6745",
+      "type": "preview_portrait",
+      "imageAssetIds": [
+        "4c9f873a-85ea-47bf-8c4d-d994d0aa3d54"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "be7748f3-e50c-4faf-b2a8-a2acb2bc6745",
+      "type": "preview_landscape",
+      "imageAssetIds": [
+        "5ca154eb-cbe8-4b2d-8fb1-5da53594bdb3"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "be7748f3-e50c-4faf-b2a8-a2acb2bc6745",
+      "type": "preview_still_life",
+      "imageAssetIds": [
+        "43a6cd55-7852-42f1-9a6d-a00a5f85cb0a"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "be7748f3-e50c-4faf-b2a8-a2acb2bc6745",
+      "type": "mood_board",
+      "imageAssetIds": [
+        "221a45f2-3e7c-48f0-9b5f-5454ed49337f"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "be7748f3-e50c-4faf-b2a8-a2acb2bc6745",
+      "type": "ui_audio_plugin",
+      "imageAssetIds": [
+        "8be8332e-1f9c-4eb2-ad64-2ec898281171"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "be7748f3-e50c-4faf-b2a8-a2acb2bc6745",
+      "type": "ui_dashboard",
+      "imageAssetIds": [
+        "a7aa2abc-59ec-480b-a65e-301010a321e9"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "e6c7e064-df83-4049-85e1-3a986e1a649b",
+      "type": "reference",
+      "imageAssetIds": [
+        "50d556b4-816f-47c8-a160-2c84f429c0b5"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "e6c7e064-df83-4049-85e1-3a986e1a649b",
+      "type": "preview_portrait",
+      "imageAssetIds": [
+        "b7c3a860-f498-42dc-a142-62e0b5396cee"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "e6c7e064-df83-4049-85e1-3a986e1a649b",
+      "type": "preview_landscape",
+      "imageAssetIds": [
+        "e89ee646-3d5f-45d7-941f-cb507a560af6"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "e6c7e064-df83-4049-85e1-3a986e1a649b",
+      "type": "preview_still_life",
+      "imageAssetIds": [
+        "33265f9b-f6f7-48c9-955e-4b65256b10fb"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "e6c7e064-df83-4049-85e1-3a986e1a649b",
+      "type": "mood_board",
+      "imageAssetIds": [
+        "07ae1e28-1856-423a-a78c-f8e8aa682550"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "e6c7e064-df83-4049-85e1-3a986e1a649b",
+      "type": "ui_audio_plugin",
+      "imageAssetIds": [
+        "22832d3a-0c5d-4cc2-89b1-db665bbac048"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "e6c7e064-df83-4049-85e1-3a986e1a649b",
+      "type": "ui_dashboard",
+      "imageAssetIds": [
+        "df130aba-2f57-407d-8d85-ced039ce2a25"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "c581b2bd-2c43-4a05-aff9-7414afe249cc",
+      "type": "reference",
+      "imageAssetIds": [
+        "b3aadf77-61d4-4517-a67c-b948d2d4fb83"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "c581b2bd-2c43-4a05-aff9-7414afe249cc",
+      "type": "preview_portrait",
+      "imageAssetIds": [
+        "32f80c8b-0111-42e7-9dc4-84f94303101f"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "c581b2bd-2c43-4a05-aff9-7414afe249cc",
+      "type": "preview_landscape",
+      "imageAssetIds": [
+        "9169c849-3f92-436a-a596-0e35fd9d4f9e"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "c581b2bd-2c43-4a05-aff9-7414afe249cc",
+      "type": "preview_still_life",
+      "imageAssetIds": [
+        "b371e76f-8ffc-429e-a183-e23c039fb0a7"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "c581b2bd-2c43-4a05-aff9-7414afe249cc",
+      "type": "mood_board",
+      "imageAssetIds": [
+        "fad9277b-ddfd-454a-be74-4aadd513052d"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "c581b2bd-2c43-4a05-aff9-7414afe249cc",
+      "type": "ui_audio_plugin",
+      "imageAssetIds": [
+        "17785e96-c68f-476a-ae1a-706ce4b6ef30"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "c581b2bd-2c43-4a05-aff9-7414afe249cc",
+      "type": "ui_dashboard",
+      "imageAssetIds": [
+        "95a08e4c-c418-45c1-a88c-eef6440609bc"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "653e3e0a-354f-4643-b0b8-2bcc397c17fe",
+      "type": "reference",
+      "imageAssetIds": [
+        "92206747-5eb7-4fd1-82e0-0a98eda7e767"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "653e3e0a-354f-4643-b0b8-2bcc397c17fe",
+      "type": "preview_portrait",
+      "imageAssetIds": [
+        "f8f9f99f-3a92-45e8-b61e-9e4e27d1ce64"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "653e3e0a-354f-4643-b0b8-2bcc397c17fe",
+      "type": "preview_landscape",
+      "imageAssetIds": [
+        "07b55863-ba73-4016-bd3b-75989c9086a7"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "653e3e0a-354f-4643-b0b8-2bcc397c17fe",
+      "type": "preview_still_life",
+      "imageAssetIds": [
+        "c6de6f2b-5921-4019-9f34-de4ed19dbcd3"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "653e3e0a-354f-4643-b0b8-2bcc397c17fe",
+      "type": "mood_board",
+      "imageAssetIds": [
+        "90e0925b-8569-469c-8901-01f2ee6df2ea"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "653e3e0a-354f-4643-b0b8-2bcc397c17fe",
+      "type": "ui_audio_plugin",
+      "imageAssetIds": [
+        "a4acd643-3beb-4f18-b859-c3cf95a1bbaf"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "653e3e0a-354f-4643-b0b8-2bcc397c17fe",
+      "type": "ui_dashboard",
+      "imageAssetIds": [
+        "0a09ff2f-e7b4-4d6b-8c30-453246b450a8"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "f0ccdeb9-9d64-4840-a535-6a368444e2e1",
+      "type": "reference",
+      "imageAssetIds": [
+        "1edfc9a8-934c-47d6-bcdb-65c9b4694ebd"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "f0ccdeb9-9d64-4840-a535-6a368444e2e1",
+      "type": "preview_portrait",
+      "imageAssetIds": [
+        "917b7ada-192e-47bd-9451-485e192d1dd7"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "f0ccdeb9-9d64-4840-a535-6a368444e2e1",
+      "type": "preview_landscape",
+      "imageAssetIds": [
+        "2b431a55-e4c6-495b-a58e-b80937e27575"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "f0ccdeb9-9d64-4840-a535-6a368444e2e1",
+      "type": "preview_still_life",
+      "imageAssetIds": [
+        "882e4b62-6e20-4b94-8aaa-a4f76cd501e0"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "f0ccdeb9-9d64-4840-a535-6a368444e2e1",
+      "type": "mood_board",
+      "imageAssetIds": [
+        "8eca1efe-7862-4a20-a8eb-bd11af3c225d"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "f0ccdeb9-9d64-4840-a535-6a368444e2e1",
+      "type": "ui_audio_plugin",
+      "imageAssetIds": [
+        "252383ed-5dca-4d82-acae-6e8da6dd3fba"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "f0ccdeb9-9d64-4840-a535-6a368444e2e1",
+      "type": "ui_dashboard",
+      "imageAssetIds": [
+        "bafd6b14-1918-45d5-a89c-de751aa7fe02"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "40a06892-19c6-47e2-ab7b-ce8152d6576f",
+      "type": "reference",
+      "imageAssetIds": [
+        "25216cc5-9169-4e63-9398-883f68cebde5"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "40a06892-19c6-47e2-ab7b-ce8152d6576f",
+      "type": "preview_portrait",
+      "imageAssetIds": [
+        "7d898516-99dd-4e55-ac38-32884e8f9234"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "40a06892-19c6-47e2-ab7b-ce8152d6576f",
+      "type": "preview_landscape",
+      "imageAssetIds": [
+        "14a2a970-2439-4e2b-ab44-40ab72a3ef21"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "40a06892-19c6-47e2-ab7b-ce8152d6576f",
+      "type": "preview_still_life",
+      "imageAssetIds": [
+        "29bc7e9c-c61f-4734-869d-9fa260c477e8"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "40a06892-19c6-47e2-ab7b-ce8152d6576f",
+      "type": "mood_board",
+      "imageAssetIds": [
+        "67560a3b-6096-4ad3-8d31-0a76e3f2afeb"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "40a06892-19c6-47e2-ab7b-ce8152d6576f",
+      "type": "ui_audio_plugin",
+      "imageAssetIds": [
+        "3c10fe23-fcf4-4f48-8698-6d5ae1cd3d8f"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    },
+    {
+      "styleId": "40a06892-19c6-47e2-ab7b-ce8152d6576f",
+      "type": "ui_dashboard",
+      "imageAssetIds": [
+        "9c5994fa-f939-4160-ae81-36d183e5b1e5"
+      ],
+      "status": "success",
+      "duplicatesFound": 0,
+      "message": "Would migrate to object storage"
+    }
+  ],
+  "duplicateDetails": []
+}

@@ -1,0 +1,18 @@
+Expand the token export functionality to support multiple formats (React, Flutter, CSS, etc.).
+Task:
+1. Review the existing generator code from Copy-That (if available). Identify the functions or templates used to generate different format outputs: e.g., a React theme (probably JSON or JS object), Flutter (Dart code as string), Material (maybe JSON or JS).
+2. On the backend, implement routes or logic to produce these formats on demand. One approach: have an endpoint like GET `/api/v1/styles/{id}/export?format=react` which will take the stored tokens and format them. Alternatively, pre-generate and store the outputs in the database when extraction happens (could slow extraction though).
+3. Possibly use a library or template engine for this. For example, to generate code, you can have template strings. But given the small size, simple string building is fine.
+   - React (JS/TS): output an object like in Copy-That's README example [oai_citation:61‡github.com](https://github.com/joshband/copy-that#:~:text=Generated%20Code%3A).
+   - CSS: perhaps generate a CSS file content with custom properties (e.g., `--primary-color: #FFF;` etc).
+   - Flutter: output a Dart class or map.
+   - W3C JSON: basically the raw design tokens JSON (which you already have).
+4. Frontend: create a UI element for export. For instance, on the results panel, add a dropdown or buttons: "Export as: JSON / React / CSS / Flutter ...". When clicked, either call the API to get that format or generate it on client-side if easier (the client has the tokens JSON, it could format small things like CSS or JSON easily without a round trip).
+5. If doing on client, implement formatting functions in JS for each type. If doing on server, ensure the response has correct `Content-Type` (e.g., application/json for JSON, text/css for CSS, etc.) and triggers a download.
+6. Test each format:
+   - JSON: should download a .json file of tokens.
+   - React: ideally provide a `.js` or `.ts` file content that looks like a theme module (maybe even include a snippet `export const theme = {...}`).
+   - Flutter: provide Dart code snippet (maybe as .dart file content).
+   - CSS: a .css file with variables or classes representing the style.
+7. If needed, sanitize token names to be valid in each context (e.g., CSS variables can't have spaces, etc.). Copy-That likely already handles naming conventions.
+8. This enhancement uses a lot of existing logic from Copy-That (where 17+ generators exist), so leveraging that will save time.

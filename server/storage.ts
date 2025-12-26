@@ -1,4 +1,4 @@
-import { type Style, type InsertStyle, type GeneratedImage, type InsertGeneratedImage, type MoodBoardAssets, type UiConceptAssets, type MetadataTags, type MetadataEnrichmentStatus, type Job, type InsertJob, type JobStatus, type JobType, type Batch, type InsertBatch, type StyleSpec, type ImageAssetType, type Bookmark, type InsertBookmark, type Rating, type InsertRating, type Collection, type InsertCollection, type CollectionItem, type InsertCollectionItem, type StyleVersion, type InsertStyleVersion, type VersionChangeType, styles, generatedImages, jobs, batches, imageAssets, bookmarks, ratings, collections, collectionItems, styleVersions } from "@shared/schema";
+import { type Style, type InsertStyle, type GeneratedImage, type InsertGeneratedImage, type MoodBoardAssets, type UiConceptAssets, type MetadataTags, type MetadataEnrichmentStatus, type Job, type InsertJob, type JobStatus, type JobType, type Batch, type InsertBatch, type StyleSpec, type ImageAssetType, type Bookmark, type InsertBookmark, type Rating, type InsertRating, type Collection, type InsertCollection, type CollectionItem, type InsertCollectionItem, type StyleVersion, type InsertStyleVersion, type VersionChangeType, styles, generatedImages, jobs, batches, imageAssets, objectAssets, bookmarks, ratings, collections, collectionItems, styleVersions } from "@shared/schema";
 import { users } from "@shared/models/auth";
 import { db } from "./db";
 import { eq, desc, and, or, inArray, sql } from "drizzle-orm";
@@ -9,6 +9,7 @@ export interface StyleSummary {
   description: string;
   createdAt: Date;
   metadataTags: any;
+  keywords: string[];
   moodBoardStatus: string;
   uiConceptsStatus: string;
   thumbnailPreview: string | null;
@@ -25,11 +26,18 @@ export interface PaginatedStyleSummaries {
   nextCursor: string | null;
 }
 
+export interface StyleFilters {
+  search?: string;
+  mood?: string[];
+  colorFamily?: string[];
+  sortBy?: "newest" | "oldest" | "name";
+}
+
 export interface IStorage {
   // Style operations
   getStyles(): Promise<Style[]>;
   getStyleSummaries(): Promise<StyleSummary[]>;
-  getStyleSummariesPaginated(limit: number, cursor?: string): Promise<PaginatedStyleSummaries>;
+  getStyleSummariesPaginated(limit: number, cursor?: string, filters?: StyleFilters): Promise<PaginatedStyleSummaries>;
   getStyleCount(): Promise<number>;
   getStyleById(id: string): Promise<Style | undefined>;
   getStyleByShareCode(shareCode: string): Promise<Style | undefined>;
@@ -78,7 +86,8 @@ export interface IStorage {
   getStylesByCreator(creatorId: string): Promise<StyleSummary[]>;
   getPublicStyleSummaries(): Promise<StyleSummary[]>;
   updateStyleVisibility(id: string, isPublic: boolean): Promise<Style | undefined>;
-  getCreatorInfo(userId: string): Promise<{ id: string; name: string } | undefined>;
+  getCreatorInfo(userId: string): Promise<{ id: string; name: string; displayName: string | null; profileImageUrl: string | null; createdAt: Date | null } | undefined>;
+  updateUserProfile(userId: string, updates: { displayName?: string }): Promise<{ id: string; displayName: string | null } | undefined>;
 
   // Bookmark operations
   getBookmarksByUser(userId: string): Promise<Bookmark[]>;
@@ -142,24 +151,31 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(users, eq(styles.creatorId, users.id))
       .orderBy(desc(styles.createdAt));
     
-    return allStyles.map(s => ({
-      id: s.id,
-      name: s.name,
-      description: s.description,
-      createdAt: s.createdAt,
-      metadataTags: s.metadataTags,
-      moodBoardStatus: (s.moodBoard as any)?.status || "pending",
-      uiConceptsStatus: (s.uiConcepts as any)?.status || "pending",
-      thumbnailPreview: (s.previews as any)?.landscape || (s.previews as any)?.portrait || null,
-      creatorId: s.creatorId,
-      creatorName: s.creatorFirstName && s.creatorLastName 
-        ? `${s.creatorFirstName} ${s.creatorLastName}` 
-        : s.creatorFirstName || null,
-      isPublic: s.isPublic,
-    }));
+    return allStyles.map(s => {
+      const uiConceptsData = s.uiConcepts as UiConceptAssets | null;
+      const uiDashboard = uiConceptsData?.dashboard;
+      const fallbackThumbnail = (s.previews as any)?.landscape || (s.previews as any)?.portrait || null;
+      const tags = s.metadataTags as MetadataTags | null;
+      return {
+        id: s.id,
+        name: s.name,
+        description: s.description,
+        createdAt: s.createdAt,
+        metadataTags: s.metadataTags,
+        keywords: tags?.keywords || [],
+        moodBoardStatus: (s.moodBoard as any)?.status || "pending",
+        uiConceptsStatus: uiConceptsData?.status || "pending",
+        thumbnailPreview: uiDashboard || fallbackThumbnail,
+        creatorId: s.creatorId,
+        creatorName: s.creatorFirstName && s.creatorLastName 
+          ? `${s.creatorFirstName} ${s.creatorLastName}` 
+          : s.creatorFirstName || null,
+        isPublic: s.isPublic,
+      };
+    });
   }
 
-  async getStyleSummariesPaginated(limit: number, cursor?: string): Promise<PaginatedStyleSummaries> {
+  async getStyleSummariesPaginated(limit: number, cursor?: string, filters?: StyleFilters): Promise<PaginatedStyleSummaries> {
     const queryLimit = Math.min(limit, 50);
     
     const selectFields = {
@@ -168,27 +184,71 @@ export class DatabaseStorage implements IStorage {
       description: styles.description,
       createdAt: styles.createdAt,
       referenceImages: styles.referenceImages,
+      metadataTags: styles.metadataTags,
       creatorId: styles.creatorId,
       isPublic: styles.isPublic,
+      uiConcepts: styles.uiConcepts,
       creatorFirstName: users.firstName,
       creatorLastName: users.lastName,
     };
     
-    let results;
+    const conditions: any[] = [];
+    
     if (cursor) {
-      const cursorDate = new Date(cursor);
-      results = await db
-        .select(selectFields)
-        .from(styles)
-        .leftJoin(users, eq(styles.creatorId, users.id))
-        .where(sql`${styles.createdAt} < ${cursorDate}`)
-        .orderBy(desc(styles.createdAt))
+      const sortBy = filters?.sortBy || "newest";
+      if (sortBy === "oldest") {
+        const cursorDate = new Date(cursor);
+        conditions.push(sql`${styles.createdAt} > ${cursorDate}`);
+      } else if (sortBy === "name") {
+        const [cursorName, cursorDate, cursorId] = cursor.split("|||");
+        conditions.push(sql`(${styles.name} > ${cursorName} OR (${styles.name} = ${cursorName} AND ${styles.createdAt} < ${new Date(cursorDate)}) OR (${styles.name} = ${cursorName} AND ${styles.createdAt} = ${new Date(cursorDate)} AND ${styles.id} > ${cursorId}))`);
+      } else {
+        const cursorDate = new Date(cursor);
+        conditions.push(sql`${styles.createdAt} < ${cursorDate}`);
+      }
+    }
+    
+    if (filters?.search) {
+      const searchTerm = `%${filters.search.toLowerCase()}%`;
+      conditions.push(sql`(LOWER(${styles.name}) LIKE ${searchTerm} OR LOWER(${styles.description}) LIKE ${searchTerm} OR EXISTS (SELECT 1 FROM jsonb_array_elements_text(${styles.metadataTags}->'keywords') AS kw WHERE LOWER(kw) LIKE ${searchTerm}))`);
+    }
+    
+    if (filters?.mood && filters.mood.length > 0) {
+      const moodConditions = filters.mood.map(m => 
+        sql`EXISTS (SELECT 1 FROM jsonb_array_elements_text(${styles.metadataTags}->'mood') AS elem WHERE elem ILIKE ${'%' + m + '%'})`
+      );
+      conditions.push(sql`(${sql.join(moodConditions, sql` OR `)})`);
+    }
+    
+    if (filters?.colorFamily && filters.colorFamily.length > 0) {
+      const colorConditions = filters.colorFamily.map(c => 
+        sql`EXISTS (SELECT 1 FROM jsonb_array_elements_text(${styles.metadataTags}->'colorFamily') AS elem WHERE elem ILIKE ${'%' + c + '%'})`
+      );
+      conditions.push(sql`(${sql.join(colorConditions, sql` OR `)})`);
+    }
+    
+    const sortBy = filters?.sortBy || "newest";
+    
+    let query = db
+      .select(selectFields)
+      .from(styles)
+      .leftJoin(users, eq(styles.creatorId, users.id));
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as typeof query;
+    }
+    
+    let results;
+    if (sortBy === "oldest") {
+      results = await query
+        .orderBy(styles.createdAt)
+        .limit(queryLimit + 1);
+    } else if (sortBy === "name") {
+      results = await query
+        .orderBy(styles.name, desc(styles.createdAt), styles.id)
         .limit(queryLimit + 1);
     } else {
-      results = await db
-        .select(selectFields)
-        .from(styles)
-        .leftJoin(users, eq(styles.creatorId, users.id))
+      results = await query
         .orderBy(desc(styles.createdAt))
         .limit(queryLimit + 1);
     }
@@ -196,24 +256,61 @@ export class DatabaseStorage implements IStorage {
     const hasMore = results.length > queryLimit;
     const items = hasMore ? results.slice(0, queryLimit) : results;
     
-    const total = await this.getStyleCount();
-    const nextCursor = hasMore && items.length > 0 
-      ? items[items.length - 1].createdAt.toISOString() 
-      : null;
+    let total: number;
+    if (filters?.search || filters?.mood?.length || filters?.colorFamily?.length) {
+      const countConditions: any[] = [];
+      if (filters.search) {
+        const searchTerm = `%${filters.search.toLowerCase()}%`;
+        countConditions.push(sql`(LOWER(${styles.name}) LIKE ${searchTerm} OR LOWER(${styles.description}) LIKE ${searchTerm} OR EXISTS (SELECT 1 FROM jsonb_array_elements_text(${styles.metadataTags}->'keywords') AS kw WHERE LOWER(kw) LIKE ${searchTerm}))`);
+      }
+      if (filters.mood && filters.mood.length > 0) {
+        const moodConditions = filters.mood.map(m => 
+          sql`EXISTS (SELECT 1 FROM jsonb_array_elements_text(${styles.metadataTags}->'mood') AS elem WHERE elem ILIKE ${'%' + m + '%'})`
+        );
+        countConditions.push(sql`(${sql.join(moodConditions, sql` OR `)})`);
+      }
+      if (filters.colorFamily && filters.colorFamily.length > 0) {
+        const colorConditions = filters.colorFamily.map(c => 
+          sql`EXISTS (SELECT 1 FROM jsonb_array_elements_text(${styles.metadataTags}->'colorFamily') AS elem WHERE elem ILIKE ${'%' + c + '%'})`
+        );
+        countConditions.push(sql`(${sql.join(colorConditions, sql` OR `)})`);
+      }
+      const countResult = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(styles)
+        .where(and(...countConditions));
+      total = countResult[0]?.count ?? 0;
+    } else {
+      total = await this.getStyleCount();
+    }
+    
+    let nextCursor: string | null = null;
+    if (hasMore && items.length > 0) {
+      const lastItem = items[items.length - 1];
+      if (sortBy === "name") {
+        nextCursor = `${lastItem.name}|||${lastItem.createdAt.toISOString()}|||${lastItem.id}`;
+      } else {
+        nextCursor = lastItem.createdAt.toISOString();
+      }
+    }
     
     return {
       items: items.map(s => {
         const refImages = s.referenceImages as string[] | null;
-        const thumbnail = refImages && refImages.length > 0 ? refImages[0] : null;
+        const uiConceptsData = s.uiConcepts as UiConceptAssets | null;
+        const uiDashboard = uiConceptsData?.dashboard;
+        const fallbackThumbnail = refImages && refImages.length > 0 ? refImages[0] : null;
+        const tags = s.metadataTags as MetadataTags | null;
         return {
           id: s.id,
           name: s.name,
           description: s.description,
           createdAt: s.createdAt,
-          metadataTags: null,
+          metadataTags: s.metadataTags,
+          keywords: tags?.keywords || [],
           moodBoardStatus: "complete",
-          uiConceptsStatus: "complete",
-          thumbnailPreview: thumbnail,
+          uiConceptsStatus: uiConceptsData?.status || "pending",
+          thumbnailPreview: uiDashboard || fallbackThumbnail,
           creatorId: s.creatorId,
           creatorName: s.creatorFirstName && s.creatorLastName 
             ? `${s.creatorFirstName} ${s.creatorLastName}` 
@@ -426,14 +523,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getImageIdsByStyleId(styleId: string): Promise<Record<string, string>> {
-    const assets = await db
-      .select({ id: imageAssets.id, type: imageAssets.type })
-      .from(imageAssets)
-      .where(eq(imageAssets.styleId, styleId));
+    const [legacyAssets, objAssets] = await Promise.all([
+      db.select({ id: imageAssets.id, type: imageAssets.type })
+        .from(imageAssets)
+        .where(eq(imageAssets.styleId, styleId)),
+      db.select({ id: objectAssets.id, type: objectAssets.type })
+        .from(objectAssets)
+        .where(eq(objectAssets.styleId, styleId)),
+    ]);
     
     const result: Record<string, string> = {};
-    for (const asset of assets) {
+    for (const asset of objAssets) {
       result[asset.type] = asset.id;
+    }
+    for (const asset of legacyAssets) {
+      if (!result[asset.type]) {
+        result[asset.type] = asset.id;
+      }
     }
     return result;
   }
@@ -441,18 +547,31 @@ export class DatabaseStorage implements IStorage {
   async getImageIdsByStyleIds(styleIds: string[]): Promise<Map<string, Record<string, string>>> {
     if (styleIds.length === 0) return new Map();
     
-    const assets = await db
-      .select({ id: imageAssets.id, type: imageAssets.type, styleId: imageAssets.styleId })
-      .from(imageAssets)
-      .where(inArray(imageAssets.styleId, styleIds));
+    const [legacyAssets, objAssets] = await Promise.all([
+      db.select({ id: imageAssets.id, type: imageAssets.type, styleId: imageAssets.styleId })
+        .from(imageAssets)
+        .where(inArray(imageAssets.styleId, styleIds)),
+      db.select({ id: objectAssets.id, type: objectAssets.type, styleId: objectAssets.styleId })
+        .from(objectAssets)
+        .where(inArray(objectAssets.styleId, styleIds)),
+    ]);
     
     const result = new Map<string, Record<string, string>>();
-    for (const asset of assets) {
+    for (const asset of objAssets) {
       if (!asset.styleId) continue;
       if (!result.has(asset.styleId)) {
         result.set(asset.styleId, {});
       }
       result.get(asset.styleId)![asset.type] = asset.id;
+    }
+    for (const asset of legacyAssets) {
+      if (!asset.styleId) continue;
+      if (!result.has(asset.styleId)) {
+        result.set(asset.styleId, {});
+      }
+      if (!result.get(asset.styleId)![asset.type]) {
+        result.get(asset.styleId)![asset.type] = asset.id;
+      }
     }
     return result;
   }
@@ -718,21 +837,28 @@ export class DatabaseStorage implements IStorage {
       .where(eq(styles.creatorId, creatorId))
       .orderBy(desc(styles.createdAt));
     
-    return creatorStyles.map(s => ({
-      id: s.id,
-      name: s.name,
-      description: s.description,
-      createdAt: s.createdAt,
-      metadataTags: s.metadataTags,
-      moodBoardStatus: (s.moodBoard as any)?.status || "pending",
-      uiConceptsStatus: (s.uiConcepts as any)?.status || "pending",
-      thumbnailPreview: (s.previews as any)?.landscape || (s.previews as any)?.portrait || null,
-      creatorId: s.creatorId,
-      creatorName: s.creatorFirstName && s.creatorLastName 
-        ? `${s.creatorFirstName} ${s.creatorLastName}` 
-        : s.creatorFirstName || null,
-      isPublic: s.isPublic,
-    }));
+    return creatorStyles.map(s => {
+      const uiConceptsData = s.uiConcepts as UiConceptAssets | null;
+      const uiDashboard = uiConceptsData?.dashboard;
+      const fallbackThumbnail = (s.previews as any)?.landscape || (s.previews as any)?.portrait || null;
+      const tags = s.metadataTags as MetadataTags | null;
+      return {
+        id: s.id,
+        name: s.name,
+        description: s.description,
+        createdAt: s.createdAt,
+        metadataTags: s.metadataTags,
+        keywords: tags?.keywords || [],
+        moodBoardStatus: (s.moodBoard as any)?.status || "pending",
+        uiConceptsStatus: uiConceptsData?.status || "pending",
+        thumbnailPreview: uiDashboard || fallbackThumbnail,
+        creatorId: s.creatorId,
+        creatorName: s.creatorFirstName && s.creatorLastName 
+          ? `${s.creatorFirstName} ${s.creatorLastName}` 
+          : s.creatorFirstName || null,
+        isPublic: s.isPublic,
+      };
+    });
   }
 
   async getPublicStyleSummaries(): Promise<StyleSummary[]> {
@@ -756,21 +882,28 @@ export class DatabaseStorage implements IStorage {
       .where(eq(styles.isPublic, true))
       .orderBy(desc(styles.createdAt));
     
-    return publicStyles.map(s => ({
-      id: s.id,
-      name: s.name,
-      description: s.description,
-      createdAt: s.createdAt,
-      metadataTags: s.metadataTags,
-      moodBoardStatus: (s.moodBoard as any)?.status || "pending",
-      uiConceptsStatus: (s.uiConcepts as any)?.status || "pending",
-      thumbnailPreview: (s.previews as any)?.landscape || (s.previews as any)?.portrait || null,
-      creatorId: s.creatorId,
-      creatorName: s.creatorFirstName && s.creatorLastName 
-        ? `${s.creatorFirstName} ${s.creatorLastName}` 
-        : s.creatorFirstName || null,
-      isPublic: s.isPublic,
-    }));
+    return publicStyles.map(s => {
+      const uiConceptsData = s.uiConcepts as UiConceptAssets | null;
+      const uiDashboard = uiConceptsData?.dashboard;
+      const fallbackThumbnail = (s.previews as any)?.landscape || (s.previews as any)?.portrait || null;
+      const tags = s.metadataTags as MetadataTags | null;
+      return {
+        id: s.id,
+        name: s.name,
+        description: s.description,
+        createdAt: s.createdAt,
+        metadataTags: s.metadataTags,
+        keywords: tags?.keywords || [],
+        moodBoardStatus: (s.moodBoard as any)?.status || "pending",
+        uiConceptsStatus: uiConceptsData?.status || "pending",
+        thumbnailPreview: uiDashboard || fallbackThumbnail,
+        creatorId: s.creatorId,
+        creatorName: s.creatorFirstName && s.creatorLastName 
+          ? `${s.creatorFirstName} ${s.creatorLastName}` 
+          : s.creatorFirstName || null,
+        isPublic: s.isPublic,
+      };
+    });
   }
 
   async updateStyleVisibility(id: string, isPublic: boolean): Promise<Style | undefined> {
@@ -785,15 +918,31 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async getCreatorInfo(userId: string): Promise<{ id: string; name: string } | undefined> {
+  async getCreatorInfo(userId: string): Promise<{ id: string; name: string; displayName: string | null; profileImageUrl: string | null; createdAt: Date | null } | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, userId));
     if (!user) return undefined;
+    const defaultName = user.firstName && user.lastName 
+      ? `${user.firstName} ${user.lastName}` 
+      : user.firstName || user.email || "Unknown";
     return {
       id: user.id,
-      name: user.firstName && user.lastName 
-        ? `${user.firstName} ${user.lastName}` 
-        : user.firstName || user.email || "Unknown",
+      name: user.displayName || defaultName,
+      displayName: user.displayName || null,
+      profileImageUrl: user.profileImageUrl || null,
+      createdAt: user.createdAt || null,
     };
+  }
+  
+  async updateUserProfile(userId: string, updates: { displayName?: string }): Promise<{ id: string; displayName: string | null } | undefined> {
+    const [updated] = await db
+      .update(users)
+      .set({ 
+        displayName: updates.displayName,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
+      .returning({ id: users.id, displayName: users.displayName });
+    return updated;
   }
 
   // Bookmark operations
@@ -823,21 +972,28 @@ export class DatabaseStorage implements IStorage {
       .where(eq(bookmarks.userId, userId))
       .orderBy(desc(bookmarks.createdAt));
 
-    return bookmarkedStyles.map((s) => ({
-      id: s.id,
-      name: s.name,
-      description: s.description,
-      createdAt: s.createdAt,
-      metadataTags: s.metadataTags,
-      moodBoardStatus: (s.moodBoard as any)?.status || "pending",
-      uiConceptsStatus: (s.uiConcepts as any)?.status || "pending",
-      thumbnailPreview: (s.previews as any)?.landscape || (s.previews as any)?.portrait || null,
-      creatorId: s.creatorId,
-      creatorName: s.creatorFirstName && s.creatorLastName 
-        ? `${s.creatorFirstName} ${s.creatorLastName}` 
-        : s.creatorFirstName || null,
-      isPublic: s.isPublic,
-    }));
+    return bookmarkedStyles.map((s) => {
+      const uiConceptsData = s.uiConcepts as UiConceptAssets | null;
+      const uiDashboard = uiConceptsData?.dashboard;
+      const fallbackThumbnail = (s.previews as any)?.landscape || (s.previews as any)?.portrait || null;
+      const tags = s.metadataTags as MetadataTags | null;
+      return {
+        id: s.id,
+        name: s.name,
+        description: s.description,
+        createdAt: s.createdAt,
+        metadataTags: s.metadataTags,
+        keywords: tags?.keywords || [],
+        moodBoardStatus: (s.moodBoard as any)?.status || "pending",
+        uiConceptsStatus: uiConceptsData?.status || "pending",
+        thumbnailPreview: uiDashboard || fallbackThumbnail,
+        creatorId: s.creatorId,
+        creatorName: s.creatorFirstName && s.creatorLastName 
+          ? `${s.creatorFirstName} ${s.creatorLastName}` 
+          : s.creatorFirstName || null,
+        isPublic: s.isPublic,
+      };
+    });
   }
 
   async getBookmark(userId: string, styleId: string): Promise<Bookmark | undefined> {
@@ -970,21 +1126,28 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(users, eq(styles.creatorId, users.id))
       .where(inArray(styles.id, styleIds));
     
-    return collectionStyles.map(s => ({
-      id: s.id,
-      name: s.name,
-      description: s.description,
-      createdAt: s.createdAt,
-      metadataTags: s.metadataTags,
-      moodBoardStatus: (s.moodBoard as MoodBoardAssets)?.status || "pending",
-      uiConceptsStatus: (s.uiConcepts as UiConceptAssets)?.status || "pending",
-      thumbnailPreview: (s.previews as any)?.landscape || null,
-      creatorId: s.creatorId,
-      creatorName: s.creatorFirstName && s.creatorLastName 
-        ? `${s.creatorFirstName} ${s.creatorLastName}` 
-        : s.creatorFirstName || null,
-      isPublic: s.isPublic,
-    }));
+    return collectionStyles.map(s => {
+      const uiConceptsData = s.uiConcepts as UiConceptAssets | null;
+      const uiDashboard = uiConceptsData?.dashboard;
+      const fallbackThumbnail = (s.previews as any)?.landscape || null;
+      const tags = s.metadataTags as MetadataTags | null;
+      return {
+        id: s.id,
+        name: s.name,
+        description: s.description,
+        createdAt: s.createdAt,
+        metadataTags: s.metadataTags,
+        keywords: tags?.keywords || [],
+        moodBoardStatus: (s.moodBoard as MoodBoardAssets)?.status || "pending",
+        uiConceptsStatus: uiConceptsData?.status || "pending",
+        thumbnailPreview: uiDashboard || fallbackThumbnail,
+        creatorId: s.creatorId,
+        creatorName: s.creatorFirstName && s.creatorLastName 
+          ? `${s.creatorFirstName} ${s.creatorLastName}` 
+          : s.creatorFirstName || null,
+        isPublic: s.isPublic,
+      };
+    });
   }
 
   async addStyleToCollection(collectionId: string, styleId: string): Promise<CollectionItem> {

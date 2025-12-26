@@ -15,7 +15,7 @@ import type { MetadataTags } from "@shared/schema";
 import { getJobProgress, startJobInBackground } from "./job-runner";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
-import { getCacheStats } from "./token-cache";
+import { getCacheStats, getCacheMetrics, resetCacheMetrics } from "./token-cache";
 
 function getDefaultMetadataTags(): MetadataTags {
   return {
@@ -136,6 +136,9 @@ export async function registerRoutes(
         })),
       };
 
+      const tokenCacheStats = await getCacheStats();
+      const cacheMetrics = getCacheMetrics();
+      
       res.json({
         timestamp: new Date().toISOString(),
         environment: process.env.NODE_ENV || "unknown",
@@ -144,6 +147,13 @@ export async function registerRoutes(
           enabled: cvEnabled,
         },
         jobs: jobStats,
+        tokenCache: {
+          ...tokenCacheStats,
+          metrics: cacheMetrics,
+          hitRate: cacheMetrics.hits + cacheMetrics.misses > 0 
+            ? ((cacheMetrics.hits / (cacheMetrics.hits + cacheMetrics.misses)) * 100).toFixed(1) + '%'
+            : 'N/A',
+        },
       });
     } catch (error) {
       console.error("Diagnostics error:", error);
@@ -152,6 +162,43 @@ export async function registerRoutes(
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
+  });
+
+  // Cache metrics endpoint - for debugging and monitoring cache performance
+  app.get("/api/cache/metrics", async (req, res) => {
+    try {
+      const stats = await getCacheStats();
+      const metrics = getCacheMetrics();
+      
+      const totalRequests = metrics.hits + metrics.misses;
+      const hitRate = totalRequests > 0 
+        ? ((metrics.hits / totalRequests) * 100).toFixed(1)
+        : 0;
+      
+      res.json({
+        database: stats,
+        runtime: metrics,
+        summary: {
+          hitRate: `${hitRate}%`,
+          totalRequests,
+          stepBreakdown: Object.entries(metrics.stepHits).map(([step, hits]) => ({
+            step,
+            hits,
+            misses: metrics.stepMisses[step as keyof typeof metrics.stepMisses],
+          })),
+        },
+      });
+    } catch (error) {
+      console.error("Cache metrics error:", error);
+      res.status(500).json({ error: "Failed to get cache metrics" });
+    }
+  });
+
+  // Reset cache metrics - for debugging
+  app.post("/api/cache/metrics/reset", (req, res) => {
+    resetCacheMetrics();
+    console.log("[CV Cache] Metrics reset");
+    res.json({ message: "Cache metrics reset successfully" });
   });
 
   // Get all style summaries (simple list for remix/select UIs)
@@ -189,8 +236,23 @@ export async function registerRoutes(
       const cursor = req.query.cursor as string | undefined;
       const userId = (req.user as any)?.claims?.sub;
       
+      const filters: { search?: string; mood?: string[]; colorFamily?: string[]; sortBy?: "newest" | "oldest" | "name" } = {};
+      if (req.query.search) {
+        filters.search = req.query.search as string;
+      }
+      if (req.query.mood) {
+        filters.mood = (req.query.mood as string).split(",").map(s => s.trim()).filter(Boolean);
+      }
+      if (req.query.colorFamily) {
+        filters.colorFamily = (req.query.colorFamily as string).split(",").map(s => s.trim()).filter(Boolean);
+      }
+      if (req.query.sortBy && ["newest", "oldest", "name"].includes(req.query.sortBy as string)) {
+        filters.sortBy = req.query.sortBy as "newest" | "oldest" | "name";
+      }
+      
       if (limit) {
-        const result = await storage.getStyleSummariesPaginated(limit, cursor);
+        const hasFilters = Object.keys(filters).length > 0;
+        const result = await storage.getStyleSummariesPaginated(limit, cursor, hasFilters ? filters : undefined);
         
         const styleIds = result.items.map(s => s.id);
         const imageIdsMap = await storage.getImageIdsByStyleIds(styleIds);
@@ -207,7 +269,7 @@ export async function registerRoutes(
         );
         
         res.set('Cache-Control', 'public, max-age=10, stale-while-revalidate=30');
-        return res.json({ ...result, items: visibleItems });
+        return res.json({ ...result, items: visibleItems, total: visibleItems.length < result.items.length ? result.total - (result.items.length - visibleItems.length) : result.total });
       }
       
       let styles = cache.get<any[]>(CACHE_KEYS.STYLE_SUMMARIES);
@@ -374,9 +436,17 @@ export async function registerRoutes(
   app.delete("/api/styles/:id", async (req, res) => {
     try {
       const styleId = req.params.id;
+      
+      const { deleteStyleImages } = await import("./image-service");
+      const { deleteObjectAssetsByStyle } = await import("./object-image-service");
+      
+      await Promise.all([
+        deleteStyleImages(styleId),
+        deleteObjectAssetsByStyle(styleId),
+      ]);
+      
       await storage.deleteStyle(styleId);
       
-      // Invalidate cache
       cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
       cache.delete(CACHE_KEYS.STYLE_DETAIL(styleId));
       
@@ -590,7 +660,7 @@ export async function registerRoutes(
     });
   });
 
-  // Image assets API - serve optimized images by ID
+  // Image assets API - serve optimized images by ID (supports both imageAssets and objectAssets)
   app.get("/api/images/:id", async (req, res) => {
     try {
       const { id } = req.params;
@@ -600,6 +670,24 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Invalid size. Use: thumb, medium, or full" });
       }
       
+      const { getImageFromObjectStorage } = await import("./object-image-service");
+      const objectImage = await getImageFromObjectStorage(id, size as "thumb" | "medium" | "full");
+      
+      if (objectImage) {
+        const matches = objectImage.data.match(/^data:([^;]+);base64,(.+)$/);
+        if (matches) {
+          const mimeType = matches[1];
+          const buffer = Buffer.from(matches[2], "base64");
+          
+          res.set({
+            "Content-Type": mimeType,
+            "Cache-Control": "public, max-age=31536000, immutable",
+            "Content-Length": buffer.length.toString(),
+          });
+          return res.send(buffer);
+        }
+      }
+      
       const { getImage } = await import("./image-service");
       const image = await getImage(id, size as "thumb" | "medium" | "full");
       
@@ -607,7 +695,6 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Image not found" });
       }
       
-      // Parse base64 and serve as binary with appropriate cache headers
       const matches = image.data.match(/^data:([^;]+);base64,(.+)$/);
       if (matches) {
         const mimeType = matches[1];
@@ -621,7 +708,6 @@ export async function registerRoutes(
         return res.send(buffer);
       }
       
-      // Fallback: return as JSON if not valid base64
       res.json(image);
     } catch (error) {
       console.error("Error serving image:", error);
@@ -684,6 +770,74 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Style spec enrichment error:", error);
       res.status(500).json({ error: "Style spec enrichment failed" });
+    }
+  });
+
+  // Regenerate softwareApp UI for all styles (admin endpoint) - runs async in background
+  app.post("/api/admin/regenerate-software-app", async (req, res) => {
+    try {
+      const allStyles = await storage.getStyles();
+      
+      // Start async regeneration in background (don't await)
+      (async () => {
+        const { generateSingleUiConcept } = await import("./mood-board-generation");
+        const { storeImage } = await import("./image-service");
+        
+        console.log(`[AdminRegenerate] Starting softwareApp regeneration for ${allStyles.length} styles...`);
+        let successCount = 0;
+        let errorCount = 0;
+        
+        for (const style of allStyles) {
+          try {
+            console.log(`[AdminRegenerate] Generating softwareApp for "${style.name}" (${style.id})...`);
+            const softwareApp = await generateSingleUiConcept({
+              styleName: style.name,
+              styleDescription: style.description,
+              tokens: style.tokens,
+              metadataTags: style.metadataTags || getDefaultMetadataTags(),
+            }, "softwareApp");
+            
+            if (softwareApp) {
+              await storeImage(softwareApp, "ui_software_app", style.id);
+              
+              const freshStyle = await storage.getStyleById(style.id);
+              if (freshStyle) {
+                const existingMoodBoard = freshStyle.moodBoard as any || { status: "complete", history: [] };
+                const existingUiConcepts = freshStyle.uiConcepts as any || { status: "pending", history: [] };
+                const updatedUiConcepts = {
+                  ...existingUiConcepts,
+                  softwareApp,
+                  status: "complete",
+                };
+                
+                await storage.updateStyleMoodBoard(style.id, existingMoodBoard, updatedUiConcepts);
+                cache.delete(CACHE_KEYS.STYLE_DETAIL(style.id));
+              }
+              
+              successCount++;
+              console.log(`[AdminRegenerate] ✓ Completed "${style.name}" (${successCount}/${allStyles.length})`);
+            } else {
+              errorCount++;
+              console.log(`[AdminRegenerate] ✗ Failed "${style.name}" - null result`);
+            }
+          } catch (err) {
+            errorCount++;
+            console.error(`[AdminRegenerate] ✗ Error for "${style.name}":`, err);
+          }
+        }
+        
+        cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
+        console.log(`[AdminRegenerate] Complete! ${successCount} succeeded, ${errorCount} failed.`);
+      })();
+      
+      // Return immediately - regeneration continues in background
+      res.json({
+        message: `Started regeneration for ${allStyles.length} styles in background. Check server logs for progress.`,
+        styleCount: allStyles.length,
+      });
+    } catch (error) {
+      console.error("Software app regeneration error:", error);
+      res.status(500).json({ error: "Software app regeneration failed" });
     }
   });
 
@@ -819,6 +973,41 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching creator info:", error);
       res.status(500).json({ error: "Failed to fetch creator info" });
+    }
+  });
+
+  // Update user profile (requires auth)
+  app.patch("/api/profile", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any)?.claims?.sub;
+      const { displayName } = req.body;
+      
+      if (displayName === undefined) {
+        return res.status(400).json({ error: "No fields to update" });
+      }
+      
+      if (typeof displayName !== "string") {
+        return res.status(400).json({ error: "displayName must be a string" });
+      }
+      
+      const trimmed = displayName.trim();
+      if (trimmed.length === 0) {
+        return res.status(400).json({ error: "displayName cannot be empty" });
+      }
+      
+      if (trimmed.length > 100) {
+        return res.status(400).json({ error: "displayName must be 100 characters or less" });
+      }
+      
+      const updated = await storage.updateUserProfile(userId, { displayName: trimmed });
+      if (!updated) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      res.status(500).json({ error: "Failed to update profile" });
     }
   });
 
@@ -1450,8 +1639,9 @@ export async function registerRoutes(
         });
       }
       
-      if (existingUiConcepts.status === "complete" && (existingUiConcepts.audioPlugin || existingUiConcepts.dashboard)) {
+      if (existingUiConcepts.status === "complete" && (existingUiConcepts.softwareApp || existingUiConcepts.audioPlugin || existingUiConcepts.dashboard)) {
         uiConceptsHistory.unshift({
+          softwareApp: existingUiConcepts.softwareApp,
           audioPlugin: existingUiConcepts.audioPlugin,
           dashboard: existingUiConcepts.dashboard,
           componentLibrary: existingUiConcepts.componentLibrary,
@@ -1791,7 +1981,250 @@ export async function registerRoutes(
     }
   });
 
+  // Analytics endpoint - aggregates design token insights for authenticated user
+  app.get("/api/analytics", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any)?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      // Get user's styles
+      const userStyles = await storage.getStylesByCreator(userId);
+      
+      // Also get all public styles for comparison
+      const allPublicStyles = await storage.getPublicStyleSummaries();
+      
+      // Aggregate analytics from user's styles
+      const analytics = computeStyleAnalytics(userStyles, allPublicStyles);
+      
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error computing analytics:", error);
+      res.status(500).json({
+        error: "Failed to compute analytics",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // Public analytics endpoint - overall platform insights (no auth required)
+  app.get("/api/analytics/public", async (req, res) => {
+    try {
+      const allStyles = await storage.getStyleSummaries();
+      const analytics = computePlatformAnalytics(allStyles);
+      
+      res.set('Cache-Control', 'public, max-age=300'); // Cache for 5 minutes
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error computing public analytics:", error);
+      res.status(500).json({
+        error: "Failed to compute analytics",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
   return httpServer;
+}
+
+// Compute analytics for a user's styles
+function computeStyleAnalytics(userStyles: any[], allPublicStyles: any[]) {
+  const moodFrequency: Record<string, number> = {};
+  const colorFamilyFrequency: Record<string, number> = {};
+  const textureFrequency: Record<string, number> = {};
+  const lightingFrequency: Record<string, number> = {};
+
+  for (const style of userStyles) {
+    const tags = style.metadataTags || {};
+    
+    for (const mood of (tags.mood || [])) {
+      moodFrequency[mood] = (moodFrequency[mood] || 0) + 1;
+    }
+    
+    for (const colorFamily of (tags.colorFamily || [])) {
+      colorFamilyFrequency[colorFamily] = (colorFamilyFrequency[colorFamily] || 0) + 1;
+    }
+    
+    for (const texture of (tags.texture || [])) {
+      textureFrequency[texture] = (textureFrequency[texture] || 0) + 1;
+    }
+    
+    for (const lighting of (tags.lighting || [])) {
+      lightingFrequency[lighting] = (lightingFrequency[lighting] || 0) + 1;
+    }
+  }
+
+  const styleCount = userStyles.length;
+  
+  const topMoods = Object.entries(moodFrequency)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([name, count]) => ({ name, count }));
+
+  const topColorFamilies = Object.entries(colorFamilyFrequency)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([name, count]) => ({ name, count }));
+
+  // Build creator counts from public styles and include current user
+  const creatorCounts: Record<string, number> = {};
+  for (const style of allPublicStyles) {
+    if (style.creatorId) {
+      creatorCounts[style.creatorId] = (creatorCounts[style.creatorId] || 0) + 1;
+    }
+  }
+  
+  // Calculate platform average properly
+  const uniqueCreatorCount = Object.keys(creatorCounts).length;
+  const platformAverage = uniqueCreatorCount > 0 
+    ? Math.round(allPublicStyles.length / uniqueCreatorCount)
+    : styleCount > 0 ? styleCount : 1;
+
+  // Calculate percentile (what percentage of creators have fewer styles)
+  const percentileRank = calculatePercentile(styleCount, creatorCounts);
+
+  // Token category distribution (based on metadata tag categories)
+  const tokenDistribution = {
+    colors: Object.keys(colorFamilyFrequency).length,
+    textures: Object.keys(textureFrequency).length,
+    moods: Object.keys(moodFrequency).length,
+    total: styleCount,
+  };
+
+  return {
+    userStats: {
+      totalStyles: styleCount,
+      platformAverageStyles: platformAverage,
+      percentileRank,
+    },
+    tokenDistribution,
+    topMoods,
+    topColorFamilies,
+    insights: generateInsights(userStyles, topMoods, topColorFamilies),
+  };
+}
+
+// Compute platform-wide analytics
+function computePlatformAnalytics(allStyles: any[]) {
+  const moodFrequency: Record<string, number> = {};
+  const colorFamilyFrequency: Record<string, number> = {};
+  const eraFrequency: Record<string, number> = {};
+  
+  for (const style of allStyles) {
+    const tags = style.metadataTags || {};
+    
+    for (const mood of (tags.mood || [])) {
+      moodFrequency[mood] = (moodFrequency[mood] || 0) + 1;
+    }
+    
+    for (const colorFamily of (tags.colorFamily || [])) {
+      colorFamilyFrequency[colorFamily] = (colorFamilyFrequency[colorFamily] || 0) + 1;
+    }
+    
+    for (const era of (tags.era || [])) {
+      eraFrequency[era] = (eraFrequency[era] || 0) + 1;
+    }
+  }
+
+  const topMoods = Object.entries(moodFrequency)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([name, count]) => ({ name, count, percentage: Math.round((count / allStyles.length) * 100) }));
+
+  const topColorFamilies = Object.entries(colorFamilyFrequency)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([name, count]) => ({ name, count, percentage: Math.round((count / allStyles.length) * 100) }));
+
+  const topEras = Object.entries(eraFrequency)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([name, count]) => ({ name, count }));
+
+  // Unique creators
+  const uniqueCreators = new Set(allStyles.map(s => s.creatorId).filter(Boolean)).size;
+
+  return {
+    platformStats: {
+      totalStyles: allStyles.length,
+      uniqueCreators,
+      averageStylesPerCreator: uniqueCreators > 0 ? Math.round(allStyles.length / uniqueCreators * 10) / 10 : 0,
+    },
+    topMoods,
+    topColorFamilies,
+    topEras,
+    trends: identifyTrends(allStyles),
+  };
+}
+
+function calculatePercentile(userCount: number, creatorCounts: Record<string, number>): number {
+  const counts = Object.values(creatorCounts);
+  
+  // Edge cases: no other creators or user has no styles
+  if (counts.length === 0 || userCount === 0) return 0;
+  
+  // Count how many creators have fewer styles than the user
+  const belowCount = counts.filter(c => c < userCount).length;
+  
+  // Return percentile (0-99 range, clamped)
+  return Math.min(99, Math.round((belowCount / counts.length) * 100));
+}
+
+function generateInsights(styles: any[], topMoods: any[], topColorFamilies: any[]): string[] {
+  const insights: string[] = [];
+  
+  if (styles.length === 0) {
+    insights.push("Create your first style to start seeing insights!");
+    return insights;
+  }
+  
+  if (styles.length === 1) {
+    insights.push("You've created your first style! Create more to see patterns emerge.");
+  } else if (styles.length >= 5) {
+    insights.push(`You're building a solid collection with ${styles.length} styles.`);
+  }
+  
+  if (topMoods.length > 0) {
+    const dominantMood = topMoods[0].name.replace(/-/g, ' ');
+    insights.push(`Your styles tend toward "${dominantMood}" moods.`);
+  }
+  
+  if (topColorFamilies.length > 0) {
+    const dominantColor = topColorFamilies[0].name.replace(/-/g, ' ');
+    insights.push(`You gravitate toward "${dominantColor}" color palettes.`);
+  }
+  
+  if (topMoods.length >= 3) {
+    insights.push("Your style range is diverse - you explore multiple visual moods.");
+  }
+  
+  return insights;
+}
+
+function identifyTrends(allStyles: any[]): { trending: string[]; emerging: string[] } {
+  // Simple trend identification based on recent styles
+  const recentStyles = allStyles
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 20);
+  
+  const recentMoods: Record<string, number> = {};
+  for (const style of recentStyles) {
+    for (const mood of (style.metadataTags?.mood || [])) {
+      recentMoods[mood] = (recentMoods[mood] || 0) + 1;
+    }
+  }
+  
+  const trending = Object.entries(recentMoods)
+    .filter(([_, count]) => count >= 3)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([name]) => name.replace(/-/g, ' '));
+  
+  return {
+    trending: trending.length > 0 ? trending : ["No clear trends yet"],
+    emerging: [],
+  };
 }
 
 // Default tokens for batch-created styles (same structure as frontend SAMPLE_TOKENS)
