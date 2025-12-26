@@ -1,0 +1,18 @@
+Add an analytics dashboard for styles (could be for the user’s own styles or overall usage metrics).
+Given the scope, let's focus on showing analytics for a single style or the user’s collection:
+1. Decide what analytics to show: e.g., for a given style, how many times it’s been viewed or forked (requires tracking these events), or design tokens analytics like “X% of styles use a blue primary color.”
+   - Also could show a breakdown of token types (like a pie chart of color vs spacing tokens counts).
+2. To start simple, implement analytics for the user’s own usage: e.g., “You have extracted 10 styles. Color tokens count: 50. Most common primary color: #2196F3” etc.
+3. Backend: If tracking events (views, forks), set up tables for those or increment counters on style model. For now, maybe skip actual event tracking and focus on static analysis of tokens.
+   - For example, for a given style, calculate something like contrast ratio of primary vs background (analytics in terms of design quality).
+   - Or across all your styles, what is the average number of colors.
+   These are more design insights than usage analytics.
+4. Frontend UI: Create an Analytics page or section. Possibly on the profile or collection page, have a button “View Analytics”.
+   - Show some summary stats (could use simple charts or just text).
+   - If focusing on design token analytics: show a list of, say, the top 5 colors you’ve used across your styles, the average font size, etc.
+   - If usage analytics: show how many people viewed or forked your public styles (requires counting in DB when those actions happen).
+5. Use a chart library if needed (but that adds weight – maybe simple bar graphs with CSS for now or just numeric summaries).
+6. This is largely a new feature with no direct prior implementation. So start small: perhaps one useful analytic: “Color Popularity” – if multiple styles, aggregate their color palettes and display the most frequent colors or color family.
+7. Ensure the analytics query is efficient: maybe pre-compute some stats when styles are saved (like store the count of tokens of each type, store dominant color, etc., in the style record).
+8. Test with some dummy data: create multiple styles, then verify the analytics page correctly reflects data (e.g., if 3 out of 5 styles have a primary color of blue, it should show blue as most common).
+9. Over time, this could evolve to include more interesting metrics (like recommendations: “Most of your styles are flat design, have you tried a neumorphic style?” etc., but that requires advanced logic).

@@ -1,0 +1,56 @@
+Implement full hybrid storage cutover using App/Object Storage as the canonical image store.
+
+Requirements:
+1) New uploads:
+   - Store original + thumb + medium in object storage (never Postgres).
+   - Generate deterministic object keys per style/asset/variant.
+
+2) DB:
+   - Write rows to object_assets:
+     (styleId, role/type, variant, objectKey, width, height, mime, size).
+   - Remove all base64 image storage from style records.
+
+3) Serving:
+   - Add GET endpoints that resolve object_assets to /objects/... URLs and return those URLs to the client.
+   - /api/styles returns thumb URLs only.
+   - /api/styles/:id returns URLs grouped by role + variant.
+   - Never return base64 images.
+
+4) Migration:
+   - Create an admin migration that:
+     - Reads existing styles.referenceImages + previews + moodBoard + uiConcepts + any image_assets rows.
+     - Writes each image to object storage.
+     - Generates original + thumb + medium variants.
+     - Creates object_assets rows.
+     - Updates style records to store only object asset IDs/keys (no base64).
+     - Leaves a safe rollback toggle (env var) to temporarily read old base64.
+
+5) Verification (required before migration):
+   - Add a command: npm run verify:image-artifacts
+   - This command must:
+     - Discover all existing image artifacts (legacy style fields + image_assets + existing object_assets).
+     - Validate base64 integrity (no invalid/truncated data).
+     - Decode and detect image format; verify MIME matches detected content.
+     - Read actual width/height; flag mismatches vs stored metadata (if any).
+     - Compute SHA-256 hash of decoded bytes; detect duplicates and stale/mismatched assets.
+     - Detect partial migrations:
+       - object exists but DB row missing
+       - DB row exists but object missing
+       - style references assets that don’t exist
+     - Emit a structured JSON report (summary + per-style issues) and exit non-zero if issues exist.
+     - Optionally support a --fix mode ONLY if it is deterministic and safe:
+       - recompute missing metadata
+       - regenerate thumb/medium from original if original is valid
+       - mark irrecoverable assets with explicit warnings (do not silently drop)
+   - Migration must refuse to run unless verification passes (or a FORCE flag is explicitly set).
+
+6) Delete flow:
+   - Deleting a style deletes all related object_assets rows and deletes corresponding objects in storage.
+   - No orphaned objects allowed.
+
+Acceptance criteria:
+- /api/styles and /api/styles/:id never return base64 images.
+- The grid uses only thumb URLs.
+- DB size stops growing with images.
+- Object storage is canonical.
+- Verification prevents migrating corrupted/stale/incorrect data.

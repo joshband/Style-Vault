@@ -1,0 +1,17 @@
+Implement "Style Collections" (similar to projects) so users can organize extracted styles.
+Task breakdown:
+1. **Database**: Use the new database to create a `Project` or `Collection` table (if not already created in the hybrid storage step). Fields: id, name, user_id (if users exist; if not, collections can be global or just keyed by session for now), created_at.
+2. **Backend API**: Create endpoints for collections:
+   - POST `/api/v1/collections` to create a new collection (with a name).
+   - GET `/api/v1/collections` to list collections (perhaps only the user's collections).
+   - GET `/api/v1/collections/{id}` to get details including styles in it.
+   - POST `/api/v1/collections/{id}/styles` to add a style (token set) to a collection.
+   These would integrate with the DB models. When a style is extracted, by default it could go into a "Default" collection or a new collection specified by the user.
+3. **Frontend UI**: Add a section to the UI for collections. Possibly a sidebar or a page that lists collections. Allow the user to create a new collection (a simple form with a name).
+   - After extracting tokens from an image, provide an option like "Save to Collection" – which pops up a list of collections or allows creating a new one.
+   - Implement that modal: call the POST collection API or POST to add style to collection.
+4. **State management**: Use React state or Zustand store to keep track of collections and current selection. For example, when a user logs in (or starts a session), fetch their collections and store in state to populate dropdowns.
+5. **Link to existing Project logic**: If Copy-That's backend logic for "projects" is available, reuse it. The Project in Copy-That is analogous to a style collection. You might only need to adjust naming and integrate with the front-end.
+6. Ensure that when a style is saved to a collection, all its token data is linked to that collection in the DB (e.g., set the project_id on the Token entries).
+7. **Testing**: Simulate via API calls: create a collection, add a style, retrieve the collection and verify the style data is present. In UI, make sure collections update reactively (e.g., after adding a style, it appears under that collection’s list).
+8. This feature will pave the way for style gallery and comparison features.

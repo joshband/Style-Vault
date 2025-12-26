@@ -96,12 +96,14 @@ export function AiMoodBoard({
 
   // Show images immediately when available, even if still generating
   const hasCollage = !!moodBoard?.collage;
+  const hasSoftwareApp = !!uiConcepts?.softwareApp;
   const hasAudioPlugin = !!uiConcepts?.audioPlugin;
   const hasDashboard = !!uiConcepts?.dashboard;
-  const hasAnyAssets = hasCollage || hasAudioPlugin || hasDashboard;
+  const hasAnyAssets = hasCollage || hasSoftwareApp || hasAudioPlugin || hasDashboard;
   
   // Track what's still loading
   const collageLoading = (isGenerating || isPending) && !hasCollage;
+  const softwareAppLoading = (isGenerating || isPending) && !hasSoftwareApp;
   const audioPluginLoading = (isGenerating || isPending) && !hasAudioPlugin;
   const dashboardLoading = (isGenerating || isPending) && !hasDashboard;
 
@@ -193,6 +195,29 @@ export function AiMoodBoard({
             </div>
           ) : (
             <LoadingPlaceholder label="Generating mood board..." />
+          )}
+        </div>
+      )}
+
+      {/* Software App Thumbnail Section - show first as primary UI concept */}
+      {(hasSoftwareApp || softwareAppLoading) && (
+        <div className="space-y-2">
+          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+            Software App UI
+            <InfoTooltip testId="tooltip-software-app">A web application interface mockup showcasing how this style applies to modern software UI.</InfoTooltip>
+          </h3>
+          {hasSoftwareApp ? (
+            <div className="relative group rounded-lg overflow-hidden border border-border" data-testid="img-container-software-app">
+              <img
+                src={uiConcepts?.softwareApp}
+                alt={`${styleName} software app`}
+                className="w-full h-auto"
+                data-testid="img-software-app"
+              />
+              <DownloadButton src={uiConcepts?.softwareApp || ""} filename={`${styleName}-software-app.png`} />
+            </div>
+          ) : (
+            <LoadingPlaceholder label="Generating software app UI..." />
           )}
         </div>
       )}
