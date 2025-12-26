@@ -560,7 +560,8 @@ export default function Compare() {
   const [error, setError] = useState<string | null>(null);
   const [showOnlyDifferences, setShowOnlyDifferences] = useState(false);
 
-  const searchParams = new URLSearchParams(location.split("?")[1] || "");
+  // Use window.location.search since wouter's location doesn't include query params
+  const searchParams = new URLSearchParams(window.location.search);
   const style1Id = searchParams.get("style1");
   const style2Id = searchParams.get("style2");
 
