@@ -4,7 +4,7 @@ import { Layout } from "@/components/layout";
 import { TokenViewer } from "@/components/token-viewer";
 import { ColorPaletteSwatches } from "@/components/color-palette-swatches";
 import { StyleSpecEditor } from "@/components/style-spec-editor";
-import { ArrowLeft, Download, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Palette, MessageSquare, Share2, Check, Copy, Droplets, FileEdit, Bookmark, Star, User, FolderPlus, Folder, Plus, FileCode, FileJson, Paintbrush } from "lucide-react";
+import { ArrowLeft, Download, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Palette, MessageSquare, Share2, Check, Copy, Droplets, FileEdit, Bookmark, Star, User, FolderPlus, Folder, Plus, FileCode, FileJson, Paintbrush, History, RotateCcw, Save } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
@@ -41,6 +41,19 @@ interface StyleAssets {
   };
   moodBoard: any;
   uiConcepts: any;
+}
+
+interface StyleVersion {
+  id: string;
+  styleId: string;
+  versionNumber: number;
+  changeType: string;
+  changeDescription: string | null;
+  createdBy: string | null;
+  tokens: any;
+  promptScaffolding: any;
+  metadataTags: any;
+  createdAt: string;
 }
 
 interface SectionHeaderProps {
@@ -110,6 +123,13 @@ export default function Inspect() {
   const [collections, setCollections] = useState<Collection[]>([]);
   const [styleCollections, setStyleCollections] = useState<Set<string>>(new Set());
   const [collectionsLoading, setCollectionsLoading] = useState(false);
+
+  // Version History
+  const [versions, setVersions] = useState<StyleVersion[]>([]);
+  const [versionsExpanded, setVersionsExpanded] = useState(false);
+  const [versionsLoading, setVersionsLoading] = useState(false);
+  const [revertingVersion, setRevertingVersion] = useState<string | null>(null);
+  const [savingVersion, setSavingVersion] = useState(false);
   
   // Check if current user is the creator
   const isOwner = isAuthenticated && user?.id === summary?.creatorId;
@@ -198,6 +218,71 @@ export default function Inspect() {
       setVisibilityLoading(false);
     }
   }, [id, isOwner, isPublic]);
+
+  // Fetch version history
+  const fetchVersions = useCallback(async () => {
+    if (!id) return;
+    setVersionsLoading(true);
+    try {
+      const res = await fetch(`/api/styles/${id}/versions`);
+      if (res.ok) {
+        const data = await res.json();
+        setVersions(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch versions:", error);
+    } finally {
+      setVersionsLoading(false);
+    }
+  }, [id]);
+
+  // Save current state as version
+  const handleSaveVersion = useCallback(async () => {
+    if (!id || !isAuthenticated) return;
+    setSavingVersion(true);
+    try {
+      const res = await fetch(`/api/styles/${id}/versions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: "Manual snapshot" }),
+      });
+      if (res.ok) {
+        await fetchVersions();
+      }
+    } catch (error) {
+      console.error("Failed to save version:", error);
+    } finally {
+      setSavingVersion(false);
+    }
+  }, [id, isAuthenticated, fetchVersions]);
+
+  // Revert to a previous version
+  const handleRevertToVersion = useCallback(async (versionId: string) => {
+    if (!id || !isAuthenticated) return;
+    if (!confirm("Revert to this version? Current state will be saved first.")) return;
+    
+    setRevertingVersion(versionId);
+    try {
+      const res = await fetch(`/api/styles/${id}/versions/${versionId}/revert`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        // Refresh the page to show updated data
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error("Failed to revert version:", error);
+    } finally {
+      setRevertingVersion(null);
+    }
+  }, [id, isAuthenticated]);
+
+  // Load versions when expanded
+  useEffect(() => {
+    if (versionsExpanded && versions.length === 0) {
+      fetchVersions();
+    }
+  }, [versionsExpanded, fetchVersions, versions.length]);
 
   // Load bookmark, rating, and collection status
   useEffect(() => {
@@ -1065,6 +1150,117 @@ module.exports = ${JSON.stringify(config, null, 2)}`;
             updatedAt={summary.updatedAt}
             onUpdate={handleSpecUpdate}
           />
+        </section>
+
+        {/* Section 6: Version History */}
+        <section className="space-y-0">
+          <SectionHeader
+            icon={<History size={20} />}
+            title="Version History"
+            description="Track changes and revert to previous versions"
+          />
+          
+          <div className="space-y-4">
+            {/* Actions row */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setVersionsExpanded(!versionsExpanded)}
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                data-testid="toggle-version-history"
+              >
+                {versionsExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                {versionsExpanded ? "Hide history" : "Show history"}
+              </button>
+              
+              {isOwner && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSaveVersion}
+                  disabled={savingVersion}
+                  data-testid="save-version-btn"
+                >
+                  {savingVersion ? (
+                    <Loader2 size={14} className="mr-2 animate-spin" />
+                  ) : (
+                    <Save size={14} className="mr-2" />
+                  )}
+                  Save Snapshot
+                </Button>
+              )}
+            </div>
+
+            {/* Version list */}
+            {versionsExpanded && (
+              <div className="space-y-2 animate-in fade-in duration-200">
+                {versionsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 size={24} className="animate-spin text-muted-foreground" />
+                  </div>
+                ) : versions.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <History size={32} className="mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No version history yet</p>
+                    <p className="text-xs mt-1">Versions are created when tokens are updated</p>
+                  </div>
+                ) : (
+                  <div className="border border-border rounded-lg divide-y divide-border">
+                    {versions.map((version) => (
+                      <div
+                        key={version.id}
+                        className="p-4 flex items-start justify-between gap-4"
+                        data-testid={`version-item-${version.id}`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">
+                              Version {version.versionNumber}
+                            </span>
+                            <span className={`text-xs px-2 py-0.5 rounded-full ${
+                              version.changeType === "created" ? "bg-green-500/10 text-green-600" :
+                              version.changeType === "tokens_updated" ? "bg-blue-500/10 text-blue-600" :
+                              version.changeType === "manual_save" ? "bg-purple-500/10 text-purple-600" :
+                              version.changeType === "reverted" ? "bg-orange-500/10 text-orange-600" :
+                              "bg-muted text-muted-foreground"
+                            }`}>
+                              {version.changeType.replace("_", " ")}
+                            </span>
+                          </div>
+                          {version.changeDescription && (
+                            <p className="text-sm text-muted-foreground mt-1 truncate">
+                              {version.changeDescription}
+                            </p>
+                          )}
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {new Date(version.createdAt).toLocaleString()}
+                          </p>
+                        </div>
+                        
+                        {isOwner && version.versionNumber < Math.max(...versions.map(v => v.versionNumber)) && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRevertToVersion(version.id)}
+                            disabled={revertingVersion === version.id}
+                            data-testid={`revert-btn-${version.id}`}
+                          >
+                            {revertingVersion === version.id ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              <>
+                                <RotateCcw size={14} className="mr-1" />
+                                Revert
+                              </>
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </section>
       </div>
     </Layout>

@@ -1140,6 +1140,113 @@ export async function registerRoutes(
     }
   });
 
+  // ========== STYLE VERSION ROUTES ==========
+
+  // Get all versions for a style
+  app.get("/api/styles/:id/versions", async (req, res) => {
+    try {
+      const versions = await storage.getStyleVersions(req.params.id);
+      res.json(versions);
+    } catch (error) {
+      console.error("Error fetching style versions:", error);
+      res.status(500).json({ error: "Failed to fetch versions" });
+    }
+  });
+
+  // Get a specific version
+  app.get("/api/styles/:id/versions/:versionId", async (req, res) => {
+    try {
+      const version = await storage.getStyleVersionById(req.params.versionId);
+      if (!version || version.styleId !== req.params.id) {
+        return res.status(404).json({ error: "Version not found" });
+      }
+      res.json(version);
+    } catch (error) {
+      console.error("Error fetching style version:", error);
+      res.status(500).json({ error: "Failed to fetch version" });
+    }
+  });
+
+  // Create a manual version snapshot (requires auth, owner only)
+  app.post("/api/styles/:id/versions", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any)?.claims?.sub;
+      const styleId = req.params.id;
+      const { description } = req.body;
+
+      const style = await storage.getStyleById(styleId);
+      if (!style) {
+        return res.status(404).json({ error: "Style not found" });
+      }
+
+      // Only the creator can create versions
+      if (style.creatorId && style.creatorId !== userId) {
+        return res.status(403).json({ error: "Only the creator can save versions" });
+      }
+
+      const latestVersion = await storage.getLatestVersionNumber(styleId);
+      const version = await storage.createStyleVersion({
+        styleId,
+        versionNumber: latestVersion + 1,
+        changeType: "manual_save",
+        changeDescription: description || "Manual snapshot",
+        createdBy: userId,
+        tokens: style.tokens,
+        promptScaffolding: style.promptScaffolding,
+        metadataTags: style.metadataTags as any,
+      });
+
+      res.json(version);
+    } catch (error) {
+      console.error("Error creating style version:", error);
+      res.status(500).json({ error: "Failed to create version" });
+    }
+  });
+
+  // Revert to a previous version (requires auth, owner only)
+  app.post("/api/styles/:id/versions/:versionId/revert", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any)?.claims?.sub;
+      const { id: styleId, versionId } = req.params;
+
+      const style = await storage.getStyleById(styleId);
+      if (!style) {
+        return res.status(404).json({ error: "Style not found" });
+      }
+
+      // Only the creator can revert versions; block if no creator (legacy styles)
+      if (!style.creatorId) {
+        return res.status(403).json({ error: "Cannot revert style with unknown creator" });
+      }
+      if (style.creatorId !== userId) {
+        return res.status(403).json({ error: "Only the creator can revert versions" });
+      }
+
+      // Create a version of current state before reverting
+      const latestVersion = await storage.getLatestVersionNumber(styleId);
+      await storage.createStyleVersion({
+        styleId,
+        versionNumber: latestVersion + 1,
+        changeType: "reverted",
+        changeDescription: `State before reverting to version ${versionId}`,
+        createdBy: userId,
+        tokens: style.tokens,
+        promptScaffolding: style.promptScaffolding,
+        metadataTags: style.metadataTags as any,
+      });
+
+      const updated = await storage.revertToVersion(styleId, versionId);
+      if (!updated) {
+        return res.status(400).json({ error: "Failed to revert" });
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error reverting style version:", error);
+      res.status(500).json({ error: "Failed to revert version" });
+    }
+  });
+
   // Generate canonical preview images for a style
   app.post("/api/generate-previews", async (req, res) => {
     try {
