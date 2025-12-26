@@ -1,7 +1,7 @@
 import { type Style, type InsertStyle, type GeneratedImage, type InsertGeneratedImage, type MoodBoardAssets, type UiConceptAssets, type MetadataTags, type MetadataEnrichmentStatus, type Job, type InsertJob, type JobStatus, type JobType, type Batch, type InsertBatch, type StyleSpec, type ImageAssetType, type Bookmark, type InsertBookmark, type Rating, type InsertRating, type Collection, type InsertCollection, type CollectionItem, type InsertCollectionItem, type StyleVersion, type InsertStyleVersion, type VersionChangeType, styles, generatedImages, jobs, batches, imageAssets, objectAssets, bookmarks, ratings, collections, collectionItems, styleVersions } from "@shared/schema";
 import { users } from "@shared/models/auth";
 import { db } from "./db";
-import { eq, desc, and, or, inArray, sql } from "drizzle-orm";
+import { eq, desc, asc, and, or, inArray, sql, gt, lt } from "drizzle-orm";
 
 export interface StyleSummary {
   id: string;
@@ -123,6 +123,9 @@ export interface IStorage {
   createStyleVersion(version: InsertStyleVersion): Promise<StyleVersion>;
   getLatestVersionNumber(styleId: string): Promise<number>;
   revertToVersion(styleId: string, versionId: string): Promise<Style | undefined>;
+
+  // Navigation operations
+  getStyleNeighbors(styleId: string): Promise<{ prevId: string | null; nextId: string | null }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1225,6 +1228,33 @@ export class DatabaseStorage implements IStorage {
       .returning();
     
     return updated;
+  }
+
+  async getStyleNeighbors(styleId: string): Promise<{ prevId: string | null; nextId: string | null }> {
+    const [currentStyle] = await db.select({ createdAt: styles.createdAt })
+      .from(styles)
+      .where(eq(styles.id, styleId));
+    
+    if (!currentStyle) {
+      return { prevId: null, nextId: null };
+    }
+
+    const [prevStyle] = await db.select({ id: styles.id })
+      .from(styles)
+      .where(gt(styles.createdAt, currentStyle.createdAt))
+      .orderBy(asc(styles.createdAt))
+      .limit(1);
+
+    const [nextStyle] = await db.select({ id: styles.id })
+      .from(styles)
+      .where(lt(styles.createdAt, currentStyle.createdAt))
+      .orderBy(desc(styles.createdAt))
+      .limit(1);
+
+    return {
+      prevId: prevStyle?.id || null,
+      nextId: nextStyle?.id || null,
+    };
   }
 }
 

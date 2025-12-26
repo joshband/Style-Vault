@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { Trash2, AlertCircle, Palette } from "lucide-react";
+import { Trash2, AlertCircle } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { memo, useState, useCallback, useRef, useEffect } from "react";
 import { trackStyleView } from "@/lib/suggestions";
@@ -185,9 +185,7 @@ const StyleCardComponent = memo(function StyleCard({ style, className, onDelete 
                   height={400}
                 />
               ) : (
-                <div className="flex-1 h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted/50">
-                  <Palette className="w-10 h-10 text-muted-foreground/20" />
-                </div>
+                <div className="flex-1 h-full bg-muted" />
               )}
             </div>
 

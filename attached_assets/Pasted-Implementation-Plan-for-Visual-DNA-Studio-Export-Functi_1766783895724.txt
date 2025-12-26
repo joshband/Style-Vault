@@ -1,0 +1,756 @@
+Implementation Plan for Visual DNA Studio Export Functionality
+
+Introduction
+
+Visual DNA Studio is envisioned as a design system tool that captures a product’s “visual DNA” – the core design tokens (colors, spacing, typography, motion, etc.) and components – and makes them available for use in various platforms. A key feature is the ability to export design tokens and components to multiple targets, ranging from design tools like Adobe Photoshop to code frameworks like React Native and Flutter. This plan outlines a technical approach to implement export functionality for the following targets:
+	•	Adobe Tools (Photoshop, Illustrator)
+	•	Figma (via plugin and file exports like .fig, .svg, .json)
+	•	JUCE (C++ GUI toolkit for audio apps)
+	•	React Native (mobile framework)
+	•	Flutter (mobile UI toolkit)
+	•	Unity (game engine UI)
+	•	Unreal Engine (game engine UI)
+	•	Web Components (standard Web Custom Elements or design tokens for web)
+	•	Next.js/Vercel (React web apps, SSR considerations)
+	•	Swift (iOS) (native iOS apps, UIKit/SwiftUI)
+	•	Material UI (React component library)
+
+The plan emphasizes compliance with the W3C Design Tokens Community Group (DTCG) 2025.10 specification – the newly stable design token format – to ensure that Visual DNA’s exports use a vendor-neutral, standard format ￼ ￼. We will also maintain a modular architecture that cleanly separates the extraction of raw design tokens from the generation of platform-specific code or assets. Both static file exports (e.g. generating files like JSON, CSS, Swift code, etc.) and dynamic integrations (e.g. plugins or scripts that push tokens into tools) will be supported where applicable. In addition, we address UX considerations for how a user will select and configure export options, and outline the backend processes, libraries, and file structure needed to implement this on Replit (our development environment). Finally, we provide example Replit AI agent prompts that can scaffold code for various export modules, accelerating development.
+
+Aligning with W3C Design Token Spec (2025.10)
+
+To ensure interoperability, Visual DNA Studio will adopt the W3C DTCG Design Tokens 2025.10 format for its internal token representation and exports. This specification (first released as a stable version in October 2025) defines a JSON-based format for design tokens that is vendor-neutral and supports modern needs like theming and complex token relationships ￼ ￼. Key alignment points include:
+	•	File Format and Extensions: Design tokens will be saved as JSON using the “.tokens” or “.tokens.json” extension recommended by the spec ￼. For example, Visual DNA can export a theme.tokens.json file containing all tokens. Using the standard extension makes it easier for other tools to recognize the file as a token set.
+	•	Token Structure: Each token will be defined with the spec’s $value and $type fields (and optional $description, etc.) ￼ ￼. For example, a color token in Visual DNA might be stored as:
+
+{
+  "primaryColor": {
+    "$type": "color",
+    "$description": "Brand primary color for backgrounds",
+    "$value": { "colorSpace": "srgb", "components": [0.1, 0.2, 0.8] }
+  }
+}
+
+This follows the DTCG format where $type disambiguates the token type and $value holds the actual data (here using sRGB components) ￼ ￼. All token categories (color, dimension, font, motion, etc.) will be expressed in this format, ensuring unambiguous interpretation by downstream tools. We will avoid characters and naming conventions disallowed by the spec (e.g. token names cannot start with $ or contain {}, per the spec rules ￼).
+
+	•	Theming and Variants: The 2025.10 spec introduces support for theming (e.g. light and dark modes, or multi-brand tokens) without duplicating files ￼. We will leverage this by structuring tokens into groups or mode-specific JSON files. For example, Visual DNA might maintain a base tokens file and extend it for dark mode tokens using the spec’s group inheritance or alias mechanisms (the spec supports alias references with {} syntax and multiple themes in one file) ￼. This ensures that exports can include variants for dark mode or different brands in a standardized way.
+	•	Single Source of Truth: By adhering to the DTCG format, Visual DNA’s token file can serve as a single source of truth that “works everywhere – from design to production code across iOS, Android, and web” ￼. The W3C announcement notes that historically tokens were fragmented across formats, but the new spec allows one token set to generate outputs for all platforms ￼ ￼. Our implementation will take advantage of this by feeding the same .tokens data into each export pipeline, reducing drift and manual maintenance.
+	•	Integration with Tools: Many industry tools and libraries now support the DTCG format. Notably, Amazon’s Style Dictionary (a widely used token transformer) is already forward-compatible with the DTCG spec (it accepts $value, $type, etc.) ￼. We plan to use such libraries for the transformation step, which means our adherence to the spec will immediately let us tap into a “production-ready ecosystem” of converters ￼. This will be detailed in the transformation sections.
+
+By aligning with the W3C format, Visual DNA Studio ensures that its exports are future-proof and interoperable. Any tool or platform that supports the 2025.10 design token standard will be able to consume Visual DNA’s output with minimal friction. This forms the foundation for the export implementation.
+
+Modular Token Extraction and Transformation Pipeline
+
+To manage the complexity of exporting to many targets, the system will be designed in a modular pipeline with a clear separation between design token extraction and target-specific transformation. This separation ensures maintainability and reusability of core data across different outputs:
+	•	Design Token Extraction (Module 1): Visual DNA Studio will extract raw design tokens from its source (which could be a design file, a user-defined style guide, or the Visual DNA internal representation). This involves capturing primitive tokens like colors, font sizes, spacing values, radii, etc., as well as possibly semantic tokens that map to UI purposes (e.g. button-background = primaryColor) ￼. The output of this stage is one or more token JSON files in DTCG format, which serve as the canonical representation of the design. This stage is concerned only with design data and is agnostic of any code or platform. The token files may be organized by categories (for example, colors.tokens.json, typography.tokens.json) or by themes (e.g. global.tokens.json, dark.tokens.json) depending on user needs. The key is that this extraction happens once and provides a tool-agnostic token repository.
+	•	Token Transformation (Module 2): For each export target, there will be a transformation module or plugin that takes the raw tokens and converts them into the format or code needed by that platform. This is analogous to an ETL pipeline: we Extract tokens, Transform them for each environment, and Load or export them ￼. Each target’s transformer will be independent and modular – adding support for a new platform means adding a new transformer without altering the core extraction logic. This also means if a token value is updated in Visual DNA, all exporters can regenerate their outputs automatically using the updated token JSON, keeping everything in sync.
+
+Our approach follows a known pattern in design systems: centralize tokens, then distribute. By not hard-coding any platform specifics in the token definition stage, we maintain flexibility. For example, a color token brandPrimary defined as #0055FF needs no knowledge of how Flutter or CSS represent colors; the Flutter module will later output it as a Dart Color(0xFF0055FF) while the CSS module will output it as --brand-primary: #0055FF. This prevents duplication and errors. Tools like Style Dictionary explicitly advocate this separation, treating design tokens as “platform-agnostic values” that get transformed with platform-specific formats in the build process ￼.
+
+To implement this pipeline, we will set up a system where the token JSON files are the input to multiple small generator scripts or libraries (one per target). For example, we might have a Node.js script for web targets, a Python or Node script for generating .ase files, and so on. Each module will resolve any token references/aliases (using DTCG rules) and apply target-specific naming or structuring. The use of a community standard means we can also incorporate existing transformation tooling:
+	•	We will leverage Style Dictionary for many platforms because it can output to CSS, JS, Swift, Android, etc., and it supports custom formats. Style Dictionary can directly ingest our DTCG-formatted JSON (with $value, $type fields) since its latest version supports the DTCG spec ￼. It will handle things like converting color formats (hex to UIColor or to CSS rgba) and merging token files. This dramatically reduces custom coding for common targets.
+	•	For platforms not covered by Style Dictionary or requiring special handling (e.g. JUCE, Unreal Engine), we will create custom transformer scripts. These will read the token JSON (the input) and produce the required output via string templates or API calls. Keeping these as separate modules (e.g. a export_unreal.py script or a juce_export.cpp generator) ensures they can be developed and tested independently.
+	•	Each transformation module will be invoked either on-demand (when a user selects an export in the UI) or via a build pipeline script. For instance, if a user selects “Export for React Native” and “Export for iOS Swift”, the system will run the RN transformer and the iOS transformer, each reading the same core token file but outputting different results.
+
+This modular design is crucial for maintainability. If the W3C format updates or new tokens are added, we only update Module 1 (extraction) and possibly some format mappings in transforms, without rewriting all exporters. Conversely, if a new platform is requested (say, Android or Angular in the future), we add a Module 2 sub-component for it without touching extraction. This also aligns with the industry best practice of treating design tokens as a pipeline through which tokens flow from design to code ￼, much like data through an ETL process.
+
+Implementation Note: We will likely maintain a configuration file (or use Style Dictionary’s config) that lists all source token files and the outputs to generate. For example, a configuration might declare that tokens/**/*.tokens.json are sources, and define a build for each platform (Web, iOS, Android, etc.). This config-driven approach means adding an export is as easy as adding a new entry, and the build system (which could be run in Replit via NPM scripts or a Python runner) will handle iterating through each. Style Dictionary’s paradigm of “platforms” and “formats” is useful here: we can define custom formats for targets like JUCE or Material-UI if needed, plugging into its pipeline ￼ ￼.
+
+In summary, by separating token creation from token consumption, Visual DNA Studio will ensure a robust and scalable export system. All exports draw from the same well of truth, and the transformation logic is encapsulated per target, making the system easy to extend and less prone to errors.
+
+User Experience for Export Format Selection
+
+Providing a powerful export feature requires careful consideration of the user experience (UX) in Visual DNA Studio. Users might range from designers wanting a Figma import to developers needing code snippets. The export UX should be clear, guided, and flexible:
+	•	Export Options Dialog: We will implement an “Export” panel or dialog where users can choose one or multiple targets to export. This UI will list all supported targets (Adobe, Figma, JUCE, etc.) grouped by category for clarity (e.g. Design Tools, Mobile Code, Game Engines, Web, etc.). Each option will have a checkbox or toggle. Users can select any combination (for instance, check “Adobe” and “React Native” together to export both).
+	•	Sub-options per Target: Some targets have multiple export formats (especially where both static and dynamic methods exist). The UI will allow the user to configure these:
+	•	For Adobe, the user could choose between “Export Color Swatches (.ase file)” and (in future) “Adobe Plugin” if available. We might present this as a dropdown or radio buttons after Adobe is selected.
+	•	For Figma, offer “Figma Plugin (sync to Figma)” vs “Export Tokens as JSON” vs “Export Figma File (.fig)”. The plugin option might simply provide instructions (since the actual sync happens via the plugin UI, described later).
+	•	In code targets like React Native, we might let the user pick “JavaScript (StyleSheet file)” or “TypeScript” depending on their project needs.
+	•	For Unity/Unreal, possibly allow “Generate C# ScriptableObject” vs “Generate JSON data file” if both are supported.
+These choices will be presented in a user-friendly way, e.g. indenting sub-options or using a secondary dropdown. The default selection for each target will favor the most common use case (for example, default to .ase for Adobe, default to the Figma plugin for Figma, default to codegen files for programming frameworks).
+	•	Descriptions and Guidance: Each export option will include a short description or tooltip. For instance, hovering “Adobe (Photoshop/Illustrator)” might show: “Exports a color palette in Adobe Swatch Exchange format for import into Photoshop or Illustrator.” Similarly, “Figma Plugin” might have: “Requires installing the Visual DNA Figma plugin. Allows direct sync of tokens into a Figma file.” Providing this context helps users pick the right formats and understand any prerequisites (like needing to have Figma open or needing to import the .ase file in Adobe). We will also indicate which options are dynamic vs static. For example, label Figma’s plugin as “(sync via plugin)” vs “(download file)”.
+	•	Combination and Packaging: If multiple exports are selected at once, the system can perform them all and present the results together. In the case of file outputs, Visual DNA Studio can package them as a ZIP download containing all the requested files (e.g. a zip might contain BrandSwatches.ase, tokens.json, and react-native/StyleSheet.js). If only one export is selected, we might directly provide that file or set of files. For plugin-based exports (like pushing to Figma), those will execute their process separately (and likely not produce a file to download, but rather a success message once done).
+	•	Dynamic Export Workflow: For targets that involve dynamic integration (like plugins or codegen pipelines), the UX will guide the user through the steps:
+	•	Figma: If “Figma Plugin” is selected, upon export we might show a modal: “Open Figma and run the Visual DNA Tokens plugin to receive the tokens.” If the plugin communicates with Visual DNA Studio, the app could also initiate a handshake. However, a simpler approach is that the export button for Figma could simply generate or update the tokens JSON and make it accessible (e.g. copy to clipboard or save to a known location) and then prompt the user to switch to Figma. We will ensure there’s clear messaging like “Token data ready. Please paste in Figma plugin” or possibly even a QR code or link if we host the JSON online for the plugin to fetch.
+	•	Adobe: For a future Adobe plugin approach, similar guidance would be needed (“The Adobe extension will pull the latest tokens from Visual DNA” or “Use the Adobe extension panel in Photoshop to import the tokens”). However, since our initial plan for Adobe is a file export (.ase), that’s straightforward: we provide the .ase file and show instructions: “In Photoshop/Illustrator, go to Swatches panel > Import Swatches and select the .ase file.”
+	•	Codegen via Replit: If some exports require running codegen (for example, maybe generating code and pushing to a Git repository), the UI should either handle it automatically or instruct the developer. In our Replit environment, we can automate most generation internally. For example, exporting to Next.js could directly produce a theme.js file. But if any manual integration is needed, we will note it (e.g. “Add this file to your project”).
+	•	Safety and Confirmation: On hitting “Export”, Visual DNA should confirm the action (especially if multiple files will be generated). After exporting, we provide feedback: a success message listing what was exported (with download links for files, or a note that “Tokens synced to Figma”). If any export fails (say, if a plugin could not be contacted), we handle that gracefully, perhaps by falling back to offering a file or giving the user troubleshooting info (like “Make sure Figma is running the plugin and try again”).
+	•	Persisting Settings: It can enhance UX to remember the user’s last export choices. If a user repeatedly exports to React Native, we might keep that pre-selected next time. We should also consider versioning: if the DTCG spec updates or if certain targets have version-specific formats (for example, Material UI v4 vs v5 theme structure), the UI might allow advanced users to pick a version. Initially, we’ll target current versions (MUI v5, Unity 2025, etc.), but this is a note for future-proofing the UX.
+
+By considering UX in the design, we ensure that the powerful export capabilities do not overwhelm the user. Instead, the user is guided to the right format for their needs and understands how to use the exported assets. This is crucial for adoption – a designer should feel confident exporting a Photoshop palette, and a developer should easily integrate the exported code. Clear labeling, grouping, and helpful instructions will make Visual DNA Studio’s export panel a user-friendly bridge between design and development worlds.
+
+Export Targets Overview
+
+The following table summarizes the export targets, the types of exports supported for each (static files vs dynamic integration), and the key tools or libraries involved in implementing them:
+
+Target	Static Export Formats	Dynamic Integration (if any)	Tools / Libraries
+Adobe Photoshop & Illustrator	• Adobe Swatch Exchange file (.ase) for color palettes ￼• Optionally, Adobe Color presets (.aco) if needed for Photoshop	• Future: UXP Plugin to sync swatches or styles in-app	Adobe UXP JavaScript API (for plugin),Custom .ase file writer (Node/Python)
+Figma	• Design tokens JSON (.json) export (DTCG format)• Vector asset export (e.g. icons as .svg files)	• Figma Plugin (Visual DNA Tokens plugin) to import tokens into Figma styles/variables	Figma Plugin API (TypeScript/HTML),Figma REST API (for .fig file if feasible)
+JUCE (C++ GUI)	• C++ code for a custom LookAndFeel class (with token-defined colors, fonts)• XML or JSON stylesheet containing token values (for runtime loading)	• Live reload support by re-reading the external style file at runtime (developer mode feature)	JUCE library (Graphics & LookAndFeel APIs),JUCE XML parsing utilities
+React Native	• JavaScript/TypeScript file exporting a StyleSheet or theme object with all tokens• JSON file of tokens (for runtime use or other libraries)	• (No native plugin; dynamic usage via an NPM package or context provider is possible)	Style Dictionary (JS output) ￼,React Native StyleSheet API
+Flutter	• Dart file defining ThemeData or ColorScheme with token values• Dart constants classes for tokens (colors, text styles, etc.)	• (No plugin; could use Flutter’s build_runner for codegen on token JSON changes)	Style Dictionary (custom Dart format) ￼,Flutter theming API (ThemeData)
+Unity (Unity UI / UI Toolkit)	• C# ScriptableObject class instance (.asset) containing token values (colors, sizes, etc.)• Unity USS (UI Style Sheets) or styles if using UI Toolkit, generated with token values	• Editor script to update tokens: e.g., a custom Unity EditorWindow that imports a tokens JSON to update the ScriptableObject	Unity Editor Scripting API (C#),Unity JSONUtility or Newtonsoft JSON for parsing
+Unreal Engine (UMG/Slate)	• Data Asset or JSON file with token values (e.g., a struct for colors, exported as .json or .csv for DataTable import)• C++ header with constants for design tokens (for use in Slate styles)	• Editor Utility Blueprint or Python script in Unreal Editor to read token file and apply to a UMG Style asset or global config	Unreal Engine Editor Scripting (Blueprint/Python),C++ Slate Style Set APIs for custom styling
+Web Components	• CSS file defining custom properties (:root { --token-name: value; }) for all tokens• JSON or JavaScript module exporting the token values (for use in JS)	• Possibly a small JS library to toggle themes (light/dark) by swapping CSS variables at runtime	Style Dictionary (CSS variables format) ￼,Lit or other Web Component libs (for demonstration of usage)
+Next.js / Vercel	• Global CSS or SCSS file with tokens as variables (for usage in app styles)• Theme configuration file (e.g., a JS object for theme, or Tailwind config if using Tailwind)	• Integrate into build: e.g., a script that runs on Vercel build to regenerate token CSS/JS from source JSON	Style Dictionary (multiple formats),Next.js configuration (to include generated styles or theme)
+Swift (iOS)	• Swift code file defining UIColor / Color and UIFont constants for tokens• Xcode Asset Catalog (.xcassets) with named colors (and possibly named text styles) for tokens	• (No live plugin; could use Swift Package Manager to pull updated tokens if hosted, but typically static)	Style Dictionary (Swift code format) ￼,Apple Xcode Asset Catalog CLI (for programmatic asset generation)
+Material-UI (React)	• JavaScript/TypeScript file exporting a MUI createTheme(...) object that maps tokens into palette, typography, etc.• Alternatively, a JSON representation of the theme that can be loaded	• (No plugin; theme is consumed at runtime by importing the file in the app)	MUI theming API (createTheme),Style Dictionary (custom JS format to output theme)
+
+Table: Export targets with their static vs dynamic approaches and relevant tools.
+
+This overview provides a blueprint of the approach for each target. Next, we delve into each target with more details on implementation strategies, covering how we will use the aforementioned tools and addressing any special considerations.
+
+Adobe Photoshop & Illustrator Export
+
+Adobe Photoshop and Illustrator are design tools where developers and designers may want to use the color palettes and style tokens defined in Visual DNA. Our export will focus on providing those tokens in a form easily usable within these Adobe apps:
+	•	Adobe Swatch Exchange (.ase) for Colors: The primary export format for Adobe will be an ASE file containing the color tokens. An .ase file (Adobe Swatch Exchange) is Adobe’s standard format for sharing color palettes between applications ￼. It can store multiple named swatches (colors) in one file, which perfectly suits exporting a set of brand colors or other color tokens. Visual DNA Studio will generate an .ase file (e.g. BrandColors.ase) where each color token becomes a swatch with the token name (e.g. a token named “Primary 500” or “Primary Color” will appear as a swatch of that name in Adobe). Users can then import this file into Photoshop or Illustrator via the Swatches panel (“Import Swatches” in PS, “Open Swatch Library > Other Library” in AI) ￼ ￼. This gives designers quick access to the exact color values from the design system, ensuring consistency.
+	•	Implementation: We will implement an ASE file writer. The .ase format is binary, but it’s documented and has existing implementations in open-source. We can either use a library or write our own small module to output it. The file essentially contains color entries with names and values (in a specific colorspace). We’ll likely output all colors in RGB. For naming, we might use the token’s $description or name; if the name has slashes (grouped, e.g. palette/primary/500), we can flatten it or use a hierarchical naming in ASE (ASE supports groups of swatches). The creation can be done in a Node script or Python script within Replit. (If no library is available, we could even prompt the Replit AI to generate an ASE-writing function – see Replit prompt below).
+	•	Text Styles and Other Tokens: Unlike colors, sharing typography or spacing tokens with Adobe tools is less straightforward, because Photoshop/Illustrator don’t have a native concept of “token” for those. However, we can partially address this:
+	•	Typography: We could export a reference document or style guide PDF that lists fonts and sizes, but that’s outside pure token export. Instead, for dynamic usage, an Adobe plugin could theoretically create text styles in Illustrator or Photoshop. Adobe’s newer extensibility (UXP) does allow script access to some document features, but text style automation is limited. As a stopgap, we might include in the export a JSON or CSV of text tokens that an Adobe user could refer to, or a ExtendScript snippet to apply them. This is a lower priority, so initially we will document that typography tokens are available via the core token JSON (which the designer can read), and focus on colors for direct import.
+	•	Gradients: If Visual DNA has gradient tokens, ASE actually can include gradients, but it’s complex. We may skip automated gradient export for now, or treat each gradient as a series of color stops in a separate data file.
+	•	Adobe Plugin (Future Integration): For a dynamic approach, we consider an Adobe Plugin using UXP (Unified Extensibility Platform) that could automatically synchronize tokens. For example, a Photoshop Extension Panel that connects to Visual DNA Studio (or reads a token JSON) and populates swatches, sets up character styles, etc. This would be useful for live updates. However, building and distributing a UXP plugin is non-trivial and beyond the initial scope. Our plan will note this as a future enhancement. In implementation terms, the plugin would be written in HTML/CSS/JS and use Adobe’s APIs to create swatches programmatically. Until then, the .ase export suffices for sharing colors, as it’s supported across Photoshop, Illustrator, and even InDesign easily.
+	•	Backend Process: Exporting to .ase will be triggered by the user selecting Adobe export. The backend process will gather all tokens of type color (filtering from the token JSON where $type == color). It will convert each color value into an appropriate representation (Adobe expects either RGB or CMYK values; we’ll use sRGB which is default for screen design). Then the process creates the ASE binary:
+	•	Write the header, then for each color token, include a color entry with name and RGB components. We might leverage an open-source snippet for ASE encoding if available to avoid mistakes.
+	•	Save the binary to a file and provide it for download.
+
+The outcome is that a designer can import the .ase and immediately have a palette of all the important colors from Visual DNA in their Adobe tool, maintaining consistency. This addresses color tokens well, which are usually the most critical for branding consistency in design files.
+
+For completeness, we will include all color tokens (including semantic ones). E.g. if the design system has a token Button Background = { alias: Primary Color }, in the ASE we might include both “Primary Color” and “Button Background” swatches (possibly duplicates in value, but named by purpose). This is up to user preference; perhaps a toggle to export only base palette vs all aliases. Initially, exporting all unique values with their token names is simplest.
+
+Replit Agent Prompt (Adobe ASE Export Script): To accelerate development of the ASE writer, we can use Replit’s AI. For example:
+
+Generate a Python script that creates an Adobe Swatch Exchange (.ase) file given a list of color tokens. Each token has a name and a hex color value. The script should write the binary .ase format (with correct header, block count, and color entries) to a file. Include support for RGB colors and ensure the token names are stored. Provide an example usage for 2 colors (e.g., “Primary” #FF5733 and “Secondary” #3357FF).
+
+(The assistant will use this prompt to scaffold the ASE file-writing logic, which we can then integrate into the export pipeline.)
+
+Figma Export (Plugin & File Formats)
+
+Figma is a popular UI design tool, and supporting Figma means allowing Visual DNA’s design tokens and assets to be imported into Figma documents. We plan a two-pronged approach for Figma: a Figma plugin for dynamic sync and static export options for offline use or integration with other workflows.
+	•	Figma Tokens Plugin (Dynamic Sync): We will develop a Figma plugin named something like “Visual DNA Tokens” that can import tokens from Visual DNA Studio into Figma. The plugin will be written in TypeScript using the Figma Plugin API. Its responsibilities:
+	•	Provide a UI (within Figma) to connect or import token data. Likely, the simplest method is a button “Import tokens” that opens a file picker for a JSON file. The user would first export a tokens.json from Visual DNA (or Visual DNA could even embed a direct link if Figma supports fetching from URL with authentication; however, due to Figma plugin security, manual file import is straightforward).
+	•	Once the JSON (in DTCG format) is loaded, the plugin will create corresponding Figma Styles and Variables. Specifically:
+	•	Color Tokens: For each color token, the plugin will create a Paint Style in Figma. For example, a token brand.primary becomes a Paint Style named “brand/primary” under the document’s style library, with the color value set. This allows designers to apply that color style to shapes/text and have consistency. (Figma’s API has figma.createPaintStyle() to create a new color style).
+	•	Text Tokens (font sizes, families): The plugin can create Text Styles for font-related tokens. For example, if tokens define Heading1 font size and family, the plugin can create a Figma Text Style named “Heading/1” with those properties (figma.createTextStyle() then set font, size, etc., note that loading the font is required via the API) ￼ ￼. We have to ensure the font families used are available; the plugin might need to prompt the user to have those fonts, or use Figma’s variable fonts feature if applicable.
+	•	Effect Tokens (shadows, blurs): If Visual DNA has shadow or effect tokens, the plugin can create Effect Styles similarly (figma.createEffectStyle()).
+	•	Spacing/Dimension Tokens: Figma doesn’t have a direct concept of “spacing style”, but we could use Figma’s new Variables feature. In 2023, Figma introduced design Variables (which can be mode-specific). We can utilize Figma Variables to store miscellaneous tokens (numbers, booleans, colors too). For example, spacing tokens could become number variables in a “Spacing” variable collection.
+	•	Theming: Using Figma’s variables, we can also support multiple themes. The plugin could create variable modes (e.g. a “Light” mode and “Dark” mode) and assign different values if our token JSON includes them. This aligns with DTCG theming and Figma’s support for modes.
+The dynamic plugin means a designer working in Figma can press a button to sync their Figma styles with the latest from Visual DNA (assuming they have the JSON or an update mechanism). This ensures the Figma file stays aligned to the source of truth. It’s essentially an importer; true two-way sync is not trivial (we won’t attempt to push changes back to Visual DNA from Figma at this time).
+Technical notes: The plugin will need to handle Figma API limitations, such as font loading asynchronously (as seen in our Stack Overflow research, one must call figma.loadFontAsync() before applying a font style ￼). Also, Figma plugin cannot directly call external URLs unless through the fetch API with CORS – we could potentially host the tokens JSON on a URL (if Visual DNA is a web app with accounts), then the plugin could fetch it. That would eliminate the manual file step. For simplicity, initial implementation will likely be: user exports tokens.json from Visual DNA, then in Figma plugin they click “Select token JSON” to load it. Later, we could integrate an OAuth or token-based link to fetch directly from Visual DNA’s cloud.
+	•	Static .fig Export: Figma’s .fig file is essentially the whole Figma document data. It’s not officially supported to import .fig files directly (they are more for backup via Figma). We mention .fig in the requirement likely as a way to share a Figma library file. Instead of generating a raw .fig, a more viable approach is:
+	•	Use Figma’s REST API to create a new file or update a file. However, Figma’s API is read-only for files (except for some limited publishing via plugins). There isn’t a public “import .fig” API. So an alternative approach: Visual DNA could provide a Figma Community file as a design library that is kept in sync with tokens. But that requires manual maintenance or an enterprise token.
+	•	Given the complexity, we might drop direct .fig export and rely on the plugin to populate an open Figma file. Another static option is to export SVGs of icon tokens or PNG assets if Visual DNA includes imagery, which a designer can then manually place into Figma.
+We will clarify in documentation that “Figma export” is primarily via the plugin and tokens JSON. The mention of .fig and .svg indicates we ensure raw assets can be exported (SVG for icons is straightforward – Visual DNA likely has vector data we can export if needed, e.g., logos or illustrations coming from the design system).
+	•	Tokens JSON Export: We will include a straightforward export of the tokens as JSON (in the DTCG format). This serves multiple purposes: it’s the file the plugin uses, but also any developer could use it for other tools (for instance, some teams use the Figma Tokens plugin or other custom pipelines; giving them a raw tokens.json means they can plug Visual DNA into any pipeline). The JSON will include all token categories and can be segmented by theme if applicable (possibly output multiple JSONs: one global, one per theme, similar to how Token Studio for Figma splits global vs theme tokens ￼).
+	•	Backend / Libraries: Figma plugin development will be done outside of the core backend – it’s essentially another project (TypeScript+HTML) that we will likely host on Figma. We will use the Figma Plugin API docs and possibly leverage existing open-source plugin examples (e.g. the “Design Tokens” plugin by Lukas Oppermann or “Figma Tokens” plugin by Jan Six) ￼ as references. Those plugins proved that exporting and importing tokens to Figma is feasible, and we’ll implement similar logic tailored to our schema.
+	•	UX: From the Visual DNA side, if the user chooses Figma export:
+	•	If they chose “Figma Plugin Sync”, Visual DNA will ensure the latest tokens.json is ready (maybe auto-downloaded or copied to clipboard) and then prompt “Now run the Figma plugin to complete import.” We might even open a link with instructions if possible.
+	•	If they chose “Raw tokens JSON”, the file download starts immediately.
+	•	If they chose “SVG assets”, we package those in a zip or in a folder.
+
+All these give flexibility. A designer proficient with Figma can use the plugin for a seamless update of their Figma libraries. If they prefer a manual approach or are using a different token manager, the raw JSON is available.
+
+Replit Agent Prompt (Figma Plugin Scaffold): We can speed up creating the plugin with an AI prompt:
+
+Create a Figma plugin (TypeScript) that imports design tokens from a JSON file and creates corresponding Figma styles. The plugin should:
+1. Open a file picker to let the user select a tokens JSON.
+2. Parse the JSON (DTCG format with $values).
+3. For each color token, create a PaintStyle with the token name and color.
+4. For each text style token (font family/size), create a TextStyle.
+5. Use Figma’s styles and variables API.
+Provide the TypeScript code for the plugin’s main file (manifest not required for now).
+
+(This prompt will help generate the boilerplate for reading a JSON and creating styles via the Figma API, which we will then refine.)
+
+JUCE Export (C++ GUI Toolkit)
+
+JUCE is a cross-platform C++ framework primarily used for audio applications, but it includes a GUI system. Exporting design tokens to JUCE will help developers maintain a consistent look in their JUCE-based UIs (for plugins or standalone apps). The challenge is that JUCE does not have a built-in theming file format in the way web or mobile frameworks do – styling is typically done in C++ code (often by subclassing LookAndFeel). We propose supporting JUCE in two ways:
+	•	C++ LookAndFeel Code Generation (Static): We will generate C++ source code that encapsulates the design tokens as a custom LookAndFeel subclass. In JUCE, a common pattern is to create a subclass of juce::LookAndFeel_Vx (or the modern juce::LookAndFeel base) and override methods to customize widget appearances (colors, borders, etc.). Our exported code would do things like:
+	•	Define Color Constants: e.g., static const juce::Colour BRAND_PRIMARY = juce::Colour(0xFF0055FF); for each color token (the 0xAARRGGBB format JUCE uses). Alternatively, create a juce::Colour myPalette[...] array or a struct of colors.
+	•	Override painting functions: e.g., override drawButtonBackground(Graphics& g, Button& button, ...) to use our token colors for default and hover states. Similarly, override getUIFont() or related methods to use token-defined fonts or sizes.
+	•	For every standard component that JUCE’s LookAndFeel can style (buttons, sliders, combo boxes, etc.), apply token values where appropriate (this requires mapping token naming conventions to JUCE’s expectations, e.g., if token says Button Corner Radius, use it in drawing buttons).
+The generated code would be provided as, say, VisualDNALookAndFeel.h/.cpp. The developer can drop this into their JUCE project, instantiate VisualDNALookAndFeel and call setDefaultLookAndFeel() to apply it globally. This gives a one-time static theme application.
+Implementation: We’ll write a template for the LookAndFeel code. Some of it can be automated (populating color values into an array or setting them via setColour on the LookAndFeel). JUCE has a mechanism LookAndFeel::setColour(componentID, Colour) for specific UI elements (each component has static IDs for parts, like Slider::textBoxOutlineColourId). We could generate a series of lnf.setColour(Slider::textBoxOutlineColourId, myColor); for each relevant token if we map tokens to those IDs. This requires some predefined mapping or naming convention (maybe Visual DNA’s token naming can correspond, or we allow the user to manually link tokens to components).
+Because hand-coding all overrides might be too verbose, we might instead focus on color theming via setColour: JUCE’s widgets use findColour() calls internally for many aspects. For example, a Label will use Label::textColourId from the LookAndFeel’s colour settings. So if we output code that says setColour(Label::textColourId, Colours::[token]) for each relevant token, we cover a lot. The developer can still override painting for more complex stuff if needed.
+	•	External Style Sheet (Dynamic): A more dynamic approach is to allow editing styles without recompiling. There’s a concept of using an external XML or JSON as a style sheet for JUCE, as demonstrated by community projects ￼. We can leverage this: Visual DNA can export a JUCE style XML file containing token values and perhaps component style parameters. At runtime, the JUCE app can load this file and apply values (e.g., read XML and call setColour accordingly, or even adjust layout spacing if provided). The forum post ￼ shows using an XML to live-reload colors and coordinates for quick iteration. For our needs:
+	•	We’ll design an XML schema for basic styling: e.g., <Style><Colors><Color id="ButtonBackground" value="#FF0000" /></Colors><Fonts>.... Alternatively, use JSON with similar structure.
+	•	Provide a small JUCE code snippet that reads this file on startup (or on a keystroke for live reload in debug builds). This code can be part of the generated LookAndFeel class or a separate utility.
+	•	This method means after deployment, one could tweak the XML to update some colors (useful for theming multiple products without recompiling, for instance). It’s optional but a nice capability.
+Initially, we will include the XML and a basic loader. Advanced live-reload (hot reload) is more for development convenience; since our main scenario is just to help developers integrate tokens, we’ll document how they could use it, possibly linking to Jelle Bakker’s approach ￼.
+	•	Other Tokens: Spacing tokens might not directly map to JUCE, because JUCE layout is code-defined. However, if Visual DNA defines standard component sizes or padding, we could provide those as constants. E.g., if there’s a token for DialogPadding = 20px, output constexpr int DIALOG_PADDING = 20;. The developer would manually use those in their code where they set bounds.
+	•	Backend Process: The JUCE exporter module will:
+	1.	Read tokens JSON.
+	2.	For each relevant token type:
+	•	Colors: prepare a C++ line or entry.
+	•	Numbers (if any for sizes): prepare a constant.
+	•	Fonts: JUCE doesn’t embed fonts easily; we might output the font name and size as constants or as code to load a TTF if provided (embedding fonts is another topic; likely we assume system fonts and just specify names).
+	3.	Fill a code template file with these values. We’ll maintain a template where certain markers are replaced by generated code. For example, /*[[COLOR_CONSTANTS]]*/ gets replaced with a list of static const juce::Colour ... definitions.
+	4.	Save the generated .h/.cpp files in a zip (or show them in a code viewer for copy-paste, if we can’t directly integrate with user’s IDE).
+	•	Distribution: The developer using Visual DNA Studio would take the output .cpp/.h and add them to their project. In documentation, we’ll guide: “Replace your app’s LookAndFeel with the generated one to theme your app.”
+
+This static code approach is straightforward and leverages the developer’s familiarity with C++. The dynamic XML approach can be offered as an advanced feature if they want easier tweaking.
+
+Replit Agent Prompt (JUCE LookAndFeel Code):
+
+Generate a JUCE C++ LookAndFeel subclass that uses custom colors and fonts from a design system. 
+- Name the class MyLookAndFeel, subclassing juce::LookAndFeel_V4.
+- It should have:
+  - A set of color definitions (e.g., primaryColor, backgroundColor as juce::Colour).
+  - In the constructor, set some component colours, for example: setColour(juce::TextButton::buttonColourId, primaryColor).
+  - Override drawButtonBackground to use primaryColor for normal state and a secondaryColor for hover (you can define secondaryColor as well).
+- Also override getTypefaceForFont to return a custom font (e.g., "Arial" for now) for demonstration.
+
+(This prompt will give us a baseline LookAndFeel code which we can then modify to insert actual token values and additional overrides as needed.)
+
+React Native Export
+
+For React Native, our goal is to export styles that developers can directly use in their JavaScript/TypeScript React Native projects to maintain consistent design. React Native styling is typically done via JavaScript objects (either through React Native’s built-in StyleSheet.create or via styling libraries). We will focus on providing the design tokens in forms that integrate smoothly with these patterns:
+	•	StyleSheet Object (JavaScript/TypeScript): We will generate a file (let’s call it designTokens.js or styles.js) that exports an object or set of objects representing the styles. There are a few approaches:
+	•	A single giant StyleSheet: e.g., const DesignSystemStyles = StyleSheet.create({ buttonPrimary: { backgroundColor: '#0055FF', borderRadius: 4, ... }, heading1: { fontSize: 32, fontFamily: '...'} }); This might not be ideal if tokens are not tied to specific components (and indeed tokens usually aren’t).
+	•	A better approach is to export token values and theme objects separately. For example:
+
+// designTokens.js
+export const Colors = {
+  primary: "#0055FF",
+  secondary: "#FFAA00",
+  //...
+};
+export const Spacing = {
+  small: 4,
+  medium: 8,
+  large: 16
+};
+// etc.
+
+This gives developers raw values to use. Additionally, we can construct a RN Theme:
+
+export const Theme = {
+  colors: {
+    primary: Colors.primary,
+    secondary: Colors.secondary,
+    // maybe semantic mappings like background: Colors.primary etc.
+  },
+  spacing: Spacing,
+  textStyles: {
+    heading1: { fontSize: 32, fontFamily: "Arial", lineHeight: 36 },
+    //...
+  }
+};
+
+This Theme object could then be used with a Context or simply imported wherever needed.
+Many RN apps use design tokens by manually creating such objects, so automating it ensures consistency. The output can be TypeScript if the user prefers type safety (we can generate .d.ts or a .ts file with typed objects).
+Using Style Dictionary: We can utilize Style Dictionary to generate a lot of this. For example, Style Dictionary can produce a JSON or JS module with all colors, all spacings, etc. It also can produce platform-specific naming (it has a “react native” transform group that might output colors as hex strings and dimensions as numbers). If available, we’ll configure Style Dictionary with a custom format to output the structure we want. Otherwise, writing a small Node script to iterate through tokens and output JS is straightforward.
+
+	•	Theming Library Integration: React Native has theming solutions (like styled-components or native-base, etc.). Our exported tokens should be easy to integrate with those:
+	•	If using styled-components in React Native, developers often create a theme object and use a <ThemeProvider>. Our Theme export can serve that purpose.
+	•	If using Expo or React Native Paper (Material Design library), they have theme structures we could map to. For example, RN Paper’s theme has a colors object – we could optionally output code to merge tokens into Paper’s DefaultTheme.
+These specifics might be beyond the core ask, so we’ll keep it general, but mention in docs that tokens can integrate with any system.
+	•	Static vs Dynamic: We consider static code generation sufficient (the developer will import the file). If dynamic updates were needed (e.g., hot reload of new tokens), one could fetch an updated JSON from an API and update a context at runtime, but that’s edge case. Typically, tokens change with app releases, not on-the-fly.
+	•	Backend Process:
+	•	Gather tokens by category.
+	•	For color tokens, ensure they’re in hex string form for CSS-like usage (React Native accepts hex #RRGGBB or rgba strings).
+	•	For dimension tokens (spacing, sizes), output as numbers (assuming pixel units).
+	•	For typography, output font sizes as numbers, font families as strings. (RN needs the font files included separately if custom fonts are used, but that’s outside tokens themselves – we assume the app has the font, we just name it).
+	•	Construct the JS file text. Possibly use a template or directly serialize an object to JSON then prettify into JS syntax.
+	•	Write the file to the output.
+	•	Example Output (in documentation we’ll show something like):
+
+// tokens.js
+export const Colors = {
+  brandPrimary: "#0055FF",
+  brandSecondary: "#FFA000",
+  textPrimary: "#333333",
+  // ...
+};
+export const Spacing = { xSmall: 2, small: 4, medium: 8, large: 16 };
+export const Typography = {
+  fontFamilyBase: "Helvetica",
+  fontSizeBase: 16,
+  heading1: { fontFamily: "Helvetica-Bold", fontSize: 32, lineHeight: 40 },
+  // ...
+};
+
+This is straightforward for developers to use. We ensure naming conventions (e.g., no spaces or special chars – we might transform token names from the design (like “Button Background”) to camelCase or PascalCase in code).
+
+	•	Integration Example: In a React Native app, a developer could do:
+
+import { Colors } from './designSystem/tokens';
+<View style={{ backgroundColor: Colors.brandPrimary, padding:  Spacing.medium }} />
+
+Or wrap components with a ThemeProvider if one is set up.
+
+Replit Agent Prompt (React Native Theme Code):
+
+Write a JavaScript module for a React Native project that exports a design theme based on given design tokens. 
+Assume we have tokens for colors (primary, secondary), spacing (small, medium, large), and font sizes (body, heading). 
+Export:
+- an object Colors with primary and secondary hex values,
+- an object Spacing with small, medium, large numbers,
+- an object FontSizes with body and heading numbers,
+- a default Theme object combining these (Theme.colors, Theme.spacing, Theme.fontSizes).
+
+(This prompt will help generate a pattern for the RN theme file, which we can adjust to actual tokens.)
+
+Flutter Export
+
+Flutter uses Dart for coding and has a theming system (ThemeData, ColorScheme, etc.) to style apps. Our plan for Flutter is to export a Dart code (or configuration) that developers can use to set up their app’s theme consistent with Visual DNA’s design tokens.
+	•	Dart Constants and ThemeData: We will generate a Dart file, for example visualdna_theme.dart, containing:
+	•	Color definitions: Using Flutter’s Color class. For instance: static const Color primaryColor = Color(0xFF0055FF); (Flutter uses 0xAARRGGBB hex integers for colors). All color tokens will be listed as Color constants, named in camelCase or PascalCase.
+	•	Text styles: Possibly define TextStyle constants if needed (e.g., static const TextStyle heading1 = TextStyle(fontSize: 32, fontFamily: 'Roboto', fontWeight: FontWeight.bold);).
+	•	ThemeData factory: A function or getter, e.g., ThemeData getAppTheme() { return ThemeData( colorScheme: ColorScheme(...), textTheme: TextTheme(...), ... ); } where we plug in our colors and text styles. Flutter’s ThemeData has a ColorScheme that we can populate with primary, secondary, etc., and a TextTheme for typography. We’ll map tokens accordingly. For example, if Visual DNA tokens define primary/secondary color and various semantic colors, we assign them to ColorScheme.primary, secondary, background, surface, etc., as appropriate. (We might not have a token for every ColorScheme field, so we’ll use sensible defaults or duplicates as needed, documenting that developer can adjust).
+	•	Spacing: Flutter doesn’t have a built-in spacing system like CSS, but some use SizedBox(height: x) or custom constants. We can export spacing constants: static const double spacingSmall = 4.0; etc., which the developer can use in padding/margins.
+	•	Integration: The developer would import this Dart file in their app and set the app’s theme:
+
+import 'visualdna_theme.dart';
+MaterialApp(
+  theme: getAppTheme(),
+  home: MyHomePage(),
+);
+
+This would apply the colors/fonts to all Material components. If they have custom widgets, they can also use the constants (e.g., use spacingSmall for padding values).
+
+	•	Style Dictionary or Automation: We could use Style Dictionary with a custom Dart format plugin (there is a community extension ￼ for Flutter). That plugin likely knows how to format color values as Dart code and maybe create a ThemeData. If using it, we’d configure the token categories accordingly. Alternatively, we generate the Dart via our own templating.
+	•	Dynamic Updates: Flutter apps typically are compiled. However, Flutter supports hot reload for dev. If tokens change, a developer would re-run codegen and hot-reload, which is fine. There’s no real-time external update for release builds (unless one uses a remote config, which is out of scope). So static is fine.
+	•	Font Handling: If the tokens specify font families, the Flutter developer must have those fonts in pubspec (bundled). We will ensure to mention the font family names in TextStyles, but it’s the developer’s responsibility to include actual font files or use GoogleFonts package.
+	•	Theming Variants: If dark mode is needed, we might generate two theme objects: e.g., getAppThemeLight() and getAppThemeDark(), using two sets of tokens (if Visual DNA provides tokens for light/dark). Flutter’s ThemeData can take brightness or you can create separate ThemeData for dark. We’ll incorporate this if tokens have mode: dark values. Possibly, we output one Dart file containing both and the developer can switch based on system brightness.
+
+Replit Agent Prompt (Flutter Theme Dart):
+
+Generate a Dart code snippet for a Flutter MaterialApp theme using custom colors and text styles.
+Define:
+- const Color primaryColor = Color(0xFF3366FF);
+- const Color secondaryColor = Color(0xFFFFCC00);
+- a ThemeData appTheme = ThemeData(
+    colorScheme: ColorScheme.light(
+      primary: primaryColor,
+      secondary: secondaryColor,
+      // other colors (background, surface) can use defaults or primary for simplicity
+    ),
+    textTheme: TextTheme(
+      headline1: TextStyle(fontSize: 32, fontFamily: 'Roboto', fontWeight: FontWeight.bold),
+      bodyText1: TextStyle(fontSize: 16, fontFamily: 'Roboto'),
+    ),
+ );
+
+(This prompt helps produce the structure for theme creation, which we can integrate with actual token values.)
+
+Unity Export
+
+Unity is widely used for games and also other interactive applications. To apply design tokens in Unity, we need to bridge the gap between design system values and Unity’s UI system (which could be the older UGUI or the newer UI Toolkit). Our strategy:
+	•	ScriptableObject for Tokens: We will create a Unity ScriptableObject class to hold the token values. ScriptableObjects are Unity assets that store data. For example, we define a class DesignTokens : ScriptableObject with fields for colors, maybe fonts, and numbers:
+
+public class DesignTokens : ScriptableObject {
+    public Color primaryColor;
+    public Color secondaryColor;
+    public Color backgroundColor;
+    public float spacingSmall;
+    public float spacingMedium;
+    public Font headingFont;
+    // etc.
+}
+
+We then generate an asset file of this type (Unity can serialize ScriptableObject to a .asset file). The .asset file will contain the actual color values, etc., assigned.
+Implementation-wise, we cannot directly produce a Unity .asset outside of Unity editor easily, but we can produce a Unity-friendly format:
+	•	Unity’s JSON serialization can handle ScriptableObjects if we create an instance at runtime, but for our export, we might simply output a JSON file with tokens that Unity can read.
+	•	Or we generate a C# script that, when run in Unity Editor, creates the ScriptableObject and fills it in.
+The developer workflow could be: Import the DesignTokens.cs class (which we provide), and a small editor script that reads tokens.json (the same JSON from Visual DNA) and populates an instance of DesignTokens. They run this script once in the Editor to create the asset. After that, their UI code can reference the values. This is a bit manual, but ensures strong typing and easy editing if needed.
+
+	•	Direct Data Approach: Alternatively, Unity’s UI Toolkit uses style sheets (USS). We could generate a USS file with custom --variables. However, Unity’s USS is not as dynamic as CSS on the web and doesn’t natively support theming variables from external source at runtime. It might be possible to use USS with values plugged in (like define classes for each token and apply those classes to UI elements in UI Builder). This is complex and probably not widely used. So we’ll stick to ScriptableObject for now.
+	•	Usage: Once the DesignTokens asset exists:
+	•	In UGUI (Canvas-based UI), a developer would manually apply these values. For instance, if there’s a Button, they can set its color via script: button.color = tokens.primaryColor; or if using a custom UI system, they might write a script that applies design tokens to multiple UI elements at start. We could provide a helper MonoBehaviour like ApplyDesignTokens that on Start finds all UI elements tagged in a certain way and applies the values. This is optional.
+	•	In UI Toolkit, one can bind values via C# as well. Or generate a theme file for UI Toolkit (it has ThemeStyleSheet but not well-documented for external creation).
+	•	Automation via Editor Script: We will include/export a Unity Editor Python script or C# EditorWindow code that reads the token JSON. Unity 2021+ allows running Editor Coroutines or Editor scripting easily. We might write:
+
+[MenuItem("Tools/Import Design Tokens")]
+static void ImportTokens() {
+    string jsonPath = "path/to/exported/tokens.json";
+    // read JSON (Unity has JsonUtility or use SimpleJSON/Newtonsoft if complex)
+    DesignTokens asset = ScriptableObject.CreateInstance<DesignTokens>();
+    // assign values from JSON, e.g., asset.primaryColor = new Color(r, g, b, a);
+    AssetDatabase.CreateAsset(asset, "Assets/DesignTokens.asset");
+    EditorUtility.SetDirty(asset);
+    AssetDatabase.SaveAssets();
+}
+
+This code, once placed in the Unity project, would allow the developer to run the import (from Unity’s menu). We can supply this as part of the export (maybe as a .cs file content to copy).
+
+	•	Font considerations: Unity’s Font class would need actual font files. If tokens specify font family names, Unity dev must import corresponding .ttf and maybe assign them manually to the ScriptableObject fields. Automating font assignment might be possible if we name-match to a file.
+	•	Color Space: Unity uses its Color struct typically with float 0-1 values. We have tokens likely in hex or 0-255. We will convert accordingly when setting (e.g., hex 0xRRGGBB -> Color(r/255,g/255,b/255,1)). Also consider gamma vs linear; for UI it’s fine in sRGB.
+	•	Testing: We’ll advise testing that the asset loads correctly and the values appear in inspector matching expected.
+
+Replit Agent Prompt (Unity ScriptableObject & Importer):
+
+Write a Unity C# ScriptableObject class named DesignTokens that has public fields for:
+- Color primaryColor, secondaryColor;
+- float spacingSmall, spacingMedium;
+Then write an Editor script (inside an Editor folder) with a menu item "Tools/Import Design Tokens" that reads a JSON file (assume path "Assets/tokens.json") and assigns the values to a new DesignTokens object, and saves it as an asset (Assets/DesignTokens.asset).
+Use UnityEditor and UnityEngine in the script.
+
+(This prompt should generate the scaffolding for the ScriptableObject and the import logic, which we’ll adapt to actual fields and all tokens.)
+
+Unreal Engine Export
+
+Unreal Engine uses C++ and Blueprints for UI (UMG) and general development. There isn’t a direct theming file format for UMG either, but we can still facilitate using design tokens:
+	•	Data Asset / Struct: We can define a UStruct or UDataAsset in Unreal C++ to hold token values, similar to Unity’s approach:
+	•	Define a struct FDesignTokens with UPROPERTY fields for colors (FLinearColor), floats, etc.
+	•	Option 1: Use a DataTable – Unreal’s DataTable can be constructed from a CSV or JSON that matches the struct. We could export a CSV with one row of all tokens, or JSON in a specific format to import as DataTable. But DataTable might be overkill for a single row; it’s usually for lists.
+	•	Option 2: Create a UDesignTokenAsset : UDataAsset class with UPROPERTYs for each token. Then produce a C++ or Blueprint asset of that class. Creating it outside the editor is tricky; more realistic is to provide the struct and ask the developer to paste in values.
+Possibly the simplest: output a .ini or .json that the game reads on startup and applies to UI. For example, a simple JSON:
+
+{ "PrimaryColor": "#0055FF", "SpacingSmall": 8, ... }
+
+Then in Unreal, the developer can load this file (Unreal C++ can use FFileHelper to read or use JsonUtilities to parse). This requires coding in the game to apply (like reading the JSON and using the values).
+
+	•	Applying in UMG: If the UI is built in UMG (Unreal’s UI Editor), the developer can expose variables for colors and assign them from code. Or create a binding that reads from a central data singleton. For example, they might have a Blueprint function library GetDesignTokens() that returns the values (reading from that JSON or data asset). Then UMG bindings use that to set widget colors/fonts. We could provide a basic Blueprint or C++ singleton that holds token values (populated at begin play).
+	•	Focus on Colors & Sizes: We likely focus on color export, since UI colors (like button background, text color) are important. We’ll ensure we export them in a format easy to copy into Unreal:
+	•	Perhaps generate a C++ header file with #define PRIMARY_COLOR FColor(0xFF0055FF) etc., or better static const FLinearColor PrimaryColor(0.0f,0.34f,1.0f,1.0f). The developer can include this in their project and use the constants in code or assign to UMG.
+	•	Alternatively, generate a Blueprint (Unreal has .uab asset for blueprint, but generating that externally is non-trivial). However, we can create a Python script for the Unreal Editor (Unreal allows running Python scripts in Editor) to create assets. That’s quite advanced.
+
+Given complexity, our initial approach for Unreal:
+	•	Provide a tokens JSON (same as main, or filtered) plus a C++ code snippet. The snippet could be part of documentation that shows how to define a global struct with those values. The developer can fill them in or use the snippet as is with values inserted.
+	•	Possibly mention using Unreal’s Material Parameters: If the design tokens include colors for 3D materials, one could generate a Material Parameter Collection asset and apply those to materials for consistent coloring. But if sticking to UI (Slate/UMG), we won’t go that far.
+
+So, summarizing: Visual DNA can output a file DesignTokens.unreal.cpp.txt containing recommended Unreal code for tokens, and tokens.json. The onus is on the developer to integrate, but we guide them.
+
+Replit Agent Prompt (Unreal C++ Snippet):
+
+Provide a C++ struct and usage example for design tokens in Unreal:
+- Define a struct FDesignTokens with static FLinearColor PrimaryColor, SecondaryColor; static float SpacingSmall;
+- Initialize those in a .cpp (e.g., FDesignTokens::PrimaryColor = FLinearColor(0.0f, 0.2f, 1.0f, 1.0f);).
+- Show how to use PrimaryColor in a UUserWidget (e.g., assigning a UBorder background color in C++).
+
+(This will yield a basic pattern for containing and using token values in Unreal, which we’ll adapt to actual values.)
+
+Web Components Export
+
+For “Web Components”, we interpret this as supporting web standards (primarily HTML/CSS/JS with Custom Elements) and possibly design token usage on the web outside of specific frameworks. The plan is to provide assets that web developers can use in any web project or web component library:
+	•	CSS Custom Properties: We will export a CSS stylesheet that defines all design tokens as CSS variables. For example, a file design-tokens.css:
+
+:root {
+  --color-primary: #0055FF;
+  --color-secondary: #FFA000;
+  --spacing-small: 4px;
+  --font-family-base: "Helvetica, Arial, sans-serif";
+  /* etc. */
+}
+
+This allows any web component or regular HTML to consume the tokens by referencing the CSS variables (e.g., background: var(--color-primary); margin: var(--spacing-small);). This approach is simple and uses web standards. It aligns with how design tokens can be used as environment-agnostic variables.
+If theming (light/dark) is relevant, we can include them via additional rules, e.g.:
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-primary: #BBBBFF;
+    /* override for dark mode if token specifies */
+  }
+}
+
+or use a .dark class on body for manual theme switching. We would generate these if tokens have multiple themes.
+
+	•	Web Component (Custom Element) Library: If Visual DNA Studio provides actual components (like a set of UI elements), we could theoretically output a set of web components styled with the tokens. However, that’s a much larger scope (essentially building a component library). The question likely expects focusing on tokens, not building components. So we’ll not generate actual HTML custom element classes, except maybe an example or two for demonstration.
+	•	JSON for JS usage: We also provide a JSON (which is the same tokens JSON in DTCG) that a developer could use in JS. But more practically, we could output a JS module that exports an ES6 object with all tokens, similar to how we did for React Native but without React specifics. This JS could be used by a web component library if they prefer JS constants over CSS vars (for example, in Lit, one might import a JS module with theme values).
+	•	Using Tools: Style Dictionary can directly output CSS variables from tokens ￼. We will configure it to do so. It will handle formatting (ensuring px units for dimensions, etc.). Also, Style Dictionary can output a generic JSON of tokens which might be redundant since we have the original JSON. We might directly use the original since it’s already in desired format (with some adjustments possibly to simpler format if needed).
+	•	Integration Example: If a developer is writing a Lit element:
+
+import './design-tokens.css';
+class MyButton extends LitElement {
+  static styles = css`
+    :host {
+      background: var(--color-primary);
+      padding: var(--spacing-small);
+    }
+  `;
+  // ...
+}
+
+Or if they prefer JS:
+
+import { tokens } from './tokens.js'; 
+this.style.backgroundColor = tokens.colors.primary;
+
+
+	•	Web Components vs Next.js vs Material UI: We treat “Web Components” as general web. We have separate sections for Next and MUI next, but note that CSS variables approach also can apply to Next.js apps (since Next can just import that CSS global file). There is overlap, but we’ll address Next/MUI separately for specifics.
+
+Replit Agent Prompt (CSS Variables Generation):
+
+Using a list of design tokens (e.g., primary color #3366FF, secondary color #FFCC00, spacingSmall 4px, baseFont "Arial"), create a CSS snippet defining these as custom properties under :root. Also include a comment for each token name.
+
+(This prompt yields the format for CSS variables file, which we can adjust to full list programmatically.)
+
+Next.js / Vercel Export
+
+Next.js is a React framework, so its needs overlap with web/Material UI, but there are a few unique considerations for SSR (server-side rendering) and deployment on Vercel:
+	•	CSS or JS Theme Integration: For a Next.js project, we can support two primary approaches:
+	1.	Global CSS Variables: As mentioned above, including :root { --... } definitions in a global stylesheet. In a Next app, one would typically import this in _app.js or include it in a global CSS file (Next.js by default supports importing a globals.css). We could instruct: drop the generated design-tokens.css into the Next project and import it once, then all pages and components can use var(--token) in styled JSX or global styles. This approach is simple and SSR-friendly (the CSS is static).
+	2.	JS Theme Object: If the project uses a CSS-in-JS solution or a context-based theme (e.g., using styled-components ThemeProvider or Material UI, or Chakra UI, etc.), they might prefer a JS object. For example, with styled-components:
+
+<ThemeProvider theme={Theme}> ... </ThemeProvider>
+
+where Theme is the object we exported (like the one described in React Native or MUI sections). We could generate a theme.js that merges tokens accordingly. If using plain CSS modules or styled-jsx, CSS variables might still be easier.
+We will likely provide both a CSS and a JS output to cover different approaches. The developer can choose which to use.
+
+	•	Tailwind CSS: An increasing number of Next.js projects use Tailwind for styling. Tailwind can be configured with a design tokens JSON. Specifically, Tailwind’s config (tailwind.config.js) has a theme section where one can plug in colors, spacing, etc. We could help by exporting a JSON or JS snippet that can be merged into Tailwind config. For example, a snippet:
+
+// tailwind.tokens.js
+module.exports = {
+  colors: {
+    primary: "#0055FF",
+    secondary: "#FFA000",
+    //...
+  },
+  spacing: {
+    sm: "4px",
+    md: "8px",
+    //...
+  }
+}
+
+Then instruct to import it in tailwind.config.js and spread it into the theme. This is a bit advanced but very useful if applicable.
+The search results even showed an example of integrating tokens with Tailwind and Next ￼. We can mention this as a possibility but might not implement fully in initial version. If time permits, we could at least provide the data needed for manual config.
+
+	•	Vercel Deployment: Nothing specific needs to be done for Vercel aside from ensuring that the build step includes generating these token files. If we assume the user will copy the files into their repository, that’s fine. However, if Visual DNA were to integrate with Vercel directly (like pushing an update to a connected Git or via an API), that’s beyond our scope. We will simply note that the output is static assets that can be checked into the Next.js project and deployed.
+	•	Automating with Replit: On Replit, we might simulate a Next project structure to show how to place the files. For instance:
+
+my-next-app/
+  styles/
+    design-tokens.css
+  utils/
+    theme.ts
+
+And instruct usage.
+
+Example: A Next.js developer using our export might do:
+	•	If CSS: import "../styles/design-tokens.css" in _app.tsx, then use classes or CSS variables in components.
+	•	If JS theme: wrap their app with context or directly use values in inline styles.
+
+We will provide guidance for both.
+
+Replit Agent Prompt (Next.js Theme Example):
+
+Show how to integrate design tokens into a Next.js application:
+1. Import a CSS file with CSS variables in pages/_app.js.
+2. Alternatively, use a ThemeProvider: create a theme.js with an object (e.g., theme.colors.primary = "#3366FF"), then in _app.js wrap <ThemeProvider theme={theme}> around the <Component />.
+Provide code snippets for _app.js for both approaches.
+
+(This will yield examples of integration that we can adapt in documentation.)
+
+Swift (iOS) Export
+
+For iOS (Swift), supporting design tokens means providing colors, fonts, etc., to iOS developers in a convenient way:
+	•	Swift Constants or Extensions: We can generate a Swift file, e.g., DesignTokens.swift, that defines the tokens. There are a couple of patterns:
+	•	Using Swift structures or enums: e.g.
+
+struct Colors {
+  static let primary = UIColor(red: 0.0, green: 0.34, blue: 1.0, alpha: 1.0)
+  static let secondary = UIColor(named: "SecondaryColor")! // if in asset catalog
+}
+struct Typography {
+  static let heading1 = UIFont(name: "Helvetica-Bold", size: 32)!
+  // ...
+}
+
+We can do the same with SwiftUI Color and Font if targeting SwiftUI: e.g. Color("PrimaryColor") if using asset catalogs, or Color(red:..., green:..., blue:...).
+
+	•	As an alternative, define an enum with static properties:
+
+enum TokenColor {
+  static let primary = UIColor(...)
+  // ...
+}
+
+This is essentially the same effect; choose whichever style is clearer.
+
+	•	We might also provide an extension on UIColor or Color:
+
+extension UIColor {
+  static var primaryColor: UIColor { UIColor(red:..., green:..., blue:..., alpha: 1) }
+}
+
+Then developers can do UIColor.primaryColor. This is nice because it doesn’t require a separate struct, but either is fine.
+
+	•	Asset Catalog (.xcassets): Xcode asset catalogs allow defining named colors (which automatically generate code to access, and adapt to dark mode if configured). For a robust solution:
+	•	We generate an Xcode .xcassets folder with a Colors dataset. Each token color becomes a Color Set in the catalog, named after the token (e.g., “PrimaryColor.colorset” containing colors for Any (light) and Dark appearances).
+	•	Xcode can use those via UIColor(named: "PrimaryColor") or SwiftUI Color("PrimaryColor").
+	•	This is great for colors especially if dark mode variants exist. We can fill the Dark appearance if the token set has it.
+	•	Similarly, for images or icons tokens (if any), we could include them in assets.
+How to implement: The asset catalog is essentially a folder with JSON (Contents.json) and the color components. We can programmatically create those. Style Dictionary has templates to create .xcassets (some community ones do).
+If not fully automating, we might not do asset catalogs in the first iteration, focusing on Swift code. But we will mention that using asset catalogs is an option for integration and possibly plan to add it.
+	•	SwiftUI vs UIKit: If a team uses SwiftUI, they might prefer Color and Font types. We can accommodate:
+	•	Provide both UIColor/UIFont and Color/Font (SwiftUI) versions. Maybe via extensions on both UIColor and Color.
+	•	SwiftUI can also define a Theme environment, but that’s custom. More likely, they directly use the Color constants or define their own Environment values. We can simply supply static Color objects for each token so they can use them in SwiftUI views.
+	•	Dynamic updates: Not really, since iOS apps are compiled. But if needed, one could fetch a JSON from server and apply at runtime. We won’t cover that in initial export – static is fine.
+	•	Backend Process:
+	•	Convert color to appropriate initializer (we have hex or srgb floats; we can use either UIColor(red: CGFloat, green: CGFloat, blue: CGFloat, alpha: CGFloat) with values 0-1).
+	•	Convert font tokens to either font names + sizes (we can’t embed fonts unless the app includes them).
+	•	Spacing and other numeric tokens to CGFloat constants or just mention them (Spacing often is just used in code, we can define let spacingSmall: CGFloat = 8.0 etc in a struct).
+	•	Create a Swift file text with these definitions.
+	•	Material Components on iOS: Apple’s own design system is somewhat Material now (SwiftUI uses a system font etc.). We won’t tie to that; we just ensure our tokens can override system where needed.
+
+Replit Agent Prompt (Swift Tokens File):
+
+Generate a Swift file that defines design tokens for an app:
+- Define an enum Colors with static UIColor properties (primaryColor, secondaryColor).
+- Define an enum Typography with static UIFont properties (heading, body).
+Use UIColor(red:..., green:..., blue:..., alpha: 1) for colors and UIFont.systemFont or UIFont(name:size:) for fonts.
+
+(This should output a template for Swift code, which we can fill in with actual values.)
+
+Material UI Export
+
+Material UI (MUI) for React is a widely used component library that is themeable. To export to MUI, we should produce a theme configuration that can be applied to MUI’s ThemeProvider. MUI’s theme is essentially a JavaScript object with predefined slots (colors, typography, spacing, components overrides, etc.). Our approach:
+	•	Theme Object Generation: We will create a JavaScript/TypeScript file (e.g., muiTheme.js or .ts) that uses MUI’s createTheme function:
+
+import { createTheme } from '@mui/material/styles';
+export const theme = createTheme({
+  palette: {
+    primary: { main: '#0055FF', contrastText: '#FFFFFF' },
+    secondary: { main: '#FFA000' },
+    background: { default: '#F5F5F5' } ,
+    text: { primary: '#333333' }
+    // etc., mapping as many tokens as we can to MUI palette fields
+  },
+  typography: {
+    fontFamily: '"Helvetica Neue", Arial, sans-serif',
+    h1: { fontSize: '2rem', fontWeight: 700 },
+    body1: { fontSize: '1rem' }
+    // etc.
+  },
+  spacing: 4, // if the design uses 4px as base unit, for instance
+  shape: {
+    borderRadius: 8 // from tokens if available
+  }
+  // we can also add components overrides if tokens define specific component styles (like Button border radius, etc.)
+});
+
+The above is an example – we’d populate actual values from tokens. If a token matches a Material concept (like border radius token goes to shape.borderRadius, etc.) we will map it.
+If any tokens don’t directly map (like we have a token for a custom component style), we could use MUI’s components override in the theme. For example, if token says Button Background = primaryColor, MUI typically uses the palette for that. But if needed, we can explicitly override:
+
+components: {
+  MuiButton: {
+    styleOverrides: {
+      root: {
+        backgroundColor: theme.palette.primary.main, // or directly token value
+        borderRadius: '8px'
+      }
+    }
+  }
+}
+
+However, much of this might be redundant if palette and shape are set appropriately (MUI Buttons automatically use theme.palette.primary, and borderRadius from theme.shape).
+
+	•	File Exports: We can either export a ready theme object (as above) or a function to get it. Usually exporting the theme constant is fine. The user will then:
+
+import { ThemeProvider } from '@mui/material/styles';
+import { theme } from './muiTheme';
+<ThemeProvider theme={theme}> <App/> </ThemeProvider>
+
+This wraps the app in the theme.
+
+	•	TypeScript: If we output TypeScript, we might want to augment MUI’s Theme type if we add custom tokens not normally in theme. But ideally we stick to their standard fields to avoid needing module augmentation. We can deliver a .js for simplicity, which should still be usable in TS (as it can infer the structure, or we provide a .d.ts).
+	•	Spacing: MUI’s spacing system is a bit unique: you can set a base value (like 8), then theme.spacing(2) returns 16px. We might decide to set spacing: 4 if the design’s smallest unit is 4px, for example. That way if dev uses theme.spacing(2) they get 8px etc. If design has multiple spacing tokens, maybe better not to rely on MUI’s single number spacing too much, or just choose one that fits the scale and let others be multiples.
+	•	Color Modes: If design includes dark mode, MUI supports toggling palette.mode = 'dark' and then expects palette values accordingly. We could generate two themes or a toggle logic. Perhaps out-of-scope for first cut, but mention that if dark tokens exist, we can produce a dark theme variant.
+	•	Automation: We can use Style Dictionary to output JSON for palette, but likely easier to just script it.
+
+Replit Agent Prompt (Material UI Theme):
+
+Create a Material-UI v5 theme object in JavaScript using createTheme with:
+- primary color #3366FF, secondary color #FFCC00,
+- a custom font family "Helvetica Neue",
+- base spacing unit of 4,
+- borderRadius of 6.
+Include palette.primary.main, palette.secondary.main, typography.fontFamily, shape.borderRadius, spacing.
+
+(This prompt will provide a base theme format, which we’ll then populate with actual token values.)
+
+⸻
+
+With each target elaborated above, we have identified the necessary output format and the implementation approach, including any libraries and processes:
+	•	We align with DTCG spec in the content of token files and use Style Dictionary or custom scripts as needed.
+	•	We maintain modularity by handling each target’s generation separately.
+	•	We support static files (like code files, JSON, CSS, ASE) and dynamic integrations (Figma plugin, possibly Adobe plugin in future, etc.).
+	•	We considered UX for how users select and use these exports.
+	•	We outlined needed backend processes (parsing tokens, transforming, using APIs) and external libraries (Style Dictionary for general conversions ￼, Figma Plugin API for Figma, JUCE’s own capabilities for reading XML ￼, etc.).
+	•	We also proposed how to structure this in a Replit environment, which we detail next.
+
+Project Structure and Replit Workflow
+
+Implementing this system on Replit requires organizing the code and providing smooth workflows for development and usage. Below is a suggested file/directory structure for the Visual DNA Studio export feature within a Replit project:
+
+/visual-dna-studio/
+├── tokens/
+│   ├── global.tokens.json          # Core design tokens in DTCG format (could be split by category/theme)
+│   └── dark.tokens.json            # Example: dark mode tokens extending global (if applicable)
+├── exports/
+│   ├── adobe/
+│   │   ├── export_adobe_ase.py     # Script to generate ASE file from tokens
+│   │   └── BrandColors.ase         # Output sample (generated)
+│   ├── figma/
+│   │   ├── tokens.json             # Exported tokens for Figma (could be same as global.tokens.json or filtered)
+│   │   └── figma-plugin/           # Directory (or separate repo) for Figma plugin code
+│   │       ├── manifest.json       # Figma plugin manifest
+│   │       └── code.ts             # Plugin code (to be developed)
+│   ├── juce/
+│   │   ├── VisualDNALookAndFeel.h  # Generated C++ header
+│   │   ├── VisualDNALookAndFeel.cpp# Generated C++ implementation
+│   │   └── style.xml               # Optional: exported XML style sheet
+│   ├── react-native/
+│   │   └── tokens.js               # Generated JS module for RN styles
+│   ├── flutter/
+│   │   └── visualdna_theme.dart    # Generated Dart file for Flutter theme
+│   ├── unity/
+│   │   ├── DesignTokens.cs         # C# ScriptableObject definition (exported or template)
+│   │   ├── ImportTokens.cs         # Editor script to import JSON into ScriptableObject
+│   │   └── tokens.unity.json       # JSON with token values (for Unity to read)
+│   ├── unreal/
+│   │   ├── DesignTokens.h          # C++ header with token constants (template or generated)
+│   │   └── DesignTokens.json       # JSON for Unreal (if used at runtime)
+│   ├── web/
+│   │   ├── design-tokens.css       # CSS custom properties
+│   │   ├── tokens.mjs              # ES6 module exporting tokens (optional alternative)
+│   │   └── tokens-tailwind.js      # Tailwind config snippet (if generated)
+│   ├── nextjs/
+│   │   ├── theme.js                # MUI or styled-components theme object
+│   │   └── design-tokens.css       # Possibly a copy or symlink to ../web/design-tokens.css
+│   └── ios/
+│       ├── DesignTokens.swift      # Swift file with UIColor/Font extensions
+│       └── DesignTokens.xcassets/  # Asset catalog directory (if we generate it)
+├── src/
+│   ├── server/                     # Backend server files (if Visual DNA has a web interface)
+│   ├── ui/                         # Frontend UI for Visual DNA Studio (export panel UI likely here)
+│   └── ...                        
+├── scripts/
+│   ├── build_all_exports.sh        # Shell or JS script to run all export scripts
+│   ├── export_to_flutter.js        # Example: Node script wrapping style dictionary for Flutter
+│   └── ... (one per target if not in exports subdirs) 
+├── README.md                       # Documentation for developers
+└── replit.toml or .replit          # Replit config to define run commands or secrets if needed
+
+Explanation:
+	•	The tokens/ directory contains the source design tokens in the standard format. These are maintained by Visual DNA’s design process or imported from design. Developers on Replit can edit these or replace with updated ones from the design tool. This separation makes it easy to update the design tokens without touching code.
+	•	The exports/ directory is organized by target and holds either the generated output or the scripts and templates to produce them. This cleanly separates the concern for each platform.
+	•	Within each target subfolder:
+	•	If the output is a single file (like CSS, Swift, JS), we can generate it directly into that folder.
+	•	If multiple files or more complex (like Figma plugin or Asset catalogs), we create sub-structure accordingly.
+	•	Also include helper scripts or templates. For example, export_adobe_ase.py in exports/adobe can be run to regenerate BrandColors.ase whenever tokens change. Similarly, in exports/juce, we might include a template file that the script uses to fill in values.
+	•	The src/ directory represents the core Visual DNA application (not detailed here, but likely where the user interface and main logic lives). The export feature will be integrated into this (for instance, the UI triggers the scripts in exports/ or uses their logic).
+	•	The scripts/ directory (optional) can hold high-level scripts like build_all_exports.sh which runs all individual export scripts in one go (useful for generating a full package of design deliverables). We could wire this up so that pressing an “Export All” button in the UI triggers this script. In Replit, we might set a .replit run command to execute something like npm run build-exports which corresponds to this script.
+	•	We will ensure Replit compatibility:
+	•	Replit provides a Linux environment, so all our scripts (Python, Node, etc.) should run in that. We might use Node for consistency (since likely the app itself might be Node/React), but Python is fine for certain tasks (like ASE generation if easier).
+	•	Replit might require adding necessary packages. For example, if using Style Dictionary, add it to package.json. If using Python for some scripts, we add them to a requirements.txt (or just keep them simple without external deps).
+	•	If any native library needed (likely not), we ensure it can be installed in Replit environment. So far, everything is plain scripting or JS which is fine.
+	•	The replit.toml or .replit config can define multiple “run” commands or hidden commands for convenience. Perhaps we define:
+	•	run = "npm start" to start the Visual DNA web app,
+	•	and some custom commands like "exports:all": "bash scripts/build_all_exports.sh".
+In Replit’s UI, these can be run from the shell or maybe via a GUI if configured.
+	•	Collaboration & Agent Usage: Since Replit supports collaborative editing and now AI Agents:
+	•	The code structure allows using Replit’s Ghostwriter/Agent to modify or add files easily. For instance, if we want to update the Flutter export logic, we open export_to_flutter.js and modify. Or use the agent with a prompt referencing that file.
+	•	We can also store prompt templates in the repo (or just in documentation) for quick reference. Possibly have a prompts/ folder with text files of the prompts we wrote in this plan. That way, a developer can copy-paste them into the Replit AI. However, this might not be necessary if the developer can reference this plan or documentation. Still, we might do it for completeness.
+	•	File Generation Workflow: We might integrate the generation directly in the Visual DNA Studio UI by invoking these scripts programmatically:
+	•	For example, if the user clicks “Export to React Native”, our backend could call a function that runs the exports/react-native generation (which could be a Node module we require instead of a separate process). We could also spawn a child process if using a language like Node for the server.
+	•	Alternatively, maintain a pure Node/JS implementation for all exports and avoid Python for simplicity (use JS to create binary .ase too, though Python might be easier for binary). Node can handle binary files with Buffers, so .ase in Node is feasible.
+	•	Using one language across might simplify integration. We should decide based on team expertise. If we use Style Dictionary (Node), probably we lean Node for all transforms. Possibly avoid Python then, and do ASE writing in Node as well.
+	•	Testing on Replit: Replit allows us to run these and even host the web app. For plugin files like Figma, we can provide them for download but testing requires the Figma environment. We might keep example outputs in the repo for reference.
+
+In summary, this structure aims to make it clear where everything lives and to allow each export module to be developed and run in isolation or together. The modular directories mirror the modular design of our system.
+
+Finally, we will ensure to document the usage of these exports (in README or in the Visual DNA Studio UI help) so end developers know how to take the output and apply it in their projects. For example, instructions for each target (some of which we’ve described above) will be included.
+
+With this plan, Visual DNA Studio will have a robust, standard-compliant export system that covers a wide array of platforms, all while keeping the architecture organized and maintainable.
