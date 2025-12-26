@@ -1326,27 +1326,6 @@ export default ${safeName};`;
             </div>
           </details>
 
-          {/* Colors */}
-          <details className="group">
-            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
-              <span className="text-sm font-medium text-foreground">Colors</span>
-              <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
-            </summary>
-            <div className="p-4 pt-0">
-              <ColorPaletteSwatches tokens={summary.tokens} />
-            </div>
-          </details>
-
-          {/* Design Tokens */}
-          <details className="group" onToggle={(e) => { if ((e.target as HTMLDetailsElement).open) setTokensExpanded(true); }}>
-            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
-              <span className="text-sm font-medium text-foreground">Design Tokens</span>
-              <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
-            </summary>
-            <div className="p-4 pt-0">
-              {tokensExpanded && <TokenViewer tokens={summary.tokens} />}
-            </div>
-          </details>
 
           {/* Create / Prompt Details */}
           <details className="group">
@@ -1522,6 +1501,28 @@ export default ${safeName};`;
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
+              )}
+            </div>
+          </details>
+
+          {/* Design DNA - Tokens section, collapsed by default */}
+          <details className="group" onToggle={(e) => { if ((e.target as HTMLDetailsElement).open) setTokensExpanded(true); }}>
+            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+              <span className="text-sm font-medium text-foreground">Design DNA</span>
+              <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="p-4 pt-0 space-y-6">
+              {tokensExpanded && (
+                <>
+                  <div>
+                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Color Palette</h4>
+                    <ColorPaletteSwatches tokens={summary.tokens} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">All Tokens</h4>
+                    <TokenViewer tokens={summary.tokens} />
+                  </div>
+                </>
               )}
             </div>
           </details>
