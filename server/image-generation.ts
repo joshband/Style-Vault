@@ -13,23 +13,60 @@ export interface GenerationResult {
   thumbnailBase64: string;
 }
 
+function extractColorPalette(tokens: Record<string, any> | undefined): string[] {
+  if (!tokens || !tokens.color) return [];
+  const colors: string[] = [];
+  for (const [name, token] of Object.entries(tokens.color)) {
+    if (token && typeof token === "object" && "$value" in token) {
+      const value = String((token as any).$value);
+      if (value.startsWith("#") || value.startsWith("rgb") || value.startsWith("hsl") || value.startsWith("oklch")) {
+        colors.push(`${name}: ${value}`);
+      }
+    }
+  }
+  return colors.slice(0, 8);
+}
+
 export async function generateStyledImage(
   prompt: string,
   styleName: string,
   styleDescription: string,
-  promptScaffolding: { base: string; modifiers: string[]; negative: string }
+  promptScaffolding: { base: string; modifiers: string[]; negative: string },
+  tokens?: Record<string, any>
 ): Promise<GenerationResult> {
   try {
-    const fullPrompt = `${promptScaffolding.base}
+    const colorPalette = extractColorPalette(tokens);
+    const hasTokenColors = colorPalette.length > 0;
+    
+    const tokenSection = hasTokenColors
+      ? `================================================================================
+PRIMARY DIRECTIVE: DESIGN TOKENS (HIGHEST PRIORITY)
+================================================================================
+The following Design Tokens were extracted from the source image. These are AUTHORITATIVE specifications:
 
-Style: ${styleName}
-Style description: ${styleDescription}
+MANDATORY COLOR PALETTE - Use ONLY these exact hex values:
+${colorPalette.map(c => `  ${c} (EXACT - no substitution)`).join("\n")}
 
-User concept: ${prompt}
+ALL major color areas in the image MUST use these exact hex values. Do NOT substitute with similar colors.
 
-Style modifiers: ${promptScaffolding.modifiers.join(", ")}
+================================================================================
+SECONDARY: STYLE CONTEXT (Use to Inform Technique)
+================================================================================
+`
+      : "";
 
-Create a high-quality image that faithfully applies the style to the user's concept. Maintain the color palette, mood, and aesthetic characteristics of the style.`;
+    const fullPrompt = `Generate an image for the "${styleName}" style.
+
+${tokenSection}Style Description: ${styleDescription}
+Style Base: ${promptScaffolding.base}
+Style Modifiers: ${promptScaffolding.modifiers.join(", ")}
+
+================================================================================
+USER REQUEST
+================================================================================
+Concept: ${prompt}
+
+Create a high-quality image that applies the style to the user's concept.${hasTokenColors ? " The image MUST use the exact Design Token colors listed above." : ""} Maintain the style's color palette, mood, lighting, and aesthetic characteristics.`;
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-image",

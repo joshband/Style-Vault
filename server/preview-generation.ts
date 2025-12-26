@@ -143,16 +143,24 @@ async function generateSinglePreview(
     landscape: "16:9 horizontal",
     stillLife: "1:1 square",
   };
-  
-  const characteristics = {
-    portrait: "color palette, lighting approach, texture treatment, and overall mood",
-    landscape: "color palette, atmospheric treatment, spatial depth, and overall mood",
-    stillLife: "color palette, material textures, lighting approach, and overall mood",
-  };
 
-  // Build color directive if we have colors
-  const colorDirective = colorPalette.length > 0
-    ? `\n\nCRITICAL - USE THESE EXACT COLORS from the design tokens:\n${colorPalette.map(c => `- ${c}`).join("\n")}\n\nThe image MUST prominently feature these specific hex colors. Do NOT substitute with similar colors.`
+  // Build token-weighted prompt
+  const hasTokenColors = colorPalette.length > 0;
+  const tokenSection = hasTokenColors
+    ? `================================================================================
+PRIMARY DIRECTIVE: DESIGN TOKENS (HIGHEST PRIORITY)
+================================================================================
+The following colors were extracted from the source image as Design Tokens. These are AUTHORITATIVE specifications:
+
+MANDATORY COLOR PALETTE - Use ONLY these exact hex values:
+${colorPalette.map(c => `  ${c} (EXACT - no substitution)`).join("\n")}
+
+ALL major color areas in the image MUST use these exact hex values. Do NOT substitute with similar colors.
+
+================================================================================
+SECONDARY: SEMANTIC CONTEXT (Use to Inform Technique)
+================================================================================
+`
     : "";
 
   try {
@@ -163,13 +171,16 @@ async function generateSinglePreview(
           role: "user",
           parts: [
             {
-              text: `Generate a ${type} image (${aspectRatios[type]} aspect ratio) rendered in the "${styleName}" visual style.
+              text: `Generate a ${type} image (${aspectRatios[type]} aspect ratio) for the "${styleName}" style.
 
+${tokenSection}Style Description: ${styleDescription}
+
+================================================================================
+SUBJECT & COMPOSITION
+================================================================================
 Subject: ${CANONICAL_SUBJECTS[type]}
 
-Apply these style characteristics to the rendering: ${styleDescription}${colorDirective}
-
-The image should clearly demonstrate this style's ${characteristics[type]}. Keep the image compact and optimized.`,
+Render this subject using${hasTokenColors ? " the Design Token colors above and" : ""} the style's visual characteristics. The image should demonstrate the style's color palette, lighting, texture, and mood.`,
             },
           ],
         },

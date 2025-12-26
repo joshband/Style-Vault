@@ -1369,7 +1369,8 @@ export async function registerRoutes(
         prompt,
         style.name,
         style.description,
-        style.promptScaffolding
+        style.promptScaffolding,
+        style.tokens
       );
 
       // Save to database
