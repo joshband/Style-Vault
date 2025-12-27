@@ -1,0 +1,243 @@
+{
+  "imageId": "abc123_example",
+  "tokens": {
+    "$schema": "https://design-tokens.org/schema.json",
+    "$version": "2025.10",
+    "$description": "Visual DNA extracted design tokens",
+    "$metadata": {
+      "sourceImageId": "abc123_example",
+      "sourceHash": "a1b2c3d4e5f67890"
+    },
+    "color": {
+      "primary": {
+        "$type": "color",
+        "$value": "oklch(0.65 0.15 240)",
+        "$description": "Primary/dominant color (frequency: 0.35)"
+      },
+      "secondary": {
+        "$type": "color",
+        "$value": "oklch(0.85 0.08 60)",
+        "$description": "Palette color 1 (frequency: 0.22)"
+      },
+      "palette": {
+        "2": {
+          "$type": "color",
+          "$value": "oklch(0.45 0.12 180)",
+          "$description": "Palette color 2 (frequency: 0.15)"
+        },
+        "3": {
+          "$type": "color",
+          "$value": "oklch(0.92 0.02 0)",
+          "$description": "Palette color 3 (frequency: 0.12)"
+        }
+      }
+    },
+    "spacing": {
+      "xs": { "$type": "dimension", "$value": "4px" },
+      "sm": { "$type": "dimension", "$value": "8px" },
+      "md": { "$type": "dimension", "$value": "16px" },
+      "lg": { "$type": "dimension", "$value": "24px" },
+      "xl": { "$type": "dimension", "$value": "32px" }
+    },
+    "fontSize": {
+      "display": { "$type": "dimension", "$value": "48px" },
+      "h1": { "$type": "dimension", "$value": "36px" },
+      "h2": { "$type": "dimension", "$value": "28px" },
+      "h3": { "$type": "dimension", "$value": "22px" },
+      "body": { "$type": "dimension", "$value": "16px" },
+      "caption": { "$type": "dimension", "$value": "14px" }
+    },
+    "typography": {
+      "scaleRatio": {
+        "$type": "number",
+        "$value": 1.333,
+        "$description": "Type scale ratio between heading levels"
+      }
+    },
+    "shadow": {
+      "sm": {
+        "$type": "shadow",
+        "$value": {
+          "color": "oklch(0 0 0 / 0.08)",
+          "offsetX": "0px",
+          "offsetY": "2px",
+          "blur": "4px",
+          "spread": "0px"
+        }
+      },
+      "md": {
+        "$type": "shadow",
+        "$value": {
+          "color": "oklch(0 0 0 / 0.12)",
+          "offsetX": "0px",
+          "offsetY": "4px",
+          "blur": "8px",
+          "spread": "0px"
+        }
+      },
+      "lg": {
+        "$type": "shadow",
+        "$value": {
+          "color": "oklch(0 0 0 / 0.16)",
+          "offsetX": "0px",
+          "offsetY": "8px",
+          "blur": "16px",
+          "spread": "0px"
+        }
+      }
+    },
+    "borderRadius": {
+      "none": { "$type": "dimension", "$value": "0px" },
+      "sm": { "$type": "dimension", "$value": "4px" },
+      "md": { "$type": "dimension", "$value": "8px" },
+      "lg": { "$type": "dimension", "$value": "16px" },
+      "full": { "$type": "dimension", "$value": "9999px" }
+    },
+    "grid": {
+      "columnWidth": { "$type": "dimension", "$value": "280px" },
+      "gutter": { "$type": "dimension", "$value": "24px" }
+    }
+  },
+  "components": [
+    {
+      "id": "abc123_region_0_f1e2d3",
+      "type": "button",
+      "bbox": { "x": 120, "y": 340, "width": 160, "height": 48 },
+      "confidence": 0.85,
+      "maskPath": "./masks/abc123_region_0_f1e2d3.png",
+      "tokenBindings": {
+        "backgroundColor": "{color.primary}",
+        "textColor": "{color.palette.3}",
+        "borderRadius": "{borderRadius.md}",
+        "padding": "{spacing.md}"
+      },
+      "variants": [
+        { "name": "default", "state": "idle" },
+        { "name": "hover", "state": "hover" },
+        { "name": "pressed", "state": "active" }
+      ],
+      "behaviorHints": {
+        "interactive": true,
+        "focusable": true,
+        "hover": true,
+        "press": true
+      }
+    },
+    {
+      "id": "abc123_region_1_a4b5c6",
+      "type": "card",
+      "bbox": { "x": 40, "y": 100, "width": 320, "height": 200 },
+      "confidence": 0.78,
+      "maskPath": "./masks/abc123_region_1_a4b5c6.png",
+      "tokenBindings": {
+        "backgroundColor": "{color.palette.3}",
+        "shadow": "{shadow.md}",
+        "borderRadius": "{borderRadius.lg}",
+        "padding": "{spacing.lg}"
+      },
+      "variants": [],
+      "behaviorHints": {
+        "interactive": true,
+        "hover": true
+      }
+    }
+  ],
+  "style": {
+    "styleTags": [
+      { "tag": "modern", "category": "aesthetic", "score": 0.82 },
+      { "tag": "minimalist", "category": "aesthetic", "score": 0.76 },
+      { "tag": "calm", "category": "mood", "score": 0.71 },
+      { "tag": "cool", "category": "temperature", "score": 0.68 },
+      { "tag": "geometric", "category": "aesthetic", "score": 0.65 }
+    ],
+    "mood": {
+      "primary": "calm",
+      "secondary": "peaceful",
+      "intensity": 0.71
+    },
+    "embedding": [0.123, -0.456, 0.789, -0.012, 0.345],
+    "caption": "A clean, modern interface with blue accents and minimal decoration"
+  },
+  "layers": [
+    {
+      "name": "foreground",
+      "depthRange": [0.0, 0.33],
+      "maskPath": "./abc123_foreground_mask.png"
+    },
+    {
+      "name": "midground",
+      "depthRange": [0.33, 0.66],
+      "maskPath": "./abc123_midground_mask.png"
+    },
+    {
+      "name": "background",
+      "depthRange": [0.66, 1.0],
+      "maskPath": "./abc123_background_mask.png"
+    }
+  ],
+  "depth": {
+    "depthMapPath": "./abc123_depth.png",
+    "depthJsonPath": "./abc123_depth.json",
+    "depthStats": {
+      "min": 0.0,
+      "max": 1.0,
+      "mean": 0.52,
+      "std": 0.18,
+      "median": 0.55,
+      "model": "depth-anything-v2-small"
+    }
+  },
+  "lighting": {
+    "lighting": {
+      "direction": "top_left",
+      "shadowIntensity": 0.45,
+      "highlightStrength": 0.32,
+      "contrastGradient": 0.58,
+      "keyLightPosition": [-0.7, -0.7, 0.85]
+    }
+  },
+  "materials": {
+    "materials": {
+      "foreground": { "type": "matte", "confidence": 0.72 },
+      "midground": { "type": "glossy", "confidence": 0.65 },
+      "background": { "type": "paper", "confidence": 0.58 }
+    },
+    "textures": {
+      "foreground": { "variance": 0.12, "high_freq": 0.25, "edges": 0.18 },
+      "midground": { "variance": 0.28, "high_freq": 0.42, "edges": 0.35 },
+      "background": { "variance": 0.08, "high_freq": 0.15, "edges": 0.10 }
+    }
+  },
+  "motion": [
+    {
+      "component": "abc123_region_0_f1e2d3",
+      "componentType": "button",
+      "motion": {
+        "type": "scale",
+        "duration": 120,
+        "easing": "easeOut",
+        "trigger": "hover"
+      }
+    },
+    {
+      "component": "abc123_region_0_f1e2d3",
+      "componentType": "button",
+      "motion": {
+        "type": "scale",
+        "duration": 80,
+        "easing": "easeIn",
+        "trigger": "press"
+      }
+    },
+    {
+      "component": "abc123_region_1_a4b5c6",
+      "componentType": "card",
+      "motion": {
+        "type": "elevation",
+        "duration": 200,
+        "easing": "easeOut",
+        "trigger": "hover"
+      }
+    }
+  ]
+}
