@@ -9,7 +9,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { RefreshCw, Activity, Settings, Wand2, Shield, AlertCircle, CheckCircle, Clock, Zap } from "lucide-react";
+import { RefreshCw, Activity, Settings, Wand2, Shield, AlertCircle, CheckCircle, Clock, Zap, Play, Square, Download, GitCompare, Loader2 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { Link } from "wouter";
 import type { Style } from "@shared/schema";
 
@@ -36,6 +37,28 @@ interface AdminStats {
   pendingEnrichment: number;
   completedMoodBoards: number;
   completedUiConcepts: number;
+}
+
+interface RegenerationProgress {
+  batchId?: string;
+  status: "idle" | "running" | "completed" | "cancelled";
+  totalStyles: number;
+  processedStyles: number;
+  successfulStyles: number;
+  failedStyles: number;
+  currentStyleId?: string;
+  currentStyleName?: string;
+  startedAt?: string;
+  estimatedCompletionAt?: string;
+  progressPercent: number;
+  recentResults?: Array<{
+    styleId: string;
+    styleName: string;
+    success: boolean;
+    durationMs: number;
+    tokensChanged: boolean;
+    materialRecipe?: string;
+  }>;
 }
 
 export default function Admin() {
@@ -92,6 +115,67 @@ export default function Admin() {
       if (!res.ok) throw new Error("Failed to fetch styles");
       const data = await res.json();
       return data.styles || [];
+    },
+  });
+
+  const { data: regenProgress, refetch: refetchRegenProgress } = useQuery<RegenerationProgress>({
+    queryKey: ["admin", "regeneration-progress"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/regeneration/progress");
+      if (!res.ok) throw new Error("Failed to fetch progress");
+      return res.json();
+    },
+    refetchInterval: (query) => query.state.data?.status === "running" ? 2000 : false,
+  });
+
+  const startComprehensiveRegenMutation = useMutation({
+    mutationFn: async (styleIds?: string[]) => {
+      const res = await fetch("/api/admin/regeneration/comprehensive", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ styleIds: styleIds?.length ? styleIds : undefined }),
+      });
+      if (!res.ok) throw new Error("Failed to start comprehensive regeneration");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Comprehensive regeneration started", description: "Check progress panel for updates." });
+      refetchRegenProgress();
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const cancelRegenMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/admin/regeneration/cancel", { method: "POST" });
+      if (!res.ok) throw new Error("Failed to cancel regeneration");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Regeneration cancelled" });
+      refetchRegenProgress();
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const downloadReportMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/admin/regeneration/report");
+      if (!res.ok) throw new Error("No report available");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `regeneration-report-${new Date().toISOString().split("T")[0]}.md`;
+      a.click();
+      URL.revokeObjectURL(url);
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
@@ -357,6 +441,123 @@ export default function Admin() {
           </TabsContent>
 
           <TabsContent value="regenerate" className="space-y-6">
+            <Card className="border-2 border-dashed border-primary/30">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <GitCompare className="w-5 h-5" />
+                  Comprehensive Regeneration with Before/After Tracking
+                </CardTitle>
+                <CardDescription>
+                  Run all pipelines (CV detection, material intelligence, AI classification, metadata enrichment) with artifact deduplication and diff tracking
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {regenProgress?.status === "running" ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span className="text-sm font-medium">
+                          Processing: {regenProgress.currentStyleName || "..."}
+                        </span>
+                      </div>
+                      <Badge variant="outline">
+                        {regenProgress.processedStyles} / {regenProgress.totalStyles}
+                      </Badge>
+                    </div>
+                    <Progress value={regenProgress.progressPercent} className="h-2" />
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-green-500" />
+                        <span>{regenProgress.successfulStyles} successful</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-red-500" />
+                        <span>{regenProgress.failedStyles} failed</span>
+                      </div>
+                      <div className="text-muted-foreground">
+                        {regenProgress.estimatedCompletionAt && (
+                          <span>ETA: {new Date(regenProgress.estimatedCompletionAt).toLocaleTimeString()}</span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {regenProgress.recentResults && regenProgress.recentResults.length > 0 && (
+                      <div className="max-h-32 overflow-y-auto space-y-1 text-sm">
+                        {regenProgress.recentResults.map((result) => (
+                          <div key={result.styleId} className="flex items-center justify-between p-2 rounded bg-muted/50">
+                            <span className="truncate flex-1">{result.styleName}</span>
+                            <div className="flex items-center gap-2">
+                              {result.materialRecipe && (
+                                <Badge variant="secondary" className="text-xs">{result.materialRecipe}</Badge>
+                              )}
+                              {result.tokensChanged && (
+                                <Badge variant="outline" className="text-xs">Tokens Updated</Badge>
+                              )}
+                              {result.success ? (
+                                <CheckCircle className="w-4 h-4 text-green-500" />
+                              ) : (
+                                <AlertCircle className="w-4 h-4 text-red-500" />
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <Button
+                      onClick={() => cancelRegenMutation.mutate()}
+                      disabled={cancelRegenMutation.isPending}
+                      variant="destructive"
+                      className="w-full"
+                      data-testid="button-cancel-regen"
+                    >
+                      <Square className="w-4 h-4 mr-2" />
+                      Cancel Regeneration
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {regenProgress?.status === "completed" && (
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-green-500/10 border border-green-500/30">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="w-5 h-5 text-green-500" />
+                          <span className="font-medium">Last regeneration complete</span>
+                        </div>
+                        <span className="text-sm text-muted-foreground">
+                          {regenProgress.successfulStyles}/{regenProgress.totalStyles} successful
+                        </span>
+                      </div>
+                    )}
+                    
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => startComprehensiveRegenMutation.mutate(selectedStyles.length > 0 ? selectedStyles : undefined)}
+                        disabled={startComprehensiveRegenMutation.isPending}
+                        className="flex-1"
+                        data-testid="button-start-comprehensive"
+                      >
+                        <Play className="w-4 h-4 mr-2" />
+                        {selectedStyles.length > 0 
+                          ? `Run Comprehensive (${selectedStyles.length} styles)` 
+                          : "Run Comprehensive (All Styles)"}
+                      </Button>
+                      
+                      <Button
+                        onClick={() => downloadReportMutation.mutate()}
+                        disabled={downloadReportMutation.isPending || !regenProgress || regenProgress.status === "idle"}
+                        variant="outline"
+                        data-testid="button-download-report"
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        Report
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card>
                 <CardHeader>
