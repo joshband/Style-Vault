@@ -23,6 +23,7 @@ const Creator = lazy(() => import("@/pages/Creator"));
 const Compare = lazy(() => import("@/pages/Compare"));
 const Analytics = lazy(() => import("@/pages/Analytics"));
 const Tools = lazy(() => import("@/pages/Tools"));
+const Admin = lazy(() => import("@/pages/Admin"));
 
 function PageLoader() {
   return (
@@ -48,6 +49,7 @@ function Router() {
         <Route path="/compare" component={Compare} />
         <Route path="/analytics" component={Analytics} />
         <Route path="/tools" component={Tools} />
+        <Route path="/admin" component={Admin} />
         <Route component={NotFound} />
       </Switch>
     </Suspense>

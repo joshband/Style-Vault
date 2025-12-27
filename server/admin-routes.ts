@@ -1,7 +1,8 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
 import { cache, CACHE_KEYS } from "./cache";
 import type { MetricType, InsertAdminMetric, Style, MoodBoardAssets, UiConceptAssets } from "@shared/schema";
+import { isAuthenticated } from "./replit_integrations/auth";
 
 type ImageType = "reference" | "previews" | "mood_board" | "ui_concepts" | "all";
 
@@ -21,12 +22,66 @@ interface RegenerateFullRequest {
   includeUiConcepts?: boolean;
 }
 
+const ADMIN_USER_IDS = process.env.ADMIN_USER_IDS?.split(",").map(s => s.trim()) || [];
+
+function isAdmin(req: Request, res: Response, next: NextFunction) {
+  if (!req.isAuthenticated || !req.isAuthenticated()) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+  
+  const user = req.user as { id: string } | undefined;
+  if (!user) {
+    return res.status(401).json({ error: "User not found" });
+  }
+  
+  if (ADMIN_USER_IDS.length > 0 && !ADMIN_USER_IDS.includes(user.id)) {
+    return res.status(403).json({ error: "Admin access required" });
+  }
+  
+  next();
+}
+
 export function registerAdminRoutes(app: Express) {
+  
+  // ==================== STATS ENDPOINT ====================
+  
+  app.get("/api/admin/stats", isAuthenticated, isAdmin, async (_req: Request, res: Response) => {
+    try {
+      const allStyles = await storage.getStylesPaginated(1, 10000);
+      const styles = allStyles.styles;
+      
+      const totalStyles = styles.length;
+      const publicStyles = styles.filter(s => s.isPublic).length;
+      const privateStyles = totalStyles - publicStyles;
+      const pendingEnrichment = styles.filter(s => s.metadataEnrichmentStatus === "pending").length;
+      
+      let completedMoodBoards = 0;
+      let completedUiConcepts = 0;
+      
+      for (const style of styles) {
+        const summary = style.assetsSummary as { moodBoardStatus?: string; uiConceptsStatus?: string } | null;
+        if (summary?.moodBoardStatus === "complete") completedMoodBoards++;
+        if (summary?.uiConceptsStatus === "complete") completedUiConcepts++;
+      }
+      
+      res.json({
+        totalStyles,
+        publicStyles,
+        privateStyles,
+        pendingEnrichment,
+        completedMoodBoards,
+        completedUiConcepts,
+      });
+    } catch (error) {
+      console.error("Error fetching admin stats:", error);
+      res.status(500).json({ error: "Failed to fetch stats" });
+    }
+  });
   
   // ==================== METRICS ENDPOINTS ====================
   
   // Get metrics summary
-  app.get("/api/admin/metrics/summary", async (_req: Request, res: Response) => {
+  app.get("/api/admin/metrics/summary", isAuthenticated, isAdmin, async (_req: Request, res: Response) => {
     try {
       const summary = await storage.getMetricsSummary();
       res.json(summary);
@@ -37,7 +92,7 @@ export function registerAdminRoutes(app: Express) {
   });
 
   // Get detailed metrics with filtering
-  app.get("/api/admin/metrics", async (req: Request, res: Response) => {
+  app.get("/api/admin/metrics", isAuthenticated, isAdmin, async (req: Request, res: Response) => {
     try {
       const type = req.query.type as MetricType | undefined;
       const styleId = req.query.styleId as string | undefined;
@@ -53,7 +108,7 @@ export function registerAdminRoutes(app: Express) {
   });
 
   // Record a metric (internal use)
-  app.post("/api/admin/metrics", async (req: Request, res: Response) => {
+  app.post("/api/admin/metrics", isAuthenticated, isAdmin, async (req: Request, res: Response) => {
     try {
       const metric = req.body as InsertAdminMetric;
       const created = await storage.recordMetric(metric);
@@ -67,7 +122,7 @@ export function registerAdminRoutes(app: Express) {
   // ==================== FEATURE TOGGLES ====================
   
   // Get all feature toggles
-  app.get("/api/admin/features", async (_req: Request, res: Response) => {
+  app.get("/api/admin/features", isAuthenticated, isAdmin, async (_req: Request, res: Response) => {
     try {
       const toggles = await storage.getAllFeatureToggles();
       res.json(toggles);
@@ -78,7 +133,7 @@ export function registerAdminRoutes(app: Express) {
   });
 
   // Get a specific feature toggle
-  app.get("/api/admin/features/:key", async (req: Request, res: Response) => {
+  app.get("/api/admin/features/:key", isAuthenticated, isAdmin, async (req: Request, res: Response) => {
     try {
       const toggle = await storage.getFeatureToggle(req.params.key);
       if (!toggle) {
@@ -92,7 +147,7 @@ export function registerAdminRoutes(app: Express) {
   });
 
   // Update a feature toggle
-  app.put("/api/admin/features/:key", async (req: Request, res: Response) => {
+  app.put("/api/admin/features/:key", isAuthenticated, isAdmin, async (req: Request, res: Response) => {
     try {
       const { enabled, value } = req.body;
       const toggle = await storage.setFeatureToggle(req.params.key, enabled, value);
@@ -106,7 +161,7 @@ export function registerAdminRoutes(app: Express) {
   // ==================== STYLE MANAGEMENT ====================
   
   // Get all styles with full data for admin
-  app.get("/api/admin/styles", async (_req: Request, res: Response) => {
+  app.get("/api/admin/styles", isAuthenticated, isAdmin, async (_req: Request, res: Response) => {
     try {
       const allStyles = await storage.getStyles();
       const summary = allStyles.map(s => ({
@@ -134,7 +189,7 @@ export function registerAdminRoutes(app: Express) {
   // ==================== REGENERATION ENDPOINTS ====================
   
   // Regenerate specific image types for styles
-  app.post("/api/admin/styles/regenerate-images", async (req: Request, res: Response) => {
+  app.post("/api/admin/styles/regenerate-images", isAuthenticated, isAdmin, async (req: Request, res: Response) => {
     try {
       const { styleIds, styleNames, imageTypes } = req.body as RegenerateImagesRequest;
       
@@ -196,7 +251,7 @@ export function registerAdminRoutes(app: Express) {
   });
 
   // Full style regeneration from source
-  app.post("/api/admin/styles/regenerate-full", async (req: Request, res: Response) => {
+  app.post("/api/admin/styles/regenerate-full", isAuthenticated, isAdmin, async (req: Request, res: Response) => {
     try {
       const body = req.body as RegenerateFullRequest;
       const { styleIds, styleNames, includeTokens = true, includeMetadata = true, includePreviews = true, includeMoodBoard = true, includeUiConcepts = true } = body;
@@ -269,7 +324,7 @@ export function registerAdminRoutes(app: Express) {
   });
 
   // Regenerate ALL community styles
-  app.post("/api/admin/styles/regenerate-all", async (req: Request, res: Response) => {
+  app.post("/api/admin/styles/regenerate-all", isAuthenticated, isAdmin, async (req: Request, res: Response) => {
     try {
       const allStyleIds = await storage.getAllStyleIds();
       const { imageTypes = ["all"], includeTokens = true, includeMetadata = true, includePreviews = true, includeMoodBoard = true, includeUiConcepts = true } = req.body;
@@ -321,7 +376,7 @@ export function registerAdminRoutes(app: Express) {
   });
 
   // Get regeneration job status
-  app.get("/api/admin/jobs", async (req: Request, res: Response) => {
+  app.get("/api/admin/jobs", isAuthenticated, isAdmin, async (req: Request, res: Response) => {
     try {
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
       const jobs = await storage.getRecentJobs(limit);
@@ -329,47 +384,6 @@ export function registerAdminRoutes(app: Express) {
     } catch (error) {
       console.error("Error fetching admin jobs:", error);
       res.status(500).json({ error: "Failed to fetch jobs" });
-    }
-  });
-
-  // Get database stats
-  app.get("/api/admin/stats", async (_req: Request, res: Response) => {
-    try {
-      const [styleCount, allStyles] = await Promise.all([
-        storage.getStyleCount(),
-        storage.getStyles(),
-      ]);
-
-      // Calculate storage estimates
-      let totalTokenSize = 0;
-      let totalPreviewSize = 0;
-      
-      for (const style of allStyles) {
-        totalTokenSize += JSON.stringify(style.tokens).length;
-        totalPreviewSize += JSON.stringify(style.previews).length;
-      }
-
-      const stats = {
-        styles: {
-          total: styleCount,
-          public: allStyles.filter(s => s.isPublic).length,
-          private: allStyles.filter(s => !s.isPublic).length,
-        },
-        assets: {
-          moodBoardComplete: allStyles.filter(s => (s.moodBoard as any)?.status === "complete").length,
-          uiConceptsComplete: allStyles.filter(s => (s.uiConcepts as any)?.status === "complete").length,
-          metadataEnriched: allStyles.filter(s => s.metadataEnrichmentStatus === "complete").length,
-        },
-        storage: {
-          estimatedTokenStorageKB: Math.round(totalTokenSize / 1024),
-          estimatedPreviewStorageKB: Math.round(totalPreviewSize / 1024),
-        },
-      };
-
-      res.json(stats);
-    } catch (error) {
-      console.error("Error fetching admin stats:", error);
-      res.status(500).json({ error: "Failed to fetch stats" });
     }
   });
 }
