@@ -186,14 +186,23 @@ export function MaterialIntelligencePanel({ styleId, referenceImage, className }
       });
 
       if (!res.ok) {
-        throw new Error("Pipeline analysis failed");
+        const errorData = await res.json().catch(() => ({}));
+        if (errorData.error?.includes("Pipeline server not available") || res.status === 503) {
+          throw new Error("Material analysis is temporarily unavailable. The analysis service is starting up - please try again in a moment.");
+        }
+        throw new Error(errorData.error || "Pipeline analysis failed");
       }
 
       const result = await res.json();
       setData(result);
       setExpanded(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
+      const message = err instanceof Error ? err.message : "Unknown error";
+      if (message.includes("fetch") || message.includes("network") || message.includes("Failed to fetch")) {
+        setError("Material analysis service is temporarily unavailable. Please try again later.");
+      } else {
+        setError(message);
+      }
     } finally {
       setLoading(false);
     }
