@@ -1,0 +1,205 @@
+You are continuing the implementation of the Visual DNA Studio extraction system.
+
+Context recap:
+- Stages 1–8 already extract raw CV, depth, components, semantics, layers, lighting, materials, and motion.
+- This stage focuses on:
+  9) normalization & standardization
+  10) API + backend orchestration
+  11) semantic search & recommendation
+  12) testing & validation
+  13) system QA & safety hardening
+
+Constraints:
+- Open-source only
+- Hosted backend (GCP compatible)
+- No UI work
+- No exporters yet
+- Must support public community usage
+- Must preserve lineage & reproducibility
+
+---------------------------------------
+STAGE 9 — UNIFIED NORMALIZATION & STANDARDIZATION
+---------------------------------------
+
+Create a normalization layer that:
+
+- Accepts outputs from stages 1–8
+- Validates, cleans, and standardizes all outputs
+- Produces a single **canonical style artifact**
+
+Responsibilities:
+
+A) DTCG Token Normalization
+- Validate tokens against W3C DTCG 2025.10
+- Enforce:
+  • $type
+  • $value
+  • $description
+- Resolve aliases
+- Group tokens by category and theme
+- Reject invalid or ambiguous tokens
+
+B) Non-DTCG Structure Normalization
+- Components
+- Layers
+- Lighting
+- Materials
+- Motion
+- Semantic style vectors
+
+Each must:
+- Conform to a JSON Schema
+- Be versioned
+- Be extensible
+
+Output:
+{
+  "styleId": "...",
+  "tokens": {...},
+  "components": {...},
+  "layers": {...},
+  "styleSemantics": {...},
+  "lighting": {...},
+  "materials": {...},
+  "motion": {...},
+  "lineage": {...}
+}
+
+---------------------------------------
+STAGE 10 — BACKEND API & PIPELINE ORCHESTRATION
+---------------------------------------
+
+Implement a backend service that:
+
+- Orchestrates the full pipeline asynchronously
+- Is deployable to GCP Cloud Run
+- Uses job-based execution (not request blocking)
+
+Required endpoints:
+
+POST /ingest/image
+POST /ingest/prompt
+GET  /styles/:id
+GET  /styles/:id/tokens
+GET  /styles/:id/components
+GET  /styles/:id/layers
+GET  /styles/:id/semantics
+GET  /styles/:id/depth
+GET  /styles/:id/lighting
+GET  /styles/:id/motion
+
+Architecture requirements:
+- Use a queue (Pub/Sub or equivalent)
+- Worker processes handle pipeline stages
+- Each stage logs:
+  • start time
+  • end time
+  • errors
+  • outputs
+
+Storage:
+- Images, masks, depth maps → Cloud Storage
+- Structured JSON → Firestore or Postgres
+- Embeddings → vector store abstraction (pluggable)
+
+---------------------------------------
+STAGE 11 — SEMANTIC SEARCH & RECOMMENDATION
+---------------------------------------
+
+Implement a semantic search & recommendation system that:
+
+- Indexes styles by:
+  • CLIP embeddings
+  • mood vectors
+  • component signatures
+  • material & lighting tags
+
+Capabilities:
+- Text-based search (“dark, glossy audio UI”)
+- Similar-style retrieval
+- Component-based similarity (“styles with cards + knobs”)
+
+Implement:
+- Vector indexing abstraction
+- Similarity scoring
+- Ranking logic
+- Explainable results (why a style matched)
+
+Endpoints:
+GET /search?q=...
+GET /styles/:id/similar
+
+---------------------------------------
+STAGE 12 — TESTING & VALIDATION
+---------------------------------------
+
+Create a comprehensive test suite:
+
+Unit tests:
+- Each pipeline stage
+- Token validation
+- Schema validation
+- Depth normalization
+- Component classification
+
+Integration tests:
+- Full pipeline run on sample images
+- Deterministic outputs for same input
+- Error recovery
+
+Test assets:
+- Sample UI screenshots
+- Sample brand images
+- Edge cases (low contrast, noisy images)
+
+Use:
+- PyTest (Python) or Jest (Node)
+- Snapshot testing for JSON outputs
+
+---------------------------------------
+STAGE 13 — SYSTEM QA, SAFETY & GOVERNANCE
+---------------------------------------
+
+Implement system-level safeguards:
+
+A) Determinism & Reproducibility
+- Same input → same output (within tolerance)
+- Version all models & pipelines
+- Record pipeline version in style artifact
+
+B) Explainability
+- Track which stage produced which data
+- Store intermediate artifacts for debugging
+
+C) Abuse & Failure Handling
+- Rate limiting
+- File size limits
+- Graceful degradation if a stage fails
+- Partial style artifacts allowed (with flags)
+
+D) Schema Governance
+- Versioned schemas
+- Backward compatibility
+- Migration helpers
+
+---------------------------------------
+DELIVERABLES
+---------------------------------------
+
+Produce:
+1) Normalization engine
+2) Backend API service
+3) Vector search module
+4) Storage abstraction
+5) Full test suite
+6) Deployment-ready structure
+
+No exporters.
+No UI.
+No shortcuts.
+
+This system must be:
+- Modular
+- Explainable
+- Future-proof
+- Community-safe
