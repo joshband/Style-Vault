@@ -4,6 +4,7 @@ import { Layout } from "@/components/layout";
 import { TokenViewer } from "@/components/token-viewer";
 import { ColorPaletteSwatches } from "@/components/color-palette-swatches";
 import { StyleSpecEditor } from "@/components/style-spec-editor";
+import { MaterialIntelligencePanel } from "@/components/material-intelligence-panel";
 import { ArrowLeft, ArrowRight, Download, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Share2, Check, Copy, Bookmark, Star, User, FolderPlus, Folder, Plus, FileCode, FileJson, Paintbrush, History, RotateCcw, Save, Sparkles, X, ChevronLeft, ChevronRight, Palette, FileText } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
@@ -1624,6 +1625,16 @@ export default ${safeName};`;
               )}
             </div>
           </details>
+
+          {/* Material Intelligence Panel */}
+          <MaterialIntelligencePanel
+            styleId={summary.id}
+            referenceImage={
+              summary.imageIds?.reference
+                ? `/api/images/${summary.imageIds.reference}?size=large`
+                : summary.referenceImages?.[0]
+            }
+          />
         </div>
 
         {/* Try It Now Dialog */}
