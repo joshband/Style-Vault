@@ -92,6 +92,42 @@ const PLATFORMS: PlatformConfig[] = [
     loginCmd: 'render login',
     deployCmd: 'render deploy',
   },
+  {
+    id: 'github-pages',
+    name: 'GitHub Pages',
+    logo: '🐙',
+    color: 'bg-[#24292e] text-white',
+    description: 'Free static hosting directly from your GitHub repo',
+    docsUrl: 'https://docs.github.com/en/pages',
+    oneClickUrl: 'https://github.com/new',
+    cliInstall: 'npm i -g gh-pages',
+    loginCmd: 'gh auth login',
+    deployCmd: 'gh-pages -d dist',
+  },
+  {
+    id: 'surge',
+    name: 'Surge',
+    logo: '⚡',
+    color: 'bg-[#FF5A5F] text-white',
+    description: 'Simple, single-command static web publishing',
+    docsUrl: 'https://surge.sh/help/',
+    oneClickUrl: 'https://surge.sh/',
+    cliInstall: 'npm i -g surge',
+    loginCmd: 'surge login',
+    deployCmd: 'surge dist',
+  },
+  {
+    id: 'firebase',
+    name: 'Firebase Hosting',
+    logo: '🔥',
+    color: 'bg-[#FFCA28] text-black',
+    description: 'Fast and secure hosting with global CDN by Google',
+    docsUrl: 'https://firebase.google.com/docs/hosting',
+    oneClickUrl: 'https://console.firebase.google.com/',
+    cliInstall: 'npm i -g firebase-tools',
+    loginCmd: 'firebase login',
+    deployCmd: 'firebase deploy --only hosting',
+  },
 ];
 
 function generateVercelConfig(styleName: string): string {
@@ -530,6 +566,67 @@ bucket = "./dist"`,
     staticPublishPath: ./dist`,
           filename: 'render.yaml',
         };
+      case 'github-pages':
+        return {
+          content: `# GitHub Pages workflow for ${styleName}
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: \${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v4
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: './dist'
+      - uses: actions/deploy-pages@v4
+        id: deployment`,
+          filename: '.github/workflows/deploy.yml',
+        };
+      case 'surge':
+        return {
+          content: `# Surge configuration for ${styleName}
+# Domain will be assigned automatically or specify your own
+# surge dist your-custom-name.surge.sh
+
+project: ${styleName.toLowerCase().replace(/[^a-z0-9-]/g, '-')}-tokens
+domain: ${styleName.toLowerCase().replace(/[^a-z0-9-]/g, '-')}.surge.sh`,
+          filename: 'CNAME',
+        };
+      case 'firebase':
+        return {
+          content: JSON.stringify({
+            hosting: {
+              public: 'dist',
+              ignore: ['firebase.json', '**/.*', '**/node_modules/**'],
+              rewrites: [{ source: '**', destination: '/index.html' }],
+              headers: [
+                {
+                  source: '**',
+                  headers: [
+                    { key: 'X-Content-Type-Options', value: 'nosniff' },
+                    { key: 'X-Frame-Options', value: 'DENY' },
+                  ],
+                },
+              ],
+            },
+          }, null, 2),
+          filename: 'firebase.json',
+        };
       default:
         return { content: generateVercelConfig(styleName), filename: 'vercel.json' };
     }
@@ -628,7 +725,7 @@ bucket = "./dist"`,
 
         <ScrollArea className="flex-1 min-h-0">
         <Tabs value={selectedPlatform} onValueChange={setSelectedPlatform} className="flex-1">
-          <TabsList className="grid w-full grid-cols-5 h-auto gap-1 p-1">
+          <TabsList className="grid w-full grid-cols-4 md:grid-cols-8 h-auto gap-1 p-1">
             {PLATFORMS.map(p => (
               <TabsTrigger 
                 key={p.id} 

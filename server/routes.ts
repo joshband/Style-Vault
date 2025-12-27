@@ -794,6 +794,114 @@ export async function registerRoutes(
     }
   });
 
+  // Style Audit - Analyze screenshot against style guide
+  app.post("/api/styles/:id/audit", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { imageBase64 } = req.body;
+
+      if (!imageBase64) {
+        return res.status(400).json({ error: "Image is required for audit" });
+      }
+
+      const style = await storage.getStyleById(id);
+      if (!style) {
+        return res.status(404).json({ error: "Style not found" });
+      }
+
+      const { auditScreenshot, calculateAuditScore, generateAuditReport } = await import("./style-audit");
+      
+      const result = await auditScreenshot(
+        imageBase64,
+        style.tokens as Record<string, any>,
+        style.name
+      );
+
+      const scoreInfo = calculateAuditScore(result);
+      const report = await generateAuditReport(result, style.name);
+
+      res.json({
+        success: true,
+        result,
+        scoreInfo,
+        report,
+      });
+    } catch (error) {
+      console.error("Style audit error:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Failed to audit screenshot",
+      });
+    }
+  });
+
+  // Code audit - Analyze code snippet against style guide
+  app.post("/api/styles/:id/audit-code", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { code, fileType } = req.body;
+
+      if (!code) {
+        return res.status(400).json({ error: "Code is required for audit" });
+      }
+
+      const style = await storage.getStyleById(id);
+      if (!style) {
+        return res.status(404).json({ error: "Style not found" });
+      }
+
+      const { auditCodeSnippet } = await import("./style-audit");
+      
+      const result = await auditCodeSnippet(
+        code,
+        style.tokens as Record<string, any>,
+        style.name,
+        fileType || "css"
+      );
+
+      res.json({
+        success: true,
+        result,
+      });
+    } catch (error) {
+      console.error("Code audit error:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Failed to audit code",
+      });
+    }
+  });
+
+  // Generic screenshot audit (without specific style)
+  app.post("/api/audit/screenshot", async (req, res) => {
+    try {
+      const { imageBase64, tokens, styleName } = req.body;
+
+      if (!imageBase64) {
+        return res.status(400).json({ error: "Image is required for audit" });
+      }
+
+      const { auditScreenshot, calculateAuditScore } = await import("./style-audit");
+      
+      const result = await auditScreenshot(
+        imageBase64,
+        tokens || {},
+        styleName || "Custom Style"
+      );
+
+      const scoreInfo = calculateAuditScore(result);
+
+      res.json({
+        success: true,
+        result,
+        scoreInfo,
+      });
+    } catch (error) {
+      console.error("Screenshot audit error:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Failed to audit screenshot",
+      });
+    }
+  });
+
   // Create a new style
   app.post("/api/styles", async (req, res) => {
     try {

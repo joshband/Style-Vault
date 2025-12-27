@@ -14,6 +14,7 @@ import { AiMoodBoard } from "@/components/ai-mood-board";
 import { ExportDialog } from "@/components/export-dialog";
 import { TokenVisualization } from "@/components/token-visualization";
 import { DeployDialog } from "@/components/deploy-dialog";
+import { StyleAudit } from "@/components/style-audit";
 import { DesignToolSync } from "@/components/DesignToolSync";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/use-auth";
@@ -1312,6 +1313,25 @@ export default ${safeName};`;
                   <path d="M2 8H13" strokeLinecap="round" />
                 </svg>
                 Deploy
+              </button>
+            }
+          />
+
+          {/* Style Audit */}
+          <StyleAudit
+            styleId={summary.id}
+            styleName={summary.name}
+            tokens={summary.tokens}
+            trigger={
+              <button 
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 border border-border bg-muted/50 hover:bg-muted rounded-lg text-sm font-medium transition-colors"
+                data-testid="button-audit-primary"
+              >
+                <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth="1.5">
+                  <circle cx="6" cy="6" r="4.5" />
+                  <path d="M9 9L14 14" strokeLinecap="round" />
+                </svg>
+                Audit
               </button>
             }
           />
