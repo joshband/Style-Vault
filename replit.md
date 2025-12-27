@@ -43,6 +43,14 @@ Preferred communication style: Simple, everyday language.
 - **Features**: Image analysis for style extraction, canonical preview generation, styled image generation, and metadata enrichment.
 - **Token-Weighted Prompts**: AI image generation prioritizes Design Tokens as primary visual directives, with semantic context as secondary guidance.
 
+### Fast Image Generation (Prodia)
+- **Provider**: Prodia AI with Flux Fast Schnell model.
+- **Endpoint**: `POST /api/generate/prodia` - accepts prompt, optional seed, optional styleId.
+- **Speed**: ~500ms generation time (sub-second).
+- **Service**: `server/prodia-service.ts` - wrapper with error handling and status checking.
+- **Status Check**: `GET /api/prodia-status` - returns enabled status and configuration message.
+- **Use Case**: Rapid iteration, real-time previews, quick drafts during style exploration.
+
 ### CV-Based Token Extraction (Optional)
 - **Technology**: Python script using `opencv-python-headless`, `numpy`, `scipy`, `coloraide` for deterministic, explainable token extraction.
 - **Capabilities**: Extracts colors (OKLCH), spacing, border radius, grid, elevation, stroke width. Includes advanced color analysis (harmony, WCAG contrast, temperature) and multi-cue depth estimation.
