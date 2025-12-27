@@ -1168,9 +1168,27 @@ export default ${safeName};`;
                   Applied
                 </div>
               </>
+            ) : assets?.uiConcepts?.softwareApp ? (
+              <>
+                <img 
+                  src={assets.uiConcepts.softwareApp}
+                  alt="Applied UI"
+                  className="absolute inset-0 w-full h-full object-cover"
+                  loading="eager"
+                  data-testid="img-applied-ui"
+                />
+                <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/70 text-white text-[10px] font-mono rounded">
+                  Applied
+                </div>
+              </>
+            ) : assets?.uiConcepts?.status === "generating" ? (
+              <div className="flex items-center justify-center h-full text-muted-foreground text-xs gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Generating...
+              </div>
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
-                Generating...
+                Pending
               </div>
             )}
           </div>
@@ -1310,10 +1328,31 @@ export default ${safeName};`;
                   const imgSrc = summary.imageIds?.[key] 
                     ? `/api/images/${summary.imageIds[key]}?size=medium`
                     : (previews as any)[type];
+                  const fullSrc = summary.imageIds?.[key]
+                    ? `/api/images/${summary.imageIds[key]}`
+                    : (previews as any)[type];
                   return (
-                    <div key={type} className="aspect-square bg-muted rounded-lg overflow-hidden border border-border relative">
+                    <div key={type} className="aspect-square bg-muted rounded-lg overflow-hidden border border-border relative group/preview">
                       {imgSrc ? (
-                        <img src={imgSrc} alt={type} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+                        <>
+                          <img src={imgSrc} alt={type} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+                          <button
+                            onClick={() => {
+                              if (!fullSrc) return;
+                              const link = document.createElement("a");
+                              link.href = fullSrc;
+                              link.download = `${summary.name}-${type}.png`;
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                            }}
+                            className="absolute top-1 right-1 p-1.5 rounded-md bg-black/50 text-white opacity-0 group-hover/preview:opacity-100 transition-opacity hover:bg-black/70"
+                            title={`Download ${type}`}
+                            data-testid={`button-download-preview-${type}`}
+                          >
+                            <Download size={12} />
+                          </button>
+                        </>
                       ) : (
                         <div className="flex items-center justify-center h-full text-muted-foreground text-xs capitalize">{type}</div>
                       )}

@@ -383,7 +383,7 @@ export async function registerRoutes(
       // Invalidate cache
       cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
       
-      // Auto-trigger mood board generation in background (don't await)
+      // Auto-trigger mood board generation in background using Prodia for speed
       setImmediate(async () => {
         try {
           console.log(`Auto-generating mood board for style: ${style.id}`);
@@ -397,19 +397,86 @@ export async function registerRoutes(
           cache.delete(CACHE_KEYS.STYLE_DETAIL(style.id));
           cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
           
-          // Generate all assets
-          const { moodBoard, uiConcepts } = await generateAllMoodBoardAssets({
-            styleName: style.name,
-            styleDescription: style.description,
-            tokens: style.tokens,
-            metadataTags: style.metadataTags || getDefaultMetadataTags(),
-            referenceImageBase64: style.referenceImages?.[0],
-          });
+          // Try Prodia first for ~10x speedup
+          const { isProdiaEnabled } = await import("./prodia-service");
+          let moodBoard: any;
+          let uiConcepts: any;
+          
+          if (isProdiaEnabled()) {
+            const { generateMoodBoardWithProdia, generateUiConceptsWithProdia } = await import("./prodia-generation");
+            
+            // Generate mood board and UI concepts in parallel with Prodia
+            const [moodBoardResult, uiResult] = await Promise.all([
+              generateMoodBoardWithProdia({
+                styleName: style.name,
+                styleDescription: style.description,
+                tokens: style.tokens,
+                metadataTags: (style.metadataTags || getDefaultMetadataTags()) as unknown as Record<string, string[]>,
+              }),
+              generateUiConceptsWithProdia({
+                styleName: style.name,
+                styleDescription: style.description,
+                tokens: style.tokens,
+                metadataTags: (style.metadataTags || getDefaultMetadataTags()) as unknown as Record<string, string[]>,
+              }),
+            ]);
+            
+            moodBoard = {
+              collage: moodBoardResult.collage,
+              status: "complete" as const,
+              history: [],
+            };
+            
+            uiConcepts = {
+              softwareApp: uiResult.softwareApp,
+              audioPlugin: uiResult.audioPlugin,
+              dashboard: uiResult.dashboard,
+              status: "complete" as const,
+              history: [],
+            };
+            
+            console.log(`[Prodia] Generated mood board and UI concepts in ${moodBoardResult.processingTimeMs + uiResult.processingTimeMs}ms`);
+          } else {
+            // Fall back to Gemini
+            const result = await generateAllMoodBoardAssets({
+              styleName: style.name,
+              styleDescription: style.description,
+              tokens: style.tokens,
+              metadataTags: style.metadataTags || getDefaultMetadataTags(),
+              referenceImageBase64: style.referenceImages?.[0],
+            });
+            moodBoard = result.moodBoard;
+            uiConcepts = result.uiConcepts;
+          }
           
           await storage.updateStyleMoodBoard(style.id, moodBoard, uiConcepts);
           cache.delete(CACHE_KEYS.STYLE_DETAIL(style.id));
           cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
           console.log(`Mood board generation complete for style: ${style.id}`);
+          
+          // Store images in image_assets table for fast retrieval
+          try {
+            const { storeImage } = await import("./image-service");
+            const storePromises: Promise<void>[] = [];
+            
+            if (moodBoard?.collage) {
+              storePromises.push(storeImage(moodBoard.collage, "mood_board", style.id).then(() => {}));
+            }
+            if (uiConcepts?.softwareApp) {
+              storePromises.push(storeImage(uiConcepts.softwareApp, "ui_software_app", style.id).then(() => {}));
+            }
+            if (uiConcepts?.audioPlugin) {
+              storePromises.push(storeImage(uiConcepts.audioPlugin, "ui_audio_plugin", style.id).then(() => {}));
+            }
+            if (uiConcepts?.dashboard) {
+              storePromises.push(storeImage(uiConcepts.dashboard, "ui_dashboard", style.id).then(() => {}));
+            }
+            
+            await Promise.all(storePromises);
+            console.log(`[Storage] Stored ${storePromises.length} images for style: ${style.id}`);
+          } catch (storageError) {
+            console.error(`Failed to store images for ${style.id}:`, storageError);
+          }
           
           // Queue metadata enrichment after mood board generation
           queueStyleForEnrichment(style.id);
@@ -1503,15 +1570,39 @@ export async function registerRoutes(
     }
   });
 
-  // Generate canonical preview images for a style
+  // Generate canonical preview images for a style - uses Prodia for speed
   app.post("/api/generate-previews", async (req, res) => {
     try {
-      const { styleName, styleDescription, referenceImageBase64, tokens } = req.body;
+      const { styleName, styleDescription, referenceImageBase64, tokens, useProdia = true } = req.body;
 
       if (!styleName || !styleDescription) {
         return res.status(400).json({ error: "Style name and description required" });
       }
 
+      // Try Prodia first for ~10-50x speedup
+      const { isProdiaEnabled } = await import("./prodia-service");
+      if (useProdia && isProdiaEnabled()) {
+        const { generateCanonicalPreviewsWithProdia } = await import("./prodia-generation");
+        const result = await generateCanonicalPreviewsWithProdia({
+          styleName,
+          styleDescription,
+          tokens,
+        });
+        
+        return res.json({ 
+          previews: {
+            portrait: result.portrait,
+            landscape: result.landscape,
+            stillLife: result.stillLife,
+          },
+          successCount: result.allFailed ? 0 : 3,
+          allFailed: result.allFailed,
+          processingTimeMs: result.processingTimeMs,
+          engine: "prodia",
+        });
+      }
+
+      // Fall back to Gemini
       const result = await generateCanonicalPreviews({
         styleName,
         styleDescription,
@@ -1519,7 +1610,6 @@ export async function registerRoutes(
         tokens,
       });
 
-      // Return with status info so frontend knows if generation partially failed
       res.json({ 
         previews: {
           portrait: result.portrait,
@@ -1528,6 +1618,7 @@ export async function registerRoutes(
         },
         successCount: result.successCount,
         allFailed: result.allFailed,
+        engine: "gemini",
       });
     } catch (error) {
       console.error("Error generating previews:", error);
@@ -1566,10 +1657,10 @@ export async function registerRoutes(
     }
   });
 
-  // Job-based preview generation with progress tracking
+  // Job-based preview generation with progress tracking - uses Prodia for speed
   app.post("/api/jobs/generate-previews", async (req, res) => {
     try {
-      const { styleName, styleDescription, referenceImageBase64, tokens } = req.body;
+      const { styleName, styleDescription, referenceImageBase64, tokens, useProdia = true } = req.body;
 
       if (!styleName || !styleDescription) {
         return res.status(400).json({ error: "Style name and description required" });
@@ -1577,8 +1668,34 @@ export async function registerRoutes(
 
       const job = await startJobInBackground(
         "preview_generation",
-        { styleName, styleDescription, referenceImageBase64, tokens },
+        { styleName, styleDescription, referenceImageBase64, tokens, useProdia },
         async (input, onProgress) => {
+          // Try Prodia first for ~10-50x speedup (~500ms vs 5-30s per image)
+          const { isProdiaEnabled } = await import("./prodia-service");
+          if (input.useProdia && isProdiaEnabled()) {
+            const { generateCanonicalPreviewsWithProdia } = await import("./prodia-generation");
+            const result = await generateCanonicalPreviewsWithProdia({
+              styleName: input.styleName,
+              styleDescription: input.styleDescription,
+              tokens: input.tokens,
+              onProgress,
+            });
+            
+            if (result.allFailed) {
+              throw new Error("All preview generations failed. Please try again.");
+            }
+            
+            return {
+              portrait: result.portrait,
+              landscape: result.landscape,
+              stillLife: result.stillLife,
+              allFailed: result.allFailed,
+              successCount: result.allFailed ? 0 : 3,
+              processingTimeMs: result.processingTimeMs,
+            };
+          }
+          
+          // Fall back to Gemini if Prodia not available
           const result = await generateCanonicalPreviews({
             styleName: input.styleName,
             styleDescription: input.styleDescription,
@@ -1587,14 +1704,13 @@ export async function registerRoutes(
             onProgress,
           });
           
-          // Throw error if all previews failed - this marks the job as failed
           if (result.allFailed) {
             throw new Error("All preview generations failed. Please try again.");
           }
           
           return result;
         },
-        { maxRetries: 2, timeoutMs: 180000 }
+        { maxRetries: 2, timeoutMs: 60000 } // Reduced timeout since Prodia is fast
       );
 
       res.json({ jobId: job.id, status: job.status });
