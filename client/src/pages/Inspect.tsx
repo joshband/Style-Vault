@@ -1234,8 +1234,9 @@ export default ${safeName};`;
                 );
               } else {
                 return (
-                  <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
-                    Pending
+                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-xs gap-2">
+                    <span>Not Generated</span>
+                    <span className="text-[10px] opacity-70">UI preview coming soon</span>
                   </div>
                 );
               }

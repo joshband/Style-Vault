@@ -1,7 +1,59 @@
 import { generateWithFluxSchnell, isProdiaEnabled, ProdiaGenerationResult } from "./prodia-service";
 import { storage } from "./storage";
+import { ai } from "./replit_integrations/image/client";
 
 type ProgressCallback = (progress: number, message: string) => Promise<void>;
+
+interface ImageAnalysis {
+  hasSubject: boolean;
+  subjectType: "portrait" | "landscape" | "still_life" | "abstract" | "ui" | "other";
+  sceneDescription: string;
+  dominantElements: string[];
+  artisticStyle: string;
+}
+
+async function analyzeReferenceImage(base64Image: string): Promise<ImageAnalysis | null> {
+  try {
+    const mimeMatch = base64Image.match(/^data:(image\/[a-z]+);base64,/);
+    const mimeType = mimeMatch?.[1] || "image/jpeg";
+    const base64Data = base64Image.replace(/^data:image\/[a-z]+;base64,/, "");
+    
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [{
+        role: "user",
+        parts: [
+          {
+            inlineData: {
+              mimeType,
+              data: base64Data,
+            },
+          },
+          {
+            text: `Analyze this image for art style transfer. Return a JSON object with:
+{
+  "hasSubject": boolean - true if there's a clear identifiable subject/scene,
+  "subjectType": "portrait" | "landscape" | "still_life" | "abstract" | "ui" | "other",
+  "sceneDescription": "Detailed 30-50 word description of the scene, subjects, and composition",
+  "dominantElements": ["list", "of", "key", "visual", "elements"],
+  "artisticStyle": "Brief description of the artistic rendering style (e.g., 'painterly oil', 'digital illustration', 'watercolor wash')"
+}
+Only return valid JSON, no markdown.`,
+          },
+        ],
+      }],
+    });
+    
+    const text = response.candidates?.[0]?.content?.parts?.[0];
+    if (!text || typeof text !== "object" || !("text" in text)) return null;
+    
+    const jsonStr = String(text.text).replace(/```json\n?|\n?```/g, "").trim();
+    return JSON.parse(jsonStr) as ImageAnalysis;
+  } catch (error) {
+    console.error("[Prodia] Failed to analyze reference image:", error);
+    return null;
+  }
+}
 
 interface TokenSummary {
   colors: { name: string; hex: string }[];
@@ -107,12 +159,32 @@ async function generatePreviewImage(
   type: "portrait" | "landscape" | "stillLife",
   styleName: string,
   styleDescription: string,
-  summary: TokenSummary
+  summary: TokenSummary,
+  analysis?: ImageAnalysis | null
 ): Promise<ProdiaGenerationResult> {
-  const subject = CANONICAL_SUBJECTS[type];
-  const styleFragment = buildStylePromptFragment(styleName, styleDescription, summary);
+  let subject: string;
   
-  const prompt = `${subject}. ${styleFragment} High quality, detailed, professional artwork.`;
+  if (analysis?.hasSubject && analysis.sceneDescription) {
+    const elements = analysis.dominantElements?.slice(0, 3).join(", ") || "";
+    const baseScene = analysis.sceneDescription;
+    
+    if (type === "portrait" && analysis.subjectType === "portrait") {
+      subject = baseScene;
+    } else if (type === "landscape" && analysis.subjectType === "landscape") {
+      subject = baseScene;
+    } else if (type === "stillLife" && analysis.subjectType === "still_life") {
+      subject = baseScene;
+    } else {
+      subject = `${baseScene}. Key elements: ${elements}. Rendered as a ${type === "stillLife" ? "still life composition" : type} view`;
+    }
+  } else {
+    subject = CANONICAL_SUBJECTS[type];
+  }
+  
+  const styleFragment = buildStylePromptFragment(styleName, styleDescription, summary);
+  const artisticHint = analysis?.artisticStyle ? `In ${analysis.artisticStyle} style.` : "";
+  
+  const prompt = `${subject}. ${styleFragment} ${artisticHint} High quality, detailed, professional artwork.`;
   
   return generateWithFluxSchnell({ prompt });
 }
@@ -130,18 +202,27 @@ export async function generateCanonicalPreviewsWithProdia(
   
   await request.onProgress?.(5, "Starting Prodia preview generation...");
   
+  let analysis: ImageAnalysis | null = null;
+  if (request.referenceImageBase64) {
+    await request.onProgress?.(8, "Analyzing reference image...");
+    analysis = await analyzeReferenceImage(request.referenceImageBase64);
+    if (analysis) {
+      console.log(`[Prodia] Reference image analyzed: ${analysis.subjectType} - ${analysis.sceneDescription?.slice(0, 50)}...`);
+    }
+  }
+  
   const [portraitResult, landscapeResult, stillLifeResult] = await Promise.all([
     (async () => {
       await request.onProgress?.(15, "Generating portrait preview...");
-      return generatePreviewImage("portrait", request.styleName, request.styleDescription, summary);
+      return generatePreviewImage("portrait", request.styleName, request.styleDescription, summary, analysis);
     })(),
     (async () => {
       await request.onProgress?.(30, "Generating landscape preview...");
-      return generatePreviewImage("landscape", request.styleName, request.styleDescription, summary);
+      return generatePreviewImage("landscape", request.styleName, request.styleDescription, summary, analysis);
     })(),
     (async () => {
       await request.onProgress?.(45, "Generating still life preview...");
-      return generatePreviewImage("stillLife", request.styleName, request.styleDescription, summary);
+      return generatePreviewImage("stillLife", request.styleName, request.styleDescription, summary, analysis);
     })(),
   ]);
   
