@@ -712,6 +712,88 @@ export async function registerRoutes(
     }
   });
 
+  // Style Consultant - analyze project description and recommend styles
+  app.post("/api/styles/consultant", async (req, res) => {
+    try {
+      const { description } = req.body;
+      
+      if (!description || typeof description !== "string" || description.trim().length < 20) {
+        return res.status(400).json({
+          error: "Please provide a project description of at least 20 characters",
+        });
+      }
+
+      const { analyzeProjectDescription, convertRecommendationToTokens } = await import("./style-consultant");
+      
+      const recommendation = await analyzeProjectDescription(description.trim());
+      
+      const tokens = convertRecommendationToTokens(recommendation.tokenSuggestions);
+
+      res.json({
+        success: true,
+        recommendation,
+        generatedTokens: tokens,
+      });
+    } catch (error) {
+      console.error("Style consultant error:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Failed to analyze project description",
+      });
+    }
+  });
+
+  // Create style from consultant recommendations
+  app.post("/api/styles/consultant/generate", async (req, res) => {
+    try {
+      const { analysis, tokenSuggestions, promptScaffolding, name, description } = req.body;
+      
+      if (!analysis || !tokenSuggestions) {
+        return res.status(400).json({
+          error: "Missing required recommendation data",
+        });
+      }
+
+      const { convertRecommendationToTokens } = await import("./style-consultant");
+      const tokens = convertRecommendationToTokens(tokenSuggestions);
+
+      const styleName = name || analysis.aestheticStyle || `${analysis.domain} Style`;
+      const styleDescription = description || analysis.summary || `A style designed for ${analysis.domain} applications.`;
+
+      const styleData = {
+        name: styleName,
+        description: styleDescription,
+        tokens,
+        promptScaffolding: promptScaffolding || {
+          base: "",
+          modifiers: [],
+          negative: "",
+        },
+        metadataTags: {
+          ...getDefaultMetadataTags(),
+          mood: analysis.mood || [],
+          keywords: analysis.keywords || [],
+        },
+        referenceImages: [],
+        previews: {
+          stillLife: "",
+          landscape: "",
+          portrait: "",
+        },
+      };
+
+      res.json({
+        success: true,
+        style: styleData,
+        message: `Generated style from consultant analysis: ${styleName}`,
+      });
+    } catch (error) {
+      console.error("Style generation from consultant error:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Failed to generate style from recommendations",
+      });
+    }
+  });
+
   // Create a new style
   app.post("/api/styles", async (req, res) => {
     try {
