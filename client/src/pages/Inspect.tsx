@@ -4,17 +4,19 @@ import { Layout } from "@/components/layout";
 import { TokenViewer } from "@/components/token-viewer";
 import { ColorPaletteSwatches } from "@/components/color-palette-swatches";
 import { StyleSpecEditor } from "@/components/style-spec-editor";
-import { ArrowLeft, ArrowRight, Download, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Share2, Check, Copy, Bookmark, Star, User, FolderPlus, Folder, Plus, FileCode, FileJson, Paintbrush, History, RotateCcw, Save, Sparkles, X, ChevronLeft, ChevronRight, Palette } from "lucide-react";
+import { ArrowLeft, ArrowRight, Download, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Share2, Check, Copy, Bookmark, Star, User, FolderPlus, Folder, Plus, FileCode, FileJson, Paintbrush, History, RotateCcw, Save, Sparkles, X, ChevronLeft, ChevronRight, Palette, FileText } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { AiMoodBoard } from "@/components/ai-mood-board";
 import { ExportDialog } from "@/components/export-dialog";
+import { TokenVisualization } from "@/components/token-visualization";
 import { DeployDialog } from "@/components/deploy-dialog";
 import { DesignToolSync } from "@/components/DesignToolSync";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/use-auth";
+import { generateBrandKitPDF } from "@/lib/pdf-export";
 
 interface StyleSummary {
   id: string;
@@ -125,6 +127,9 @@ export default function Inspect() {
   const [versionsLoading, setVersionsLoading] = useState(false);
   const [revertingVersion, setRevertingVersion] = useState<string | null>(null);
   const [savingVersion, setSavingVersion] = useState(false);
+  
+  // PDF Export
+  const [pdfExporting, setPdfExporting] = useState(false);
   
   // Try It Now - Image Generation
   const [tryItOpen, setTryItOpen] = useState(false);
@@ -1146,6 +1151,12 @@ export default ${safeName};`;
                   Source
                 </div>
               </>
+            ) : summary.tokens ? (
+              <TokenVisualization 
+                tokens={summary.tokens} 
+                compact={true}
+                className="absolute inset-0"
+              />
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
                 No source image
@@ -1257,6 +1268,29 @@ export default ${safeName};`;
               </button>
             }
           />
+          
+          {/* PDF Brand Kit */}
+          <button 
+            onClick={async () => {
+              setPdfExporting(true);
+              try {
+                await generateBrandKitPDF({
+                  name: summary.name,
+                  description: summary.description,
+                  tokens: summary.tokens,
+                  metadataTags: summary.metadataTags,
+                });
+              } finally {
+                setPdfExporting(false);
+              }
+            }}
+            disabled={pdfExporting}
+            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 border border-border bg-muted/50 hover:bg-muted rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+            data-testid="button-pdf-export"
+          >
+            {pdfExporting ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
+            Brand Kit
+          </button>
           
           {/* Deploy */}
           <DeployDialog 
