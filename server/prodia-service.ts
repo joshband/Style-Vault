@@ -40,7 +40,7 @@ export async function generateWithFluxSchnell(
   try {
     const client = getClient();
     
-    const config: Record<string, unknown> = {
+    const config: Record<string, string | number | boolean> = {
       prompt: options.prompt,
     };
     
@@ -50,7 +50,7 @@ export async function generateWithFluxSchnell(
 
     const job = await client.job({
       type: "inference.flux.schnell.txt2img.v1",
-      config,
+      config: config as Record<string, string | number | boolean>,
     });
 
     const imageBuffer = await job.arrayBuffer();
@@ -93,7 +93,7 @@ export async function generateWithFluxDev(
   try {
     const client = getClient();
     
-    const config: Record<string, unknown> = {
+    const config: Record<string, string | number | boolean> = {
       prompt: options.prompt,
     };
     
@@ -103,7 +103,7 @@ export async function generateWithFluxDev(
 
     const job = await client.job({
       type: "inference.flux.dev.txt2img.v1",
-      config,
+      config: config as Record<string, string | number | boolean>,
     });
 
     const imageBuffer = await job.arrayBuffer();

@@ -1650,6 +1650,71 @@ export async function registerRoutes(
     }
   });
 
+  // Fast image generation with Prodia (Flux Schnell - ~200ms)
+  app.post("/api/generate/prodia", async (req, res) => {
+    try {
+      const { prompt, seed, styleId } = req.body;
+
+      if (!prompt) {
+        return res.status(400).json({ error: "Prompt is required" });
+      }
+
+      const { isProdiaEnabled, generateWithFluxSchnell } = await import("./prodia-service");
+
+      if (!isProdiaEnabled()) {
+        return res.status(503).json({
+          error: "Prodia is not configured",
+          message: "PRODIA_TOKEN environment variable is not set",
+        });
+      }
+
+      // If styleId provided, enhance prompt with style tokens
+      let enhancedPrompt = prompt;
+      if (styleId) {
+        const style = await storage.getStyleById(styleId);
+        if (style && style.promptScaffolding) {
+          enhancedPrompt = `${style.promptScaffolding}\n\n${prompt}`;
+        }
+      }
+
+      const result = await generateWithFluxSchnell({
+        prompt: enhancedPrompt,
+        seed: seed ? parseInt(seed, 10) : undefined,
+      });
+
+      if (!result.success) {
+        return res.status(500).json({
+          error: "Generation failed",
+          message: result.error,
+        });
+      }
+
+      res.json({
+        imageBase64: result.imageBase64,
+        processingTimeMs: result.processingTimeMs,
+        seed: result.seed,
+        model: "flux-schnell",
+      });
+    } catch (error) {
+      console.error("Error in Prodia generation:", error);
+      res.status(500).json({
+        error: "Failed to generate image",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // Check Prodia status
+  app.get("/api/prodia-status", async (req, res) => {
+    const { isProdiaEnabled } = await import("./prodia-service");
+    res.json({
+      enabled: isProdiaEnabled(),
+      message: isProdiaEnabled()
+        ? "Prodia is configured and ready"
+        : "Prodia is not configured. Set PRODIA_TOKEN to enable fast generation.",
+    });
+  });
+
   // Get all generated images (admin only)
   app.get("/api/generated-images", async (req, res) => {
     try {
