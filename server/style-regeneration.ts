@@ -75,12 +75,14 @@ function computeHash(data: string): string {
 }
 
 function computeTokenDiff(before: Record<string, any>, after: Record<string, any>): { added: string[]; removed: string[]; modified: string[] } {
-  const beforeKeys = new Set(Object.keys(flattenObject(before)));
-  const afterKeys = new Set(Object.keys(flattenObject(after)));
+  const beforeFlat = flattenObject(before);
+  const afterFlat = flattenObject(after);
+  const beforeKeys = new Set(Object.keys(beforeFlat));
+  const afterKeys = new Set(Object.keys(afterFlat));
   
   const added = Array.from(afterKeys).filter(k => !beforeKeys.has(k));
   const removed = Array.from(beforeKeys).filter(k => !afterKeys.has(k));
-  const modified = Array.from(beforeKeys).filter(k => afterKeys.has(k) && JSON.stringify(before[k]) !== JSON.stringify(after[k]));
+  const modified = Array.from(beforeKeys).filter(k => afterKeys.has(k) && JSON.stringify(beforeFlat[k]) !== JSON.stringify(afterFlat[k]));
   
   return { added, removed, modified };
 }
