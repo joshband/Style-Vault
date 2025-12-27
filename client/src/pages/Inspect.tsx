@@ -4,7 +4,7 @@ import { Layout } from "@/components/layout";
 import { TokenViewer } from "@/components/token-viewer";
 import { ColorPaletteSwatches } from "@/components/color-palette-swatches";
 import { StyleSpecEditor } from "@/components/style-spec-editor";
-import { ArrowLeft, ArrowRight, Download, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Share2, Check, Copy, Bookmark, Star, User, FolderPlus, Folder, Plus, FileCode, FileJson, Paintbrush, History, RotateCcw, Save, Sparkles, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, Download, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Share2, Check, Copy, Bookmark, Star, User, FolderPlus, Folder, Plus, FileCode, FileJson, Paintbrush, History, RotateCcw, Save, Sparkles, X, ChevronLeft, ChevronRight, Palette } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
@@ -12,6 +12,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { AiMoodBoard } from "@/components/ai-mood-board";
 import { ExportDialog } from "@/components/export-dialog";
 import { DeployDialog } from "@/components/deploy-dialog";
+import { DesignToolSync } from "@/components/DesignToolSync";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/use-auth";
 
 interface StyleSummary {
@@ -1255,6 +1257,25 @@ export default ${safeName};`;
               </button>
             }
           />
+          
+          {/* Design Tools */}
+          <Dialog>
+            <DialogTrigger asChild>
+              <button 
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 border border-border bg-muted/50 hover:bg-muted rounded-lg text-sm font-medium transition-colors"
+                data-testid="button-design-tools"
+              >
+                <Palette size={16} />
+                Figma/XD
+              </button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl p-0 overflow-hidden">
+              <DesignToolSync 
+                styleName={summary.name}
+                tokens={summary.tokens}
+              />
+            </DialogContent>
+          </Dialog>
           
           {/* Remix / Apply */}
           <Button
