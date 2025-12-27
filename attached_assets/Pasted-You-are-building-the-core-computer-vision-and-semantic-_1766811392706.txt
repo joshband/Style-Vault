@@ -1,0 +1,271 @@
+You are building the core computer-vision and semantic extraction pipeline for Visual DNA Studio.
+
+Context:
+- Visual DNA Studio translates raw visual inputs (images + prompts) into reusable design systems.
+- This is a 1 → many system: one input produces tokens, components, variants, and semantic layers.
+- Design tokens must conform to W3C DTCG 2025.10.
+- Components, mood, lighting, motion, depth, and material are NOT part of DTCG and must be modeled separately.
+- Use open-source models only.
+- Execution is offloaded to hosted backends (GCP-compatible).
+- Input is static 2D images only.
+
+Your task is to scaffold a **modular extraction pipeline** that covers:
+
+1) CV-based token extraction
+2) UI component detection & schema generation
+3) Semantic style & mood inference
+4) Image layering & material analysis
+5) Lighting & shadow inference
+6) 2D → depth estimation (Depth Anything V2)
+7) Motion / animation recommendation
+8) Unified normalization & output assembly
+
+DO NOT implement exporters or UI.
+DO NOT add decorative branding.
+DO NOT collapse everything into a single monolith.
+
+---------------------------------------
+ARCHITECTURE REQUIREMENTS
+---------------------------------------
+
+• Implement the pipeline as distinct, composable stages.
+• Each stage must:
+  - Accept structured input
+  - Produce structured JSON output
+  - Be independently replaceable
+• Provide a coordinator that runs stages sequentially and aggregates results.
+
+Recommended structure:
+
+/pipeline
+  /ingest
+  /preprocess
+  /extract
+    /color
+    /layout
+    /typography
+    /components
+    /depth
+    /lighting
+    /materials
+    /semantics
+    /motion
+  /normalize
+  /assemble
+  /schemas
+  /api
+
+---------------------------------------
+STAGE 0 — INGESTION & PREPROCESSING
+---------------------------------------
+
+Create an ingestion module that:
+- Accepts PNG/JPG/WebP images
+- Normalizes color space to sRGB
+- Resizes to multiple resolutions
+- Generates a stable image hash
+- Stores original and derived assets (no UI)
+
+Output:
+{
+  "imageId": "...",
+  "originalPath": "...",
+  "sizes": {...},
+  "hash": "..."
+}
+
+---------------------------------------
+STAGE 1 — PRIMITIVE CV EXTRACTION
+---------------------------------------
+
+A) Color primitives
+- Cluster dominant colors (k-means or median cut)
+- Extract frequency + spatial weighting
+- Output raw palette (no naming)
+
+B) Geometry & layout primitives
+- Detect bounding boxes and alignment
+- Identify repeated spacing distances
+- Infer grid rhythm (if any)
+
+C) Typography primitives
+- Detect text regions (OCR)
+- Estimate font sizes & hierarchy
+- Capture relative scale (no font naming)
+
+Use open-source CV tools only.
+
+---------------------------------------
+STAGE 2 — DEPTH ESTIMATION (Depth Anything V2)
+---------------------------------------
+
+Integrate Depth Anything V2 as a dedicated module.
+
+- Accept preprocessed image
+- Produce a normalized depth map
+- Save:
+  - 16-bit PNG depth image
+  - JSON depth grid (normalized floats)
+
+Output:
+{
+  "depthMapPath": "...",
+  "depthStats": {...}
+}
+
+---------------------------------------
+STAGE 3 — COMPONENT DETECTION
+---------------------------------------
+
+Using segmentation (e.g. SAM-like output or region proposals):
+
+- Identify UI-like regions
+- Classify regions into:
+  Button, Input, Card, Nav, TextBlock, Image, Icon, Unknown
+- Use CLIP-based classification or heuristic rules
+
+Output:
+{
+  "regions": [
+    {
+      "id": "...",
+      "bbox": [...],
+      "maskPath": "...",
+      "componentType": "...",
+      "confidence": 0.87
+    }
+  ]
+}
+
+---------------------------------------
+STAGE 4 — COMPONENT SCHEMA GENERATION
+---------------------------------------
+
+Generate a **Component Schema JSON** (non-DTCG):
+
+For each detected component:
+- Name
+- Semantic role
+- Token bindings (by reference)
+- Variants (size/state)
+- Behavior hints (hover, press)
+
+Output must validate against a JSON Schema you define.
+
+---------------------------------------
+STAGE 5 — STYLE, MOOD & ARTISTIC INFERENCE
+---------------------------------------
+
+Create a semantic inference module using:
+- CLIP embeddings
+- BLIP image captioning
+- A curated style taxonomy
+
+Produce:
+- Art/style tags (e.g. brutalist, minimalist, neon)
+- Mood descriptors (e.g. somber, energetic)
+- A numeric style vector (for search/reco)
+
+Output:
+{
+  "styleTags": [...],
+  "mood": {...},
+  "embedding": [...]
+}
+
+---------------------------------------
+STAGE 6 — LAYERING, MATERIAL & TEXTURE
+---------------------------------------
+
+Using segmentation + depth:
+
+- Infer foreground / midground / background layers
+- Extract texture descriptors (frequency analysis, Gabor filters)
+- Classify material feel:
+  matte, glossy, metallic, fabric, glass
+
+Output:
+{
+  "layers": [...],
+  "materials": {...}
+}
+
+---------------------------------------
+STAGE 7 — LIGHTING & SHADOW INFERENCE
+---------------------------------------
+
+Analyze:
+- Shadow direction & intensity
+- Highlight spread
+- Contrast gradients
+
+Use:
+- Image gradients
+- Depth cues (if available)
+
+Output:
+{
+  "lighting": {
+    "direction": "...",
+    "shadowIntensity": 0.8,
+    "highlightStrength": 0.5
+  }
+}
+
+---------------------------------------
+STAGE 8 — MOTION / ANIMATION RECOMMENDATION
+---------------------------------------
+
+Create a heuristic-based motion engine that:
+
+- Suggests micro-interactions per component type
+- Outputs motion tokens:
+  type, duration, easing, trigger
+
+Example:
+{
+  "component": "Button",
+  "motion": {
+    "type": "scale",
+    "duration": 160,
+    "easing": "easeOut"
+  }
+}
+
+---------------------------------------
+NORMALIZATION & OUTPUT ASSEMBLY
+---------------------------------------
+
+Finally, assemble a unified output:
+
+{
+  "tokens": { ...DTCG compliant... },
+  "components": { ... },
+  "style": { ... },
+  "layers": { ... },
+  "depth": { ... },
+  "lighting": { ... },
+  "materials": { ... },
+  "motion": { ... }
+}
+
+• DTCG tokens MUST be valid 2025.10
+• All non-token data lives outside tokens
+• Preserve lineage and extensibility
+
+---------------------------------------
+DELIVERABLES
+---------------------------------------
+
+1) Modular code scaffold
+2) JSON schemas for:
+   - Tokens
+   - Components
+   - Layers
+   - Motion
+3) Example outputs
+4) Clear module boundaries
+5) GCP-deployable service structure
+
+Do not optimize prematurely.
+Clarity and replaceability matter more than speed.
