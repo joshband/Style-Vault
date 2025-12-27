@@ -24,6 +24,7 @@ Preferred communication style: Simple, everyday language.
 - **One-Click Deploy**: Supports deployment to Vercel and Netlify by generating platform-specific configurations and bundling necessary assets.
 - **Async Job Orchestration**: A robust system (`server/job-runner.ts`) manages long-running operations like token_extraction, image_generation, and metadata_enrichment with retry logic and backoff.
 - **Node.js-to-Python Pipeline Integration**: A bridge (`server/pipeline-bridge.ts`) facilitates communication with a Python backend for advanced CV, validation, and semantic search capabilities.
+- **Component + Material Intelligence Pipeline**: CV-based system for detecting UI components (buttons, sliders, knobs, cards) and extracting material/texture signals (translucency, specular, emission, grain, microcontrast). Features a library of 12 material recipes (glassmorphic, anodized metal, soft plastic, neon, etc.) with confidence-scored matching. Optional Gemini AI semantic classification for enhanced component labeling.
 
 ### Feature Specifications
 - **User Features**: Bookmarking, 1-5 star ratings and reviews, creator-linked style galleries, public/private style visibility, and protected routes requiring authentication.
@@ -37,7 +38,8 @@ Preferred communication style: Simple, everyday language.
 - **Prompt Scaffolding**: Structured prompts derived from tokens ensure consistent application of styles in AI generation.
 - **Job-Based Async Operations**: Guarantees reliability for long-running and resource-intensive tasks.
 - **Pluggable Storage**: Utilizes in-memory storage for development and production-ready interfaces for cloud services.
-- **Python Pipeline Backend**: Modular Python services for advanced functionalities like DTCG validation, canonical assembly, semantic search, and safety hardening.
+- **Python Pipeline Backend**: Modular Python services for advanced functionalities like DTCG validation, canonical assembly, semantic search, safety hardening, and material intelligence.
+- **Material Intelligence Panel**: Interactive UI component in the Style Inspector for analyzing material properties, viewing detected components, and exploring matched recipes with layer topology and interaction bindings.
 
 ## External Dependencies
 
