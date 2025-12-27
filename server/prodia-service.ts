@@ -49,7 +49,7 @@ export async function generateWithFluxSchnell(
     }
 
     const job = await client.job({
-      type: "inference.flux.schnell.txt2img.v1",
+      type: "inference.flux-fast.schnell.txt2img.v1",
       config: config as Record<string, string | number | boolean>,
     });
 
