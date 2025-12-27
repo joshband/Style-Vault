@@ -17,6 +17,7 @@ import { DesignToolSync } from "@/components/DesignToolSync";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/use-auth";
 import { generateBrandKitPDF } from "@/lib/pdf-export";
+import { toast } from "sonner";
 
 interface StyleSummary {
   id: string;
@@ -1280,6 +1281,10 @@ export default ${safeName};`;
                   tokens: summary.tokens,
                   metadataTags: summary.metadataTags,
                 });
+                toast.success("Brand Kit PDF downloaded!");
+              } catch (error) {
+                console.error("PDF export error:", error);
+                toast.error("Failed to generate PDF. Please try again.");
               } finally {
                 setPdfExporting(false);
               }
