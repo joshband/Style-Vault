@@ -4,13 +4,20 @@ import { cn } from "@/lib/utils";
 import { DTCGTokenGroup, DesignToken } from "@/lib/store";
 
 interface TokenViewerProps {
-  tokens: DTCGTokenGroup;
+  tokens: DTCGTokenGroup | null | undefined;
   className?: string;
   expandable?: boolean;
   showExport?: boolean;
 }
 
 export function TokenViewer({ tokens, className, expandable = false, showExport = false }: TokenViewerProps) {
+  if (!tokens || typeof tokens !== "object") {
+    return (
+      <div className={cn("font-mono text-xs bg-muted/30 border border-border rounded-md p-4 text-muted-foreground", className)}>
+        No design tokens available
+      </div>
+    );
+  }
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async (e: React.MouseEvent) => {

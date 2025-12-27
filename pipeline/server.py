@@ -216,11 +216,32 @@ class PipelineHandler(BaseHTTPRequestHandler):
         pass
 
 
+def is_port_in_use(port: int) -> bool:
+    """Check if a port is already in use."""
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            s.bind(("127.0.0.1", port))
+            return False
+        except OSError:
+            return True
+
+
 def run_server(port: int = 8765):
     """Run the pipeline HTTP server."""
-    server = HTTPServer(("127.0.0.1", port), PipelineHandler)
-    print(f"[Pipeline Server] Running on http://127.0.0.1:{port}")
-    server.serve_forever()
+    if is_port_in_use(port):
+        print(f"[Pipeline Server] Port {port} already in use, assuming another instance is running")
+        return
+    
+    try:
+        server = HTTPServer(("127.0.0.1", port), PipelineHandler)
+        print(f"[Pipeline Server] Running on http://127.0.0.1:{port}")
+        server.serve_forever()
+    except OSError as e:
+        if "Address already in use" in str(e):
+            print(f"[Pipeline Server] Port {port} already in use, skipping")
+        else:
+            raise
 
 
 if __name__ == "__main__":

@@ -80,7 +80,7 @@ function ColorSwatch({ name, hex, usage }: ColorSwatchProps) {
 }
 
 interface ColorPaletteSwatchesProps {
-  tokens: DTCGTokenGroup;
+  tokens: DTCGTokenGroup | null | undefined;
   className?: string;
 }
 
@@ -101,8 +101,10 @@ const COLOR_USAGE_MAP: Record<string, string> = {
   info: "Info",
 };
 
-function extractColors(tokens: DTCGTokenGroup): { name: string; hex: string; usage: string }[] {
+function extractColors(tokens: DTCGTokenGroup | null | undefined): { name: string; hex: string; usage: string }[] {
   const colors: { name: string; hex: string; usage: string }[] = [];
+  if (!tokens || typeof tokens !== "object") return colors;
+  
   const seenKeys = new Set<string>();
   
   const colorGroup = tokens.color;
