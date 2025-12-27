@@ -395,3 +395,53 @@ export const insertObjectAssetSchema = createInsertSchema(objectAssets).omit({
 
 export type InsertObjectAsset = z.infer<typeof insertObjectAssetSchema>;
 export type ObjectAsset = typeof objectAssets.$inferSelect;
+
+// Admin metrics table - tracks performance metrics for operations
+export type MetricType = 
+  | "token_extraction"
+  | "preview_generation"
+  | "mood_board_generation"
+  | "ui_concepts_generation"
+  | "metadata_enrichment"
+  | "image_storage"
+  | "style_creation"
+  | "style_regeneration";
+
+export const adminMetrics = pgTable("admin_metrics", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  type: text("type").$type<MetricType>().notNull(),
+  styleId: varchar("style_id"),
+  durationMs: integer("duration_ms").notNull(),
+  inputSizeBytes: integer("input_size_bytes"),
+  outputSizeBytes: integer("output_size_bytes"),
+  aiModel: text("ai_model"),
+  success: boolean("success").default(true).notNull(),
+  errorMessage: text("error_message"),
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertAdminMetricSchema = createInsertSchema(adminMetrics).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAdminMetric = z.infer<typeof insertAdminMetricSchema>;
+export type AdminMetric = typeof adminMetrics.$inferSelect;
+
+// Feature toggles table - controls feature flags and configuration
+export const featureToggles = pgTable("feature_toggles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  key: text("key").notNull().unique(),
+  enabled: boolean("enabled").default(true).notNull(),
+  value: jsonb("value").$type<Record<string, any>>(),
+  description: text("description"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertFeatureToggleSchema = createInsertSchema(featureToggles).omit({
+  id: true,
+});
+
+export type InsertFeatureToggle = z.infer<typeof insertFeatureToggleSchema>;
+export type FeatureToggle = typeof featureToggles.$inferSelect;

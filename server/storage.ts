@@ -1,4 +1,4 @@
-import { type Style, type InsertStyle, type GeneratedImage, type InsertGeneratedImage, type MoodBoardAssets, type UiConceptAssets, type MetadataTags, type MetadataEnrichmentStatus, type Job, type InsertJob, type JobStatus, type JobType, type Batch, type InsertBatch, type StyleSpec, type ImageAssetType, type Bookmark, type InsertBookmark, type Rating, type InsertRating, type Collection, type InsertCollection, type CollectionItem, type InsertCollectionItem, type StyleVersion, type InsertStyleVersion, type VersionChangeType, styles, generatedImages, jobs, batches, imageAssets, objectAssets, bookmarks, ratings, collections, collectionItems, styleVersions } from "@shared/schema";
+import { type Style, type InsertStyle, type GeneratedImage, type InsertGeneratedImage, type MoodBoardAssets, type UiConceptAssets, type MetadataTags, type MetadataEnrichmentStatus, type Job, type InsertJob, type JobStatus, type JobType, type Batch, type InsertBatch, type StyleSpec, type ImageAssetType, type Bookmark, type InsertBookmark, type Rating, type InsertRating, type Collection, type InsertCollection, type CollectionItem, type InsertCollectionItem, type StyleVersion, type InsertStyleVersion, type VersionChangeType, type AdminMetric, type InsertAdminMetric, type MetricType, type FeatureToggle, type InsertFeatureToggle, styles, generatedImages, jobs, batches, imageAssets, objectAssets, bookmarks, ratings, collections, collectionItems, styleVersions, adminMetrics, featureToggles } from "@shared/schema";
 import { users } from "@shared/models/auth";
 import { db } from "./db";
 import { eq, desc, asc, and, or, inArray, sql, gt, lt } from "drizzle-orm";
@@ -126,6 +126,29 @@ export interface IStorage {
 
   // Navigation operations
   getStyleNeighbors(styleId: string): Promise<{ prevId: string | null; nextId: string | null }>;
+
+  // Admin metrics operations
+  recordMetric(metric: InsertAdminMetric): Promise<AdminMetric>;
+  getMetrics(options?: { type?: MetricType; styleId?: string; limit?: number; since?: Date }): Promise<AdminMetric[]>;
+  getMetricsSummary(): Promise<{
+    totalOperations: number;
+    averageDurationMs: number;
+    successRate: number;
+    byType: Record<string, { count: number; avgDurationMs: number; successRate: number }>;
+    last24Hours: { count: number; avgDurationMs: number };
+  }>;
+
+  // Feature toggle operations
+  getFeatureToggle(key: string): Promise<FeatureToggle | undefined>;
+  getAllFeatureToggles(): Promise<FeatureToggle[]>;
+  setFeatureToggle(key: string, enabled: boolean, value?: Record<string, any>): Promise<FeatureToggle>;
+  isFeatureEnabled(key: string): Promise<boolean>;
+
+  // Style batch operations for admin
+  getStylesByIds(ids: string[]): Promise<Style[]>;
+  getStylesByNames(names: string[]): Promise<Style[]>;
+  getAllStyleIds(): Promise<string[]>;
+  updateStyleFull(id: string, updates: Partial<InsertStyle>): Promise<Style | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1255,6 +1278,132 @@ export class DatabaseStorage implements IStorage {
       prevId: prevStyle?.id || null,
       nextId: nextStyle?.id || null,
     };
+  }
+
+  // Admin metrics operations
+  async recordMetric(metric: InsertAdminMetric): Promise<AdminMetric> {
+    const [created] = await db.insert(adminMetrics).values(metric).returning();
+    return created;
+  }
+
+  async getMetrics(options?: { type?: MetricType; styleId?: string; limit?: number; since?: Date }): Promise<AdminMetric[]> {
+    const conditions: any[] = [];
+    
+    if (options?.type) {
+      conditions.push(eq(adminMetrics.type, options.type));
+    }
+    if (options?.styleId) {
+      conditions.push(eq(adminMetrics.styleId, options.styleId));
+    }
+    if (options?.since) {
+      conditions.push(gt(adminMetrics.createdAt, options.since));
+    }
+
+    let query = db.select().from(adminMetrics);
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    
+    return query.orderBy(desc(adminMetrics.createdAt)).limit(options?.limit || 100);
+  }
+
+  async getMetricsSummary(): Promise<{
+    totalOperations: number;
+    averageDurationMs: number;
+    successRate: number;
+    byType: Record<string, { count: number; avgDurationMs: number; successRate: number }>;
+    last24Hours: { count: number; avgDurationMs: number };
+  }> {
+    const allMetrics = await db.select().from(adminMetrics);
+    const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    
+    const totalOperations = allMetrics.length;
+    const totalDuration = allMetrics.reduce((sum, m) => sum + m.durationMs, 0);
+    const successCount = allMetrics.filter(m => m.success).length;
+    
+    const byType: Record<string, { count: number; avgDurationMs: number; successRate: number }> = {};
+    for (const metric of allMetrics) {
+      if (!byType[metric.type]) {
+        byType[metric.type] = { count: 0, avgDurationMs: 0, successRate: 0 };
+      }
+      byType[metric.type].count++;
+    }
+    
+    for (const type of Object.keys(byType)) {
+      const typeMetrics = allMetrics.filter(m => m.type === type);
+      const typeDuration = typeMetrics.reduce((sum, m) => sum + m.durationMs, 0);
+      const typeSuccess = typeMetrics.filter(m => m.success).length;
+      byType[type].avgDurationMs = Math.round(typeDuration / typeMetrics.length);
+      byType[type].successRate = typeMetrics.length > 0 ? typeSuccess / typeMetrics.length : 0;
+    }
+    
+    const recent = allMetrics.filter(m => new Date(m.createdAt) > last24h);
+    const recentDuration = recent.reduce((sum, m) => sum + m.durationMs, 0);
+    
+    return {
+      totalOperations,
+      averageDurationMs: totalOperations > 0 ? Math.round(totalDuration / totalOperations) : 0,
+      successRate: totalOperations > 0 ? successCount / totalOperations : 0,
+      byType,
+      last24Hours: {
+        count: recent.length,
+        avgDurationMs: recent.length > 0 ? Math.round(recentDuration / recent.length) : 0,
+      },
+    };
+  }
+
+  // Feature toggle operations
+  async getFeatureToggle(key: string): Promise<FeatureToggle | undefined> {
+    const [toggle] = await db.select().from(featureToggles).where(eq(featureToggles.key, key));
+    return toggle;
+  }
+
+  async getAllFeatureToggles(): Promise<FeatureToggle[]> {
+    return db.select().from(featureToggles).orderBy(asc(featureToggles.key));
+  }
+
+  async setFeatureToggle(key: string, enabled: boolean, value?: Record<string, any>): Promise<FeatureToggle> {
+    const existing = await this.getFeatureToggle(key);
+    if (existing) {
+      const [updated] = await db.update(featureToggles)
+        .set({ enabled, value: value ?? existing.value, updatedAt: new Date() })
+        .where(eq(featureToggles.key, key))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(featureToggles)
+      .values({ key, enabled, value: value ?? {} })
+      .returning();
+    return created;
+  }
+
+  async isFeatureEnabled(key: string): Promise<boolean> {
+    const toggle = await this.getFeatureToggle(key);
+    return toggle?.enabled ?? false;
+  }
+
+  // Style batch operations for admin
+  async getStylesByIds(ids: string[]): Promise<Style[]> {
+    if (ids.length === 0) return [];
+    return db.select().from(styles).where(inArray(styles.id, ids));
+  }
+
+  async getStylesByNames(names: string[]): Promise<Style[]> {
+    if (names.length === 0) return [];
+    return db.select().from(styles).where(inArray(styles.name, names));
+  }
+
+  async getAllStyleIds(): Promise<string[]> {
+    const result = await db.select({ id: styles.id }).from(styles);
+    return result.map(r => r.id);
+  }
+
+  async updateStyleFull(id: string, updates: Partial<InsertStyle>): Promise<Style | undefined> {
+    const [updated] = await db.update(styles)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(styles.id, id))
+      .returning();
+    return updated;
   }
 }
 
