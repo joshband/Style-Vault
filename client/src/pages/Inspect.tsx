@@ -74,6 +74,23 @@ function SectionHeader({ title, description }: { title: string; description?: st
   );
 }
 
+const MAX_SAFE_BASE64_LENGTH = 100000;
+
+function isSafeBase64(src: string | undefined): boolean {
+  if (!src) return false;
+  if (src.startsWith('/api/')) return true;
+  if (src.startsWith('data:') || src.length > 100) {
+    return src.length < MAX_SAFE_BASE64_LENGTH;
+  }
+  return true;
+}
+
+function getSafeImageSrc(imageIdSrc: string | undefined, base64Fallback: string | undefined): string | null {
+  if (imageIdSrc) return imageIdSrc;
+  if (base64Fallback && isSafeBase64(base64Fallback)) return base64Fallback;
+  return null;
+}
+
 function PreviewSkeleton({ aspect }: { aspect: string }) {
   return (
     <div className={`${aspect} bg-muted rounded-lg overflow-hidden border border-border animate-pulse`}>
@@ -1138,73 +1155,91 @@ export default ${safeName};`;
         <section className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Source Image - Trust Signal */}
           <div className="relative aspect-square rounded-lg overflow-hidden border border-border bg-muted">
-            {(summary.imageIds?.reference || (summary.referenceImages && summary.referenceImages.length > 0)) ? (
-              <>
-                <img 
-                  src={summary.imageIds?.reference 
-                    ? `/api/images/${summary.imageIds.reference}?size=medium`
-                    : summary.referenceImages[0]
-                  } 
-                  alt="Source reference"
-                  className="absolute inset-0 w-full h-full object-cover"
-                  loading="eager"
-                  data-testid="img-source-reference"
-                />
-                <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/70 text-white text-[10px] font-mono rounded">
-                  Source
-                </div>
-              </>
-            ) : summary.tokens ? (
-              <TokenVisualization 
-                tokens={summary.tokens} 
-                compact={true}
-                className="absolute inset-0"
-              />
-            ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
-                No source image
-              </div>
-            )}
+            {(() => {
+              const refImageIdSrc = summary.imageIds?.reference 
+                ? `/api/images/${summary.imageIds.reference}?size=medium`
+                : undefined;
+              const refBase64Fallback = summary.referenceImages?.[0];
+              const refSrc = getSafeImageSrc(refImageIdSrc, refBase64Fallback);
+              
+              if (refSrc) {
+                return (
+                  <>
+                    <img 
+                      src={refSrc} 
+                      alt="Source reference"
+                      className="absolute inset-0 w-full h-full object-cover"
+                      loading="eager"
+                      data-testid="img-source-reference"
+                    />
+                    <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/70 text-white text-[10px] font-mono rounded">
+                      Source
+                    </div>
+                  </>
+                );
+              } else if (refBase64Fallback && !isSafeBase64(refBase64Fallback)) {
+                return (
+                  <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
+                    Image too large to display
+                  </div>
+                );
+              } else if (summary.tokens) {
+                return (
+                  <TokenVisualization 
+                    tokens={summary.tokens} 
+                    compact={true}
+                    className="absolute inset-0"
+                  />
+                );
+              } else {
+                return (
+                  <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
+                    No source image
+                  </div>
+                );
+              }
+            })()}
           </div>
           
           {/* Software App UI - Style Output */}
           <div className="relative aspect-square rounded-lg overflow-hidden border border-border bg-muted">
-            {summary.imageIds?.ui_software_app ? (
-              <>
-                <img 
-                  src={`/api/images/${summary.imageIds.ui_software_app}?size=medium`}
-                  alt="Applied UI"
-                  className="absolute inset-0 w-full h-full object-cover"
-                  loading="eager"
-                  data-testid="img-applied-ui"
-                />
-                <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/70 text-white text-[10px] font-mono rounded">
-                  Applied
-                </div>
-              </>
-            ) : assets?.uiConcepts?.softwareApp ? (
-              <>
-                <img 
-                  src={assets.uiConcepts.softwareApp}
-                  alt="Applied UI"
-                  className="absolute inset-0 w-full h-full object-cover"
-                  loading="eager"
-                  data-testid="img-applied-ui"
-                />
-                <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/70 text-white text-[10px] font-mono rounded">
-                  Applied
-                </div>
-              </>
-            ) : assets?.uiConcepts?.status === "generating" || summary.uiConceptsStatus === "generating" ? (
-              <div className="flex items-center justify-center h-full text-muted-foreground text-xs gap-2">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Generating...
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
-                Pending
-              </div>
-            )}
+            {(() => {
+              const uiImageIdSrc = summary.imageIds?.ui_software_app 
+                ? `/api/images/${summary.imageIds.ui_software_app}?size=medium`
+                : undefined;
+              const uiBase64Fallback = assets?.uiConcepts?.softwareApp;
+              const uiSrc = getSafeImageSrc(uiImageIdSrc, uiBase64Fallback);
+              
+              if (uiSrc) {
+                return (
+                  <>
+                    <img 
+                      src={uiSrc}
+                      alt="Applied UI"
+                      className="absolute inset-0 w-full h-full object-cover"
+                      loading="eager"
+                      data-testid="img-applied-ui"
+                    />
+                    <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/70 text-white text-[10px] font-mono rounded">
+                      Applied
+                    </div>
+                  </>
+                );
+              } else if (assets?.uiConcepts?.status === "generating" || summary.uiConceptsStatus === "generating") {
+                return (
+                  <div className="flex items-center justify-center h-full text-muted-foreground text-xs gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Generating...
+                  </div>
+                );
+              } else {
+                return (
+                  <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
+                    Pending
+                  </div>
+                );
+              }
+            })()}
           </div>
         </section>
 
@@ -1385,12 +1420,14 @@ export default ${safeName};`;
               <div className="grid grid-cols-3 gap-2">
                 {['landscape', 'portrait', 'stillLife'].map((type) => {
                   const key = type === 'stillLife' ? 'preview_still_life' : `preview_${type}`;
-                  const imgSrc = summary.imageIds?.[key] 
+                  const imageIdSrc = summary.imageIds?.[key] 
                     ? `/api/images/${summary.imageIds[key]}?size=medium`
-                    : (previews as any)[type];
+                    : undefined;
+                  const base64Fallback = (previews as any)[type];
+                  const imgSrc = getSafeImageSrc(imageIdSrc, base64Fallback);
                   const fullSrc = summary.imageIds?.[key]
                     ? `/api/images/${summary.imageIds[key]}`
-                    : (previews as any)[type];
+                    : (isSafeBase64(base64Fallback) ? base64Fallback : null);
                   return (
                     <div key={type} className="aspect-square bg-muted rounded-lg overflow-hidden border border-border relative group/preview">
                       {imgSrc ? (
@@ -1414,7 +1451,9 @@ export default ${safeName};`;
                           </button>
                         </>
                       ) : (
-                        <div className="flex items-center justify-center h-full text-muted-foreground text-xs capitalize">{type}</div>
+                        <div className="flex items-center justify-center h-full text-muted-foreground text-xs capitalize">
+                          {base64Fallback && !isSafeBase64(base64Fallback) ? 'Preview too large' : type}
+                        </div>
                       )}
                     </div>
                   );
@@ -1649,11 +1688,12 @@ export default ${safeName};`;
           {/* Material Intelligence Panel */}
           <MaterialIntelligencePanel
             styleId={summary.id}
-            referenceImage={
+            referenceImage={getSafeImageSrc(
               summary.imageIds?.reference
                 ? `/api/images/${summary.imageIds.reference}?size=large`
-                : summary.referenceImages?.[0]
-            }
+                : undefined,
+              isSafeBase64(summary.referenceImages?.[0]) ? summary.referenceImages?.[0] : undefined
+            ) || undefined}
           />
         </div>
 
