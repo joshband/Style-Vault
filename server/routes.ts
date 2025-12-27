@@ -22,6 +22,7 @@ import { initializePipelineStorage, getPipelineStorageConfig, pipelineBlobStorag
 import { visionService } from "./vision-service";
 import { analyzeImageCombined, enrichMetadataWithVision } from "./combined-analysis";
 import { generateComprehensiveDTCG } from "./comprehensive-dtcg";
+import { generateRandomStyle } from "./random-style-generator";
 
 function getDefaultMetadataTags(): MetadataTags {
   return {
@@ -673,6 +674,41 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching style assets:", error);
       res.status(500).json({ error: "Failed to fetch style assets" });
+    }
+  });
+
+  // Generate a random style (Surprise Me feature)
+  app.post("/api/styles/random", async (req, res) => {
+    try {
+      const randomStyleData = generateRandomStyle();
+      
+      const styleData = {
+        name: randomStyleData.name,
+        description: randomStyleData.description,
+        tokens: randomStyleData.tokens,
+        promptScaffolding: randomStyleData.promptScaffolding,
+        metadataTags: {
+          ...getDefaultMetadataTags(),
+          ...randomStyleData.metadataTags,
+        },
+        referenceImages: [],
+        previews: {
+          stillLife: "",
+          landscape: "",
+          portrait: "",
+        },
+      };
+      
+      res.json({
+        success: true,
+        style: styleData,
+        message: `Generated random style: ${randomStyleData.name}`,
+      });
+    } catch (error) {
+      console.error("Random style generation error:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Failed to generate random style",
+      });
     }
   });
 

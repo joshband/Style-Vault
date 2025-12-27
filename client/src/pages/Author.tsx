@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Upload, Wand2, ArrowRight, ArrowLeft, Loader2, X, Layers, Check, Sparkles, AlertCircle, RefreshCw, FileJson, ChevronDown } from "lucide-react";
+import { Upload, Wand2, ArrowRight, ArrowLeft, Loader2, X, Layers, Check, Sparkles, AlertCircle, RefreshCw, FileJson, ChevronDown, Shuffle } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { createStyle, SAMPLE_TOKENS } from "@/lib/store";
 import { useToast } from "@/hooks/use-toast";
@@ -10,7 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { detectFormat, importTokens, SUPPORTED_FORMATS, ImportResult, countTokens, TokenStats } from "@/lib/token-importers";
 
 type WizardStep = 1 | 2;
-type InputMode = "image" | "prompt" | "file" | null;
+type InputMode = "image" | "prompt" | "file" | "random" | null;
 type ErrorType = "ai_unavailable" | "cv_disabled" | "network" | "unknown" | null;
 
 interface AuthorError {
@@ -144,6 +144,7 @@ export default function Author() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isGeneratingRandom, setIsGeneratingRandom] = useState(false);
   
   // Error state - preserved across retries
   const [analyzeError, setAnalyzeError] = useState<AuthorError | null>(null);
@@ -410,6 +411,51 @@ export default function Author() {
     if (tokenFileInputRef.current) tokenFileInputRef.current.value = "";
   };
   
+  const handleSurpriseMe = async () => {
+    if (isProcessing) return;
+    
+    setIsGeneratingRandom(true);
+    setAnalyzeError(null);
+    
+    try {
+      const response = await fetch("/api/styles/random", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to generate random style");
+      }
+      
+      const data = await response.json();
+      
+      if (data.success && data.style) {
+        setInputMode("random");
+        setName(data.style.name);
+        setDescription(data.style.description);
+        setImportedTokens(data.style.tokens);
+        
+        toast({
+          title: "Random style generated!",
+          description: `Created "${data.style.name}" - a unique style just for you`,
+        });
+        
+        // Move to step 2
+        setStep(2);
+      }
+    } catch (error) {
+      const classified = classifyError(error, "random style generation");
+      setAnalyzeError(classified);
+      toast({
+        title: "Generation failed",
+        description: classified.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingRandom(false);
+    }
+  };
+  
   const handleTokenFileSelect = async (file: File) => {
     if (isProcessing) return;
     
@@ -631,6 +677,28 @@ export default function Author() {
                       <span className="text-sm font-medium text-center">Import Tokens</span>
                       <span className="text-xs mt-2 opacity-60 text-center">Figma, CSS, DTCG</span>
                     </div>
+                  </div>
+                  
+                  {/* Surprise Me Button */}
+                  <div className="flex justify-center">
+                    <button
+                      onClick={handleSurpriseMe}
+                      disabled={isGeneratingRandom}
+                      className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+                      data-testid="button-surprise-me"
+                    >
+                      {isGeneratingRandom ? (
+                        <>
+                          <Loader2 size={18} className="animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Shuffle size={18} />
+                          Surprise Me
+                        </>
+                      )}
+                    </button>
                   </div>
                   
                   {/* Batch upload link */}
