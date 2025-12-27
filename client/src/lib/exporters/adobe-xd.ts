@@ -9,28 +9,22 @@
 import type { ExporterDefinition, NormalizedTokenSet, NormalizedToken } from '../token-pipeline';
 import { parseColor } from '../token-pipeline';
 
-interface XDToken {
-  id: string;
+interface XDEntity {
+  class: string;
   type: string;
-  value: unknown;
+  id: string;
   name: string;
+  value: unknown;
+  tags?: string[];
   description?: string;
-  category?: string;
 }
 
-interface XDColorValue {
-  mode: string;
-  value: {
-    r: number;
-    g: number;
-    b: number;
-    a: number;
-  };
-}
-
-interface XDDimensionValue {
-  value: number;
-  unit: string;
+function generateUUID(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
 }
 
 export const exportAdobeXD: ExporterDefinition = {
@@ -49,34 +43,26 @@ export const exportAdobeXD: ExporterDefinition = {
       type: 'boolean',
       default: true,
     },
-    {
-      id: 'flattenGroups',
-      label: 'Flatten token groups',
-      type: 'boolean',
-      default: false,
-    },
   ],
-  export: (tokens: NormalizedTokenSet, options?: Record<string, unknown>): string => {
-    const flattenGroups = options?.flattenGroups ?? false;
-
-    const xdTokens: XDToken[] = [];
-    const categories: Record<string, string[]> = {};
+  export: (tokens: NormalizedTokenSet, _options?: Record<string, unknown>): string => {
+    const entities: XDEntity[] = [];
+    const collections: Record<string, string[]> = {};
 
     for (const token of tokens.tokens) {
-      const xdToken = convertToXDToken(token, flattenGroups as boolean);
-      if (xdToken) {
-        xdTokens.push(xdToken);
+      const entity = convertToXDEntity(token);
+      if (entity) {
+        entities.push(entity);
         
-        const category = token.path[0] || 'other';
-        if (!categories[category]) {
-          categories[category] = [];
+        const collection = token.path[0] || 'general';
+        if (!collections[collection]) {
+          collections[collection] = [];
         }
-        categories[category].push(xdToken.id);
+        collections[collection].push(entity.id);
       }
     }
 
     const dspPackage = {
-      dsp_spec_version: '0.8.0',
+      dsp_spec_version: '0.9.0',
       last_updated_by: 'Visual DNA Studio',
       last_updated: tokens.metadata.exportedAt,
       settings: {
@@ -84,11 +70,13 @@ export const exportAdobeXD: ExporterDefinition = {
         build_status_label: 'Production',
         package_version: '1.0.0',
       },
-      entities: xdTokens,
-      categories: Object.entries(categories).map(([name, tokenIds]) => ({
-        id: `category_${name}`,
+      entities,
+      collections: Object.entries(collections).map(([name, entityIds]) => ({
+        class: 'collection',
+        type: 'token-collection',
+        id: generateUUID(),
         name: name.charAt(0).toUpperCase() + name.slice(1),
-        token_ids: tokenIds,
+        entity_ids: entityIds,
       })),
       fonts: extractFontReferences(tokens),
     };
@@ -97,32 +85,27 @@ export const exportAdobeXD: ExporterDefinition = {
   },
 };
 
-function convertToXDToken(token: NormalizedToken, flatten: boolean): XDToken | null {
-  const id = flatten 
-    ? token.path.join('-').toLowerCase().replace(/[^a-z0-9-]/g, '-')
-    : token.path.join('/');
-  
-  const name = token.path[token.path.length - 1] || id;
+function convertToXDEntity(token: NormalizedToken): XDEntity | null {
+  const id = generateUUID();
+  const name = token.path.join(' / ');
+  const tags = [token.path[0]].filter(Boolean);
 
-  let xdType: string;
-  let xdValue: unknown;
+  let entityType: string;
+  let entityValue: unknown;
 
   switch (token.type) {
     case 'color':
-      xdType = 'color';
+      entityType = 'color';
       const parsed = typeof token.value === 'string' ? parseColor(token.value) : null;
       if (parsed) {
-        xdValue = {
-          mode: 'rgb',
-          value: {
-            r: parsed.r,
-            g: parsed.g,
-            b: parsed.b,
-            a: parsed.a,
-          },
-        } as XDColorValue;
+        entityValue = {
+          a: parsed.a,
+          r: parsed.r,
+          g: parsed.g,
+          b: parsed.b,
+        };
       } else {
-        xdValue = { mode: 'hex', value: token.value };
+        entityValue = { hex: token.value };
       }
       break;
 
@@ -132,88 +115,137 @@ function convertToXDToken(token: NormalizedToken, flatten: boolean): XDToken | n
     case 'borderWidth':
     case 'fontSize':
     case 'lineHeight':
-      xdType = 'size';
+      entityType = 'size';
       const dimValue = String(token.value);
       const numericValue = parseFloat(dimValue.replace(/[^\d.-]/g, '')) || 0;
       const unit = dimValue.replace(/[\d.-]/g, '') || 'px';
-      xdValue = { value: numericValue, unit } as XDDimensionValue;
+      entityValue = {
+        measure: numericValue,
+        unit: unit,
+      };
       break;
 
     case 'fontFamily':
-      xdType = 'font';
-      xdValue = { family: String(token.value) };
+      entityType = 'font-family';
+      entityValue = {
+        family: String(token.value).split(',')[0].trim().replace(/["']/g, ''),
+      };
       break;
 
     case 'fontWeight':
-      xdType = 'fontWeight';
-      xdValue = { weight: String(token.value) };
+      entityType = 'font-weight';
+      const weightValue = String(token.value);
+      const numericWeight = parseInt(weightValue, 10);
+      entityValue = {
+        weight: isNaN(numericWeight) ? weightValue : numericWeight,
+      };
       break;
 
     case 'shadow':
-      xdType = 'shadow';
-      xdValue = parseShadowValue(token.value);
+      entityType = 'shadow';
+      entityValue = parseShadowValue(token.value);
       break;
 
     case 'gradient':
-      xdType = 'gradient';
-      xdValue = parseGradientValue(token.value);
+      entityType = 'gradient';
+      entityValue = parseGradientValue(token.value);
       break;
 
     case 'duration':
-      xdType = 'duration';
+      entityType = 'duration';
       const durationMs = parseDuration(String(token.value));
-      xdValue = { value: durationMs, unit: 'ms' };
+      entityValue = {
+        measure: durationMs,
+        unit: 'ms',
+      };
       break;
 
     case 'cubicBezier':
-      xdType = 'easing';
-      xdValue = { type: 'cubic-bezier', value: token.value };
+      entityType = 'easing';
+      if (Array.isArray(token.value) && token.value.length === 4) {
+        entityValue = {
+          x1: token.value[0],
+          y1: token.value[1],
+          x2: token.value[2],
+          y2: token.value[3],
+        };
+      } else {
+        entityValue = token.value;
+      }
+      break;
+
+    case 'opacity':
+      entityType = 'opacity';
+      const opacityVal = typeof token.value === 'number' ? token.value : parseFloat(String(token.value));
+      entityValue = {
+        value: isNaN(opacityVal) ? 1 : opacityVal,
+      };
       break;
 
     default:
-      xdType = 'custom';
-      xdValue = token.value;
+      entityType = 'custom';
+      entityValue = { raw: token.value };
   }
 
   return {
+    class: 'token',
+    type: entityType,
     id,
-    type: xdType,
-    value: xdValue,
     name,
+    value: entityValue,
+    tags,
     description: token.description || undefined,
-    category: token.path[0],
   };
 }
 
 function parseShadowValue(value: unknown): unknown {
+  if (typeof value === 'object' && value !== null) {
+    const shadow = value as Record<string, unknown>;
+    const parsed = shadow.color && typeof shadow.color === 'string' ? parseColor(shadow.color) : null;
+    return {
+      offsetX: { measure: shadow.offsetX || shadow.x || 0, unit: 'px' },
+      offsetY: { measure: shadow.offsetY || shadow.y || 0, unit: 'px' },
+      blur: { measure: shadow.blur || 0, unit: 'px' },
+      spread: { measure: shadow.spread || 0, unit: 'px' },
+      color: parsed ? { r: parsed.r, g: parsed.g, b: parsed.b, a: parsed.a } : { hex: shadow.color || '#000000' },
+    };
+  }
+  
   if (typeof value === 'string') {
     const parts = value.split(/\s+/);
     const colorMatch = value.match(/(#[0-9A-Fa-f]{3,8}|rgba?\([^)]+\)|hsla?\([^)]+\))/);
+    const colorStr = colorMatch ? colorMatch[0] : '#000000';
+    const parsed = parseColor(colorStr);
     return {
-      offsetX: parseFloat(parts[0]) || 0,
-      offsetY: parseFloat(parts[1]) || 0,
-      blur: parseFloat(parts[2]) || 0,
-      spread: parseFloat(parts[3]) || 0,
-      color: colorMatch ? colorMatch[0] : '#000000',
+      offsetX: { measure: parseFloat(parts[0]) || 0, unit: 'px' },
+      offsetY: { measure: parseFloat(parts[1]) || 0, unit: 'px' },
+      blur: { measure: parseFloat(parts[2]) || 0, unit: 'px' },
+      spread: { measure: parseFloat(parts[3]) || 0, unit: 'px' },
+      color: parsed ? { r: parsed.r, g: parsed.g, b: parsed.b, a: parsed.a } : { hex: colorStr },
     };
   }
+  
   return value;
 }
 
 function parseGradientValue(value: unknown): unknown {
   if (typeof value === 'string') {
-    const linearMatch = value.match(/linear-gradient\(([^)]+)\)/);
+    const linearMatch = value.match(/linear-gradient\(([^,]+),\s*(.+)\)/);
     if (linearMatch) {
       return {
         type: 'linear',
-        value: linearMatch[1],
+        angle: linearMatch[1].trim(),
+        stops: linearMatch[2].split(',').map((stop, i, arr) => ({
+          color: { hex: stop.trim().split(/\s+/)[0] },
+          position: i / Math.max(1, arr.length - 1),
+        })),
       };
     }
     const radialMatch = value.match(/radial-gradient\(([^)]+)\)/);
     if (radialMatch) {
       return {
         type: 'radial',
-        value: radialMatch[1],
+        definition: radialMatch[1],
       };
     }
   }

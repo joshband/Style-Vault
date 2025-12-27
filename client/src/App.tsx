@@ -6,7 +6,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { Spinner } from "@/components/ui/spinner";
+import { initializeExporters } from "@/lib/exporters";
 import NotFound from "@/pages/not-found";
+
+initializeExporters();
 
 const Explore = lazy(() => import("@/pages/Explore"));
 const Inspect = lazy(() => import("@/pages/Inspect"));

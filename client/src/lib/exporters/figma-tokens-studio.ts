@@ -7,7 +7,6 @@
  */
 
 import type { ExporterDefinition, NormalizedTokenSet, NormalizedToken } from '../token-pipeline';
-import { parseColor } from '../token-pipeline';
 
 interface TokensStudioToken {
   value: unknown;
@@ -37,7 +36,7 @@ export const exportFigmaTokensStudio: ExporterDefinition = {
     },
     {
       id: 'includeReferences',
-      label: 'Include alias references',
+      label: 'Preserve alias references (e.g., {color.primary})',
       type: 'boolean',
       default: true,
     },
@@ -101,6 +100,11 @@ function insertTokenInTree(
   current[finalKey] = token;
 }
 
+function isAliasReference(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  return /^\{[^}]+\}$/.test(value);
+}
+
 function convertToTokensStudioToken(
   token: NormalizedToken, 
   includeReferences: boolean
@@ -108,82 +112,100 @@ function convertToTokensStudioToken(
   let tsType: string;
   let tsValue: unknown;
 
+  const rawValue = token.value;
+  
+  if (includeReferences && isAliasReference(rawValue)) {
+    tsValue = rawValue;
+    tsType = mapTokenType(token.type);
+    
+    const result: TokensStudioToken = {
+      value: tsValue,
+      type: tsType,
+    };
+    
+    if (token.description) {
+      result.description = token.description;
+    }
+    
+    return result;
+  }
+
   switch (token.type) {
     case 'color':
       tsType = 'color';
-      tsValue = token.value;
+      tsValue = rawValue;
       break;
 
     case 'dimension':
     case 'spacing':
       tsType = 'dimension';
-      tsValue = String(token.value);
+      tsValue = String(rawValue);
       break;
 
     case 'borderRadius':
       tsType = 'borderRadius';
-      tsValue = String(token.value);
+      tsValue = String(rawValue);
       break;
 
     case 'borderWidth':
       tsType = 'borderWidth';
-      tsValue = String(token.value);
+      tsValue = String(rawValue);
       break;
 
     case 'fontSize':
       tsType = 'fontSizes';
-      tsValue = String(token.value);
+      tsValue = String(rawValue);
       break;
 
     case 'lineHeight':
       tsType = 'lineHeights';
-      tsValue = String(token.value);
+      tsValue = String(rawValue);
       break;
 
     case 'letterSpacing':
       tsType = 'letterSpacing';
-      tsValue = String(token.value);
+      tsValue = String(rawValue);
       break;
 
     case 'fontFamily':
       tsType = 'fontFamilies';
-      tsValue = token.value;
+      tsValue = rawValue;
       break;
 
     case 'fontWeight':
       tsType = 'fontWeights';
-      tsValue = token.value;
+      tsValue = rawValue;
       break;
 
     case 'shadow':
       tsType = 'boxShadow';
-      tsValue = formatShadowForTokensStudio(token.value);
+      tsValue = formatShadowForTokensStudio(rawValue);
       break;
 
     case 'opacity':
       tsType = 'opacity';
-      tsValue = String(token.value);
+      tsValue = String(rawValue);
       break;
 
     case 'duration':
       tsType = 'duration';
-      tsValue = String(token.value);
+      tsValue = String(rawValue);
       break;
 
     case 'cubicBezier':
       tsType = 'easing';
-      tsValue = token.value;
+      tsValue = rawValue;
       break;
 
     case 'composition':
     case 'typography':
       tsType = 'typography';
-      tsValue = formatTypographyForTokensStudio(token.value);
+      tsValue = formatTypographyForTokensStudio(rawValue, includeReferences);
       break;
 
     default:
       tsType = 'other';
-      tsValue = token.value;
+      tsValue = rawValue;
   }
 
   const result: TokensStudioToken = {
@@ -198,15 +220,37 @@ function convertToTokensStudioToken(
   return result;
 }
 
+function mapTokenType(type: string): string {
+  const typeMap: Record<string, string> = {
+    color: 'color',
+    dimension: 'dimension',
+    spacing: 'dimension',
+    borderRadius: 'borderRadius',
+    borderWidth: 'borderWidth',
+    fontSize: 'fontSizes',
+    lineHeight: 'lineHeights',
+    letterSpacing: 'letterSpacing',
+    fontFamily: 'fontFamilies',
+    fontWeight: 'fontWeights',
+    shadow: 'boxShadow',
+    opacity: 'opacity',
+    duration: 'duration',
+    cubicBezier: 'easing',
+    composition: 'typography',
+    typography: 'typography',
+  };
+  return typeMap[type] || 'other';
+}
+
 function formatShadowForTokensStudio(value: unknown): unknown {
   if (typeof value === 'object' && value !== null) {
     const shadow = value as Record<string, unknown>;
     return {
-      x: String(shadow.offsetX || shadow.x || '0'),
-      y: String(shadow.offsetY || shadow.y || '0'),
-      blur: String(shadow.blur || '0'),
-      spread: String(shadow.spread || '0'),
-      color: String(shadow.color || '#000000'),
+      x: String(shadow.offsetX ?? shadow.x ?? '0'),
+      y: String(shadow.offsetY ?? shadow.y ?? '0'),
+      blur: String(shadow.blur ?? '0'),
+      spread: String(shadow.spread ?? '0'),
+      color: String(shadow.color ?? '#000000'),
       type: shadow.inset ? 'innerShadow' : 'dropShadow',
     };
   }
@@ -227,18 +271,44 @@ function formatShadowForTokensStudio(value: unknown): unknown {
   return value;
 }
 
-function formatTypographyForTokensStudio(value: unknown): unknown {
+function formatTypographyForTokensStudio(value: unknown, includeReferences: boolean): unknown {
   if (typeof value === 'object' && value !== null) {
     const typo = value as Record<string, unknown>;
-    return {
-      fontFamily: typo.fontFamily || undefined,
-      fontWeight: typo.fontWeight || undefined,
-      fontSize: typo.fontSize || undefined,
-      lineHeight: typo.lineHeight || undefined,
-      letterSpacing: typo.letterSpacing || undefined,
-      textCase: typo.textCase || typo.textTransform || undefined,
-      textDecoration: typo.textDecoration || undefined,
-    };
+    const result: Record<string, unknown> = {};
+    
+    if (typo.fontFamily !== undefined) {
+      result.fontFamily = includeReferences && isAliasReference(typo.fontFamily) 
+        ? typo.fontFamily 
+        : typo.fontFamily;
+    }
+    if (typo.fontWeight !== undefined) {
+      result.fontWeight = includeReferences && isAliasReference(typo.fontWeight)
+        ? typo.fontWeight
+        : typo.fontWeight;
+    }
+    if (typo.fontSize !== undefined) {
+      result.fontSize = includeReferences && isAliasReference(typo.fontSize)
+        ? typo.fontSize
+        : typo.fontSize;
+    }
+    if (typo.lineHeight !== undefined) {
+      result.lineHeight = includeReferences && isAliasReference(typo.lineHeight)
+        ? typo.lineHeight
+        : typo.lineHeight;
+    }
+    if (typo.letterSpacing !== undefined) {
+      result.letterSpacing = includeReferences && isAliasReference(typo.letterSpacing)
+        ? typo.letterSpacing
+        : typo.letterSpacing;
+    }
+    if (typo.textCase ?? typo.textTransform) {
+      result.textCase = typo.textCase ?? typo.textTransform;
+    }
+    if (typo.textDecoration !== undefined) {
+      result.textDecoration = typo.textDecoration;
+    }
+    
+    return result;
   }
   return value;
 }
