@@ -17,6 +17,7 @@ import {
   type CVCacheType,
   type AnalysisSettings 
 } from './token-cache';
+import { storage } from './storage';
 
 const getModuleDir = (): string => {
   if (typeof import.meta.url !== 'undefined') {
@@ -153,6 +154,12 @@ export async function extractTokensWithCV(imageBase64: string, useCache: boolean
 
       if (code !== 0) {
         console.error('[CV Bridge] Python process failed:', stderr);
+        storage.recordMetric({
+          type: "token_extraction",
+          durationMs: processingTimeMs,
+          success: false,
+          metadata: { extractor: "cv", error: stderr?.slice(0, 200) },
+        }).catch(() => {});
         resolve({
           success: false,
           error: stderr || 'CV extraction failed',
@@ -168,6 +175,13 @@ export async function extractTokensWithCV(imageBase64: string, useCache: boolean
           await setCachedTokens(imageHash, tokens, processingTimeMs);
         }
         
+        storage.recordMetric({
+          type: "token_extraction",
+          durationMs: processingTimeMs,
+          success: true,
+          metadata: { extractor: "cv", tokenCount: Object.keys(tokens).length },
+        }).catch(() => {});
+        
         resolve({
           success: true,
           tokens,
@@ -175,6 +189,12 @@ export async function extractTokensWithCV(imageBase64: string, useCache: boolean
         });
       } catch (parseError) {
         console.error('[CV Bridge] Failed to parse output:', stdout);
+        storage.recordMetric({
+          type: "token_extraction",
+          durationMs: processingTimeMs,
+          success: false,
+          metadata: { extractor: "cv", error: "parse_failure" },
+        }).catch(() => {});
         resolve({
           success: false,
           error: 'Failed to parse CV extraction output',

@@ -189,6 +189,7 @@ function parseEnrichmentResponse(text: string): EnrichmentResult | null {
 }
 
 export async function enrichStyleMetadata(styleId: string): Promise<boolean> {
+  const startTime = Date.now();
   try {
     await storage.updateStyleEnrichmentStatus(styleId, "processing");
     
@@ -212,6 +213,13 @@ export async function enrichStyleMetadata(styleId: string): Promise<boolean> {
     if (!enrichmentResult) {
       console.error(`Failed to parse enrichment for style ${styleId}`);
       await storage.updateStyleEnrichmentStatus(styleId, "failed");
+      storage.recordMetric({
+        type: "metadata_enrichment",
+        styleId,
+        durationMs: Date.now() - startTime,
+        success: false,
+        metadata: { error: "parse_failure" },
+      }).catch(() => {});
       return false;
     }
     
@@ -223,10 +231,26 @@ export async function enrichStyleMetadata(styleId: string): Promise<boolean> {
     
     await storage.updateStyleMetadata(styleId, updatedTags, "complete");
     console.log(`Successfully enriched metadata for style ${styleId}`);
+    
+    storage.recordMetric({
+      type: "metadata_enrichment",
+      styleId,
+      durationMs: Date.now() - startTime,
+      success: true,
+      metadata: { tagCount: Object.keys(enrichmentResult).length },
+    }).catch(() => {});
+    
     return true;
   } catch (error) {
     console.error(`Error enriching style ${styleId}:`, error);
     await storage.updateStyleEnrichmentStatus(styleId, "failed");
+    storage.recordMetric({
+      type: "metadata_enrichment",
+      styleId,
+      durationMs: Date.now() - startTime,
+      success: false,
+      metadata: { error: error instanceof Error ? error.message : "unknown" },
+    }).catch(() => {});
     return false;
   }
 }

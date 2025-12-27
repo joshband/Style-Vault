@@ -1,4 +1,5 @@
 import { generateWithFluxSchnell, isProdiaEnabled, ProdiaGenerationResult } from "./prodia-service";
+import { storage } from "./storage";
 
 type ProgressCallback = (progress: number, message: string) => Promise<void>;
 
@@ -160,6 +161,19 @@ export async function generateCanonicalPreviewsWithProdia(
   
   console.log(`[Prodia] Generated previews in ${result.processingTimeMs}ms`);
   
+  // Record metrics
+  storage.recordMetric({
+    type: "preview_generation",
+    durationMs: result.processingTimeMs,
+    success: !result.allFailed,
+    metadata: { 
+      generator: "prodia",
+      portrait: portraitResult.success,
+      landscape: landscapeResult.success,
+      stillLife: stillLifeResult.success,
+    },
+  }).catch(err => console.error("Failed to record preview metric:", err));
+  
   return result;
 }
 
@@ -184,13 +198,23 @@ export async function generateMoodBoardWithProdia(
   
   await request.onProgress?.(100, "Mood board complete");
   
+  const processingTimeMs = Date.now() - startTime;
+  
+  // Record metrics
+  storage.recordMetric({
+    type: "mood_board_generation",
+    durationMs: processingTimeMs,
+    success: result.success,
+    metadata: { generator: "prodia" },
+  }).catch(err => console.error("Failed to record mood board metric:", err));
+  
   if (!result.success) {
     throw new Error(result.error || "Failed to generate mood board");
   }
   
   return {
     collage: result.imageBase64!,
-    processingTimeMs: Date.now() - startTime,
+    processingTimeMs,
   };
 }
 
@@ -230,11 +254,27 @@ export async function generateUiConceptsWithProdia(
   
   await request.onProgress?.(100, "UI concepts complete");
   
+  const processingTimeMs = Date.now() - startTime;
+  const allSucceeded = softwareAppResult.success && audioPluginResult.success && dashboardResult.success;
+  
+  // Record metrics
+  storage.recordMetric({
+    type: "ui_concept_generation",
+    durationMs: processingTimeMs,
+    success: allSucceeded,
+    metadata: {
+      generator: "prodia",
+      softwareApp: softwareAppResult.success,
+      audioPlugin: audioPluginResult.success,
+      dashboard: dashboardResult.success,
+    },
+  }).catch(err => console.error("Failed to record UI concept metric:", err));
+  
   return {
     softwareApp: softwareAppResult.success ? softwareAppResult.imageBase64 : undefined,
     audioPlugin: audioPluginResult.success ? audioPluginResult.imageBase64 : undefined,
     dashboard: dashboardResult.success ? dashboardResult.imageBase64 : undefined,
-    processingTimeMs: Date.now() - startTime,
+    processingTimeMs,
   };
 }
 

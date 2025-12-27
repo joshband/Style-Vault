@@ -22,10 +22,10 @@ interface MetricsSummary {
 
 interface FeatureToggle {
   id: string;
-  featureKey: string;
+  key: string;
   enabled: boolean;
   description: string | null;
-  configJson: Record<string, unknown> | null;
+  value: Record<string, unknown> | null;
   updatedAt: string;
 }
 
@@ -96,8 +96,8 @@ export default function Admin() {
   });
 
   const toggleFeatureMutation = useMutation({
-    mutationFn: async ({ featureKey, enabled }: { featureKey: string; enabled: boolean }) => {
-      const res = await fetch(`/api/admin/features/${featureKey}`, {
+    mutationFn: async ({ key, enabled }: { key: string; enabled: boolean }) => {
+      const res = await fetch(`/api/admin/features/${key}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ enabled }),
@@ -327,10 +327,10 @@ export default function Admin() {
                     <div 
                       key={feature.id} 
                       className="flex items-center justify-between p-4 rounded-lg border"
-                      data-testid={`feature-row-${feature.featureKey}`}
+                      data-testid={`feature-row-${feature.key}`}
                     >
                       <div className="space-y-1">
-                        <p className="font-medium">{feature.featureKey.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}</p>
+                        <p className="font-medium">{feature.key.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}</p>
                         {feature.description && (
                           <p className="text-sm text-muted-foreground">{feature.description}</p>
                         )}
@@ -342,9 +342,9 @@ export default function Admin() {
                         <Switch
                           checked={feature.enabled}
                           onCheckedChange={(checked) => 
-                            toggleFeatureMutation.mutate({ featureKey: feature.featureKey, enabled: checked })
+                            toggleFeatureMutation.mutate({ key: feature.key, enabled: checked })
                           }
-                          data-testid={`toggle-${feature.featureKey}`}
+                          data-testid={`toggle-${feature.key}`}
                         />
                       </div>
                     </div>
