@@ -24,7 +24,7 @@ interface RegenerateFullRequest {
 
 const ADMIN_USER_IDS = process.env.ADMIN_USER_IDS?.split(",").map(s => s.trim()) || [];
 
-function isAdmin(req: Request, res: Response, next: NextFunction) {
+async function isAdmin(req: Request, res: Response, next: NextFunction) {
   if (!req.isAuthenticated || !req.isAuthenticated()) {
     return res.status(401).json({ error: "Authentication required" });
   }
@@ -34,10 +34,16 @@ function isAdmin(req: Request, res: Response, next: NextFunction) {
     return res.status(401).json({ error: "User not found" });
   }
   
-  if (ADMIN_USER_IDS.length > 0 && !ADMIN_USER_IDS.includes(user.id)) {
-    return res.status(403).json({ error: "Admin access required" });
+  // Check if admin restriction is enabled via feature toggle
+  const adminRestrictionToggle = await storage.getFeatureToggle("admin_restricted_access");
+  const isRestricted = adminRestrictionToggle?.enabled ?? false;
+  
+  // If restricted mode is enabled, check against ADMIN_USER_IDS
+  if (isRestricted && ADMIN_USER_IDS.length > 0 && !ADMIN_USER_IDS.includes(user.id)) {
+    return res.status(403).json({ error: "Admin access required. Your user ID is not in the allowed list." });
   }
   
+  // If not restricted, allow all authenticated users
   next();
 }
 
@@ -47,21 +53,21 @@ export function registerAdminRoutes(app: Express) {
   
   app.get("/api/admin/stats", isAuthenticated, isAdmin, async (_req: Request, res: Response) => {
     try {
-      const allStyles = await storage.getStylesPaginated(1, 10000);
-      const styles = allStyles.styles;
+      const styles: Style[] = await storage.getStyles();
       
       const totalStyles = styles.length;
-      const publicStyles = styles.filter(s => s.isPublic).length;
+      const publicStyles = styles.filter((s: Style) => s.isPublic).length;
       const privateStyles = totalStyles - publicStyles;
-      const pendingEnrichment = styles.filter(s => s.metadataEnrichmentStatus === "pending").length;
+      const pendingEnrichment = styles.filter((s: Style) => s.metadataEnrichmentStatus === "pending").length;
       
       let completedMoodBoards = 0;
       let completedUiConcepts = 0;
       
       for (const style of styles) {
-        const summary = style.assetsSummary as { moodBoardStatus?: string; uiConceptsStatus?: string } | null;
-        if (summary?.moodBoardStatus === "complete") completedMoodBoards++;
-        if (summary?.uiConceptsStatus === "complete") completedUiConcepts++;
+        const moodBoard = style.moodBoard as { status?: string } | null;
+        const uiConcepts = style.uiConcepts as { status?: string } | null;
+        if (moodBoard?.status === "complete") completedMoodBoards++;
+        if (uiConcepts?.status === "complete") completedUiConcepts++;
       }
       
       res.json({
