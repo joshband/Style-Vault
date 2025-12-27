@@ -16,6 +16,7 @@ import { getJobProgress, startJobInBackground } from "./job-runner";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { getCacheStats, getCacheMetrics, resetCacheMetrics } from "./token-cache";
+import { registerAdminRoutes } from "./admin-routes";
 
 function getDefaultMetadataTags(): MetadataTags {
   return {
@@ -53,6 +54,9 @@ export async function registerRoutes(
   
   // Register object storage routes for App Storage
   registerObjectStorageRoutes(app);
+  
+  // Register admin routes for metrics, features, and regeneration
+  registerAdminRoutes(app);
 
   // Health check endpoint for diagnosing database connectivity
   app.get("/api/health", async (req, res) => {
