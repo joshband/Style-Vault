@@ -7,6 +7,7 @@ import { db } from "./db";
 import { testRuns, testCases } from "@shared/schema";
 import { desc, eq, sql } from "drizzle-orm";
 import { regenerateAllStyles, regenerateSingleStyle, getRegenerationProgress, cancelRegeneration, generateRegenerationReport, type BatchRegenerationProgress, type RegenerationResult } from "./style-regeneration";
+import { migrateStyleImages, storeImage } from "./image-service";
 
 type ImageType = "reference" | "previews" | "mood_board" | "ui_concepts" | "all";
 
@@ -702,6 +703,149 @@ export function registerAdminRoutes(app: Express) {
     } catch (error) {
       console.error("Error fetching regeneration comparison:", error);
       res.status(500).json({ error: "Failed to fetch comparison" });
+    }
+  });
+
+  // ==================== IMAGE MIGRATION ENDPOINT ====================
+  
+  // Migrate all styles from base64 to proper image storage
+  app.post("/api/admin/migrate-images", isAuthenticated, isAdmin, async (req: Request, res: Response) => {
+    try {
+      const { styleIds, dryRun = false, clearOldData = false } = req.body;
+      
+      let stylesToMigrate: Style[];
+      if (styleIds && styleIds.length > 0) {
+        stylesToMigrate = [];
+        for (const id of styleIds) {
+          const style = await storage.getStyleById(id);
+          if (style) stylesToMigrate.push(style);
+        }
+      } else {
+        stylesToMigrate = await storage.getStyles();
+      }
+      
+      const results: { styleId: string; styleName: string; migrated: boolean; imageIds?: Record<string, string>; error?: string }[] = [];
+      let successCount = 0;
+      let skipCount = 0;
+      let failCount = 0;
+      
+      for (const style of stylesToMigrate) {
+        try {
+          // Check if already has proper imageIds (stored in separate image_assets table)
+          const existingImageIds = await storage.getImageIdsByStyleId(style.id);
+          const hasExistingImages = existingImageIds && Object.keys(existingImageIds).length > 0;
+          
+          // Get raw data
+          const previews = style.previews as { portrait?: string; landscape?: string; stillLife?: string } | null;
+          const referenceImages = style.referenceImages as string[] | null;
+          const moodBoard = style.moodBoard as { collage?: string } | null;
+          const uiConcepts = style.uiConcepts as { softwareApp?: string; audioPlugin?: string; dashboard?: string } | null;
+          
+          // Check if has base64 data to migrate
+          const hasBase64Data = 
+            (referenceImages && referenceImages[0] && referenceImages[0].length > 1000) ||
+            (previews?.portrait && previews.portrait.length > 1000) ||
+            (previews?.landscape && previews.landscape.length > 1000) ||
+            (previews?.stillLife && previews.stillLife.length > 1000) ||
+            (moodBoard?.collage && moodBoard.collage.length > 1000) ||
+            (uiConcepts?.softwareApp && uiConcepts.softwareApp.length > 1000);
+          
+          if (!hasBase64Data) {
+            skipCount++;
+            results.push({ styleId: style.id, styleName: style.name, migrated: false, error: "No base64 data to migrate" });
+            continue;
+          }
+          
+          if (dryRun) {
+            results.push({ styleId: style.id, styleName: style.name, migrated: false, error: "Dry run - would migrate" });
+            continue;
+          }
+          
+          // Migrate images
+          const imageIds = await migrateStyleImages(style.id, {
+            referenceImages: referenceImages || undefined,
+            previews: previews || undefined,
+            moodBoard: moodBoard || undefined,
+            uiConcepts: uiConcepts || undefined,
+          });
+          
+          // Note: imageIds are stored in the image_assets table automatically by migrateStyleImages
+          // No need to update styles table - the storeImage function links assets to styleId
+          
+          // Optionally clear old base64 data to reduce database size
+          if (clearOldData) {
+            await storage.updateStyleFull(style.id, {
+              previews: {} as any,
+              referenceImages: [] as any,
+            });
+          }
+          
+          // Merge for result display
+          const mergedImageIds = { ...existingImageIds, ...imageIds };
+          
+          successCount++;
+          results.push({ styleId: style.id, styleName: style.name, migrated: true, imageIds });
+          
+          // Add small delay between migrations to avoid overwhelming the system
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+        } catch (error) {
+          failCount++;
+          results.push({ styleId: style.id, styleName: style.name, migrated: false, error: String(error) });
+          console.error(`Error migrating style ${style.id}:`, error);
+        }
+      }
+      
+      res.json({
+        total: stylesToMigrate.length,
+        success: successCount,
+        skipped: skipCount,
+        failed: failCount,
+        dryRun,
+        clearOldData,
+        results,
+      });
+    } catch (error) {
+      console.error("Error during image migration:", error);
+      res.status(500).json({ error: "Failed to migrate images" });
+    }
+  });
+  
+  // Get migration status for a single style
+  app.get("/api/admin/style/:styleId/image-status", isAuthenticated, isAdmin, async (req: Request, res: Response) => {
+    try {
+      const { styleId } = req.params;
+      const style = await storage.getStyleById(styleId);
+      
+      if (!style) {
+        return res.status(404).json({ error: "Style not found" });
+      }
+      
+      const imageIds = await storage.getImageIdsByStyleId(styleId);
+      const previews = style.previews as { portrait?: string; landscape?: string; stillLife?: string } | null;
+      const referenceImages = style.referenceImages as string[] | null;
+      
+      res.json({
+        styleId,
+        styleName: style.name,
+        hasImageIds: Object.keys(imageIds).length > 0,
+        imageIds,
+        hasLegacyBase64: {
+          reference: !!(referenceImages && referenceImages[0] && referenceImages[0].length > 1000),
+          portrait: !!(previews?.portrait && previews.portrait.length > 1000),
+          landscape: !!(previews?.landscape && previews.landscape.length > 1000),
+          stillLife: !!(previews?.stillLife && previews.stillLife.length > 1000),
+        },
+        base64Sizes: {
+          reference: referenceImages?.[0]?.length || 0,
+          portrait: previews?.portrait?.length || 0,
+          landscape: previews?.landscape?.length || 0,
+          stillLife: previews?.stillLife?.length || 0,
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching image status:", error);
+      res.status(500).json({ error: "Failed to fetch image status" });
     }
   });
 }

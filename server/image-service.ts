@@ -12,11 +12,57 @@ interface ImageDimensions {
 }
 
 async function base64ToBuffer(base64: string): Promise<Buffer> {
-  const matches = base64.match(/^data:image\/[^;]+;base64,(.+)$/);
+  let data = base64;
+  
+  // Handle double prefix case (e.g., data:image/png;base64,data:image/jpeg;base64,...)
+  // Keep extracting until we get to the actual base64 data
+  while (data.includes(";base64,data:")) {
+    const parts = data.split(";base64,");
+    if (parts.length > 1) {
+      data = parts.slice(1).join(";base64,");
+    } else {
+      break;
+    }
+  }
+  
+  // Handle data URI format
+  const matches = data.match(/^data:image\/[^;]+;base64,(.+)$/);
   if (matches) {
     return Buffer.from(matches[1], "base64");
   }
-  return Buffer.from(base64, "base64");
+  
+  // Handle data URI with other mime types
+  const genericMatches = data.match(/^data:[^;]+;base64,(.+)$/);
+  if (genericMatches) {
+    return Buffer.from(genericMatches[1], "base64");
+  }
+  
+  // Raw base64
+  return Buffer.from(data, "base64");
+}
+
+function isValidBase64Image(data: string): boolean {
+  if (!data || data.length < 100) return false;
+  
+  // Check for common data URI prefixes
+  if (data.startsWith("data:image/")) return true;
+  
+  // Check if it's raw base64 that decodes to something image-like
+  try {
+    const buffer = Buffer.from(data.substring(0, 100), "base64");
+    // PNG signature
+    if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) return true;
+    // JPEG signature
+    if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) return true;
+    // WebP signature
+    if (buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46) return true;
+    // GIF signature
+    if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46) return true;
+  } catch {
+    return false;
+  }
+  
+  return false;
 }
 
 function bufferToBase64(buffer: Buffer, mimeType: string = "image/webp"): string {
@@ -129,50 +175,46 @@ export async function migrateStyleImages(styleId: string, styleData: {
 }): Promise<Record<string, string>> {
   const imageIds: Record<string, string> = {};
 
-  try {
-    if (styleData.referenceImages && styleData.referenceImages[0]) {
-      const id = await storeImage(styleData.referenceImages[0], "reference", styleId);
-      imageIds.reference = id;
+  const tryStoreImage = async (data: string | undefined, type: ImageAssetType): Promise<string | null> => {
+    if (!data || !isValidBase64Image(data)) {
+      console.log(`[ImageService] Skipping ${type} - invalid or missing base64 data`);
+      return null;
     }
+    try {
+      const id = await storeImage(data, type, styleId);
+      return id;
+    } catch (error) {
+      console.error(`[ImageService] Error storing ${type} for style ${styleId}:`, error);
+      return null;
+    }
+  };
 
-    if (styleData.previews?.portrait) {
-      const id = await storeImage(styleData.previews.portrait, "preview_portrait", styleId);
-      imageIds.preview_portrait = id;
-    }
-    if (styleData.previews?.landscape) {
-      const id = await storeImage(styleData.previews.landscape, "preview_landscape", styleId);
-      imageIds.preview_landscape = id;
-    }
-    if (styleData.previews?.stillLife) {
-      const id = await storeImage(styleData.previews.stillLife, "preview_still_life", styleId);
-      imageIds.preview_still_life = id;
-    }
+  const refId = await tryStoreImage(styleData.referenceImages?.[0], "reference");
+  if (refId) imageIds.reference = refId;
 
-    if (styleData.moodBoard?.collage) {
-      const id = await storeImage(styleData.moodBoard.collage, "mood_board", styleId);
-      imageIds.mood_board = id;
-    }
+  const portraitId = await tryStoreImage(styleData.previews?.portrait, "preview_portrait");
+  if (portraitId) imageIds.preview_portrait = portraitId;
 
-    if (styleData.uiConcepts?.softwareApp) {
-      const id = await storeImage(styleData.uiConcepts.softwareApp, "ui_software_app", styleId);
-      imageIds.ui_software_app = id;
-    }
-    if (styleData.uiConcepts?.audioPlugin) {
-      const id = await storeImage(styleData.uiConcepts.audioPlugin, "ui_audio_plugin", styleId);
-      imageIds.ui_audio_plugin = id;
-    }
-    if (styleData.uiConcepts?.dashboard) {
-      const id = await storeImage(styleData.uiConcepts.dashboard, "ui_dashboard", styleId);
-      imageIds.ui_dashboard = id;
-    }
-    if (styleData.uiConcepts?.componentLibrary) {
-      const id = await storeImage(styleData.uiConcepts.componentLibrary, "ui_component_library", styleId);
-      imageIds.ui_component_library = id;
-    }
-  } catch (error) {
-    console.error(`Error migrating images for style ${styleId}:`, error);
-    throw error;
-  }
+  const landscapeId = await tryStoreImage(styleData.previews?.landscape, "preview_landscape");
+  if (landscapeId) imageIds.preview_landscape = landscapeId;
+
+  const stillLifeId = await tryStoreImage(styleData.previews?.stillLife, "preview_still_life");
+  if (stillLifeId) imageIds.preview_still_life = stillLifeId;
+
+  const moodBoardId = await tryStoreImage(styleData.moodBoard?.collage, "mood_board");
+  if (moodBoardId) imageIds.mood_board = moodBoardId;
+
+  const softwareAppId = await tryStoreImage(styleData.uiConcepts?.softwareApp, "ui_software_app");
+  if (softwareAppId) imageIds.ui_software_app = softwareAppId;
+
+  const audioPluginId = await tryStoreImage(styleData.uiConcepts?.audioPlugin, "ui_audio_plugin");
+  if (audioPluginId) imageIds.ui_audio_plugin = audioPluginId;
+
+  const dashboardId = await tryStoreImage(styleData.uiConcepts?.dashboard, "ui_dashboard");
+  if (dashboardId) imageIds.ui_dashboard = dashboardId;
+
+  const componentLibraryId = await tryStoreImage(styleData.uiConcepts?.componentLibrary, "ui_component_library");
+  if (componentLibraryId) imageIds.ui_component_library = componentLibraryId;
 
   return imageIds;
 }
