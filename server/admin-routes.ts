@@ -6,6 +6,7 @@ import { isAuthenticated } from "./replit_integrations/auth";
 import { db } from "./db";
 import { testRuns, testCases } from "@shared/schema";
 import { desc, eq, sql } from "drizzle-orm";
+import { regenerateAllStyles, regenerateSingleStyle, getRegenerationProgress, cancelRegeneration, generateRegenerationReport, type BatchRegenerationProgress, type RegenerationResult } from "./style-regeneration";
 
 type ImageType = "reference" | "previews" | "mood_board" | "ui_concepts" | "all";
 
@@ -495,6 +496,212 @@ export function registerAdminRoutes(app: Express) {
     } catch (error) {
       console.error("Error fetching admin jobs:", error);
       res.status(500).json({ error: "Failed to fetch jobs" });
+    }
+  });
+
+  // ==================== COMPREHENSIVE REGENERATION WITH BEFORE/AFTER TRACKING ====================
+
+  // Start comprehensive regeneration (all pipelines including material intelligence)
+  app.post("/api/admin/regeneration/comprehensive", isAuthenticated, isAdmin, async (req: Request, res: Response) => {
+    try {
+      const { styleIds } = req.body;
+      
+      // Check if regeneration is already in progress
+      const existingProgress = getRegenerationProgress();
+      if (existingProgress && existingProgress.status === "running") {
+        return res.status(409).json({
+          error: "Regeneration already in progress",
+          progress: existingProgress,
+        });
+      }
+
+      // Start regeneration in background
+      regenerateAllStyles({ styleIds }).then((result) => {
+        console.log(`[Admin] Comprehensive regeneration complete: ${result.successfulStyles}/${result.totalStyles} successful`);
+      }).catch((error) => {
+        console.error("[Admin] Comprehensive regeneration failed:", error);
+      });
+
+      res.json({
+        message: "Comprehensive regeneration started",
+        status: "running",
+        estimatedStyles: styleIds?.length || (await storage.getStyleCount()),
+      });
+    } catch (error) {
+      console.error("Error starting comprehensive regeneration:", error);
+      res.status(500).json({ error: "Failed to start regeneration" });
+    }
+  });
+
+  // Get comprehensive regeneration progress
+  app.get("/api/admin/regeneration/progress", isAuthenticated, isAdmin, async (_req: Request, res: Response) => {
+    try {
+      const progress = getRegenerationProgress();
+      
+      if (!progress) {
+        return res.json({ 
+          status: "idle", 
+          message: "No regeneration in progress" 
+        });
+      }
+
+      // Return progress with limited results to avoid large payloads
+      const recentResults = progress.results.slice(-10);
+      
+      res.json({
+        batchId: progress.batchId,
+        status: progress.status,
+        totalStyles: progress.totalStyles,
+        processedStyles: progress.processedStyles,
+        successfulStyles: progress.successfulStyles,
+        failedStyles: progress.failedStyles,
+        currentStyleId: progress.currentStyleId,
+        currentStyleName: progress.currentStyleName,
+        startedAt: progress.startedAt,
+        estimatedCompletionAt: progress.estimatedCompletionAt,
+        progressPercent: Math.round((progress.processedStyles / progress.totalStyles) * 100),
+        recentResults: recentResults.map(r => ({
+          styleId: r.styleId,
+          styleName: r.styleName,
+          success: r.success,
+          durationMs: r.totalDurationMs,
+          tokensChanged: r.diff.tokensChanged,
+          materialRecipe: r.diff.newRecipe,
+        })),
+      });
+    } catch (error) {
+      console.error("Error fetching regeneration progress:", error);
+      res.status(500).json({ error: "Failed to fetch progress" });
+    }
+  });
+
+  // Cancel ongoing regeneration
+  app.post("/api/admin/regeneration/cancel", isAuthenticated, isAdmin, async (_req: Request, res: Response) => {
+    try {
+      const cancelled = cancelRegeneration();
+      
+      if (cancelled) {
+        res.json({ message: "Regeneration cancelled", status: "cancelled" });
+      } else {
+        res.status(400).json({ error: "No regeneration in progress to cancel" });
+      }
+    } catch (error) {
+      console.error("Error cancelling regeneration:", error);
+      res.status(500).json({ error: "Failed to cancel regeneration" });
+    }
+  });
+
+  // Get regeneration report
+  app.get("/api/admin/regeneration/report", isAuthenticated, isAdmin, async (_req: Request, res: Response) => {
+    try {
+      const progress = getRegenerationProgress();
+      
+      if (!progress || progress.results.length === 0) {
+        return res.status(404).json({ error: "No regeneration results available" });
+      }
+
+      const report = generateRegenerationReport(progress.results);
+      
+      res.setHeader("Content-Type", "text/markdown");
+      res.setHeader("Content-Disposition", `attachment; filename="regeneration-report-${new Date().toISOString().split("T")[0]}.md"`);
+      res.send(report);
+    } catch (error) {
+      console.error("Error generating regeneration report:", error);
+      res.status(500).json({ error: "Failed to generate report" });
+    }
+  });
+
+  // Regenerate single style with comprehensive pipeline
+  app.post("/api/admin/regeneration/style/:styleId", isAuthenticated, isAdmin, async (req: Request, res: Response) => {
+    try {
+      const { styleId } = req.params;
+      
+      const result = await regenerateSingleStyle(styleId);
+      
+      if (!result) {
+        return res.status(404).json({ error: "Style not found" });
+      }
+
+      res.json({
+        success: result.success,
+        styleId: result.styleId,
+        styleName: result.styleName,
+        durationMs: result.totalDurationMs,
+        stages: result.stages.map(s => ({
+          name: s.name,
+          status: s.status,
+          durationMs: s.durationMs,
+          error: s.error,
+        })),
+        diff: {
+          tokensChanged: result.diff.tokensChanged,
+          tokensDelta: {
+            added: result.diff.tokensDelta.added.length,
+            removed: result.diff.tokensDelta.removed.length,
+            modified: result.diff.tokensDelta.modified.length,
+          },
+          metadataChanged: result.diff.metadataChanged,
+          previewsRegenerated: result.diff.previewsRegenerated,
+          newMaterialRecipe: result.diff.newRecipe,
+        },
+        beforeSnapshot: {
+          capturedAt: result.beforeSnapshot.capturedAt,
+          tokenCount: Object.keys(result.beforeSnapshot.tokens).length,
+        },
+        afterSnapshot: {
+          capturedAt: result.afterSnapshot.capturedAt,
+          tokenCount: Object.keys(result.afterSnapshot.tokens).length,
+          materialRecipe: result.afterSnapshot.materialSignature?.recipe_match?.global?.label,
+          componentCount: result.afterSnapshot.componentCount,
+        },
+      });
+    } catch (error) {
+      console.error("Error regenerating single style:", error);
+      res.status(500).json({ error: "Failed to regenerate style" });
+    }
+  });
+
+  // Get before/after comparison for a specific style
+  app.get("/api/admin/regeneration/comparison/:styleId", isAuthenticated, isAdmin, async (req: Request, res: Response) => {
+    try {
+      const { styleId } = req.params;
+      
+      const progress = getRegenerationProgress();
+      
+      if (!progress) {
+        return res.status(404).json({ error: "No regeneration data available" });
+      }
+
+      const result = progress.results.find(r => r.styleId === styleId);
+      
+      if (!result) {
+        return res.status(404).json({ error: "Style not found in regeneration results" });
+      }
+
+      res.json({
+        styleId: result.styleId,
+        styleName: result.styleName,
+        success: result.success,
+        before: {
+          capturedAt: result.beforeSnapshot.capturedAt,
+          tokens: result.beforeSnapshot.tokens,
+          metadataTags: result.beforeSnapshot.metadataTags,
+          previewHashes: result.beforeSnapshot.previewHashes,
+        },
+        after: {
+          capturedAt: result.afterSnapshot.capturedAt,
+          tokens: result.afterSnapshot.tokens,
+          metadataTags: result.afterSnapshot.metadataTags,
+          previewHashes: result.afterSnapshot.previewHashes,
+          materialSignature: result.afterSnapshot.materialSignature,
+          componentCount: result.afterSnapshot.componentCount,
+        },
+        diff: result.diff,
+        stages: result.stages,
+      });
+    } catch (error) {
+      console.error("Error fetching regeneration comparison:", error);
+      res.status(500).json({ error: "Failed to fetch comparison" });
     }
   });
 }
