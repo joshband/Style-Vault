@@ -2889,6 +2889,86 @@ export async function registerRoutes(
     }
   });
 
+  // AI-enhanced component and material classification
+  app.post("/api/pipeline/classify-ai", async (req, res) => {
+    try {
+      const { image, components, materialSignals, textureSignals } = req.body;
+      
+      if (!image) {
+        return res.status(400).json({ error: "Image data required (base64)" });
+      }
+      
+      const { classifyComponentsWithAI } = await import("./component-ai-classification");
+      
+      const imageBase64 = image.replace(/^data:[^;]+;base64,/, "");
+      
+      const result = await classifyComponentsWithAI(
+        imageBase64,
+        components || [],
+        materialSignals || {
+          translucency_score: 0.3,
+          specular_density: 0.4,
+          emission_score: 0.2,
+          depth_shadow_complexity: 0.3,
+        },
+        textureSignals || {
+          texture_grain: 0.2,
+          microcontrast: 0.3,
+          anisotropy: 0.15,
+          noise_type_hint: "none",
+        }
+      );
+      
+      res.json(result);
+    } catch (error) {
+      console.error("AI classification error:", error);
+      res.status(500).json({
+        error: "AI classification failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // Generate AI-enhanced material tokens
+  app.post("/api/pipeline/material-tokens-ai", async (req, res) => {
+    try {
+      const { image, recipeMatch, materialSignals, textureSignals } = req.body;
+      
+      if (!image) {
+        return res.status(400).json({ error: "Image data required (base64)" });
+      }
+      
+      const { generateMaterialTokensWithAI } = await import("./component-ai-classification");
+      
+      const imageBase64 = image.replace(/^data:[^;]+;base64,/, "");
+      
+      const tokens = await generateMaterialTokensWithAI(
+        imageBase64,
+        recipeMatch || { recipe_id: "unknown", label: "Unknown", confidence: 0.5 },
+        materialSignals || {
+          translucency_score: 0.3,
+          specular_density: 0.4,
+          emission_score: 0.2,
+          depth_shadow_complexity: 0.3,
+        },
+        textureSignals || {
+          texture_grain: 0.2,
+          microcontrast: 0.3,
+          anisotropy: 0.15,
+          noise_type_hint: "none",
+        }
+      );
+      
+      res.json({ tokens });
+    } catch (error) {
+      console.error("Material token generation error:", error);
+      res.status(500).json({
+        error: "Material token generation failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
   return httpServer;
 }
 
