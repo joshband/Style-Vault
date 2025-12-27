@@ -12,13 +12,16 @@ from urllib.parse import urlparse, parse_qs
 import threading
 from typing import Dict, Any, Optional
 
-from normalize.dtcg_validator import validate_dtcg_tokens
-from normalize.canonical_assembler import assemble_canonical_artifact, generate_style_id
-from api.job_queue import InMemoryJobQueue, JobStatus, JobPriority
-from search.semantic_search import SemanticSearchEngine
+from pipeline.normalize.dtcg_validator import validate_dtcg_tokens
+from pipeline.normalize.canonical_assembler import assemble_canonical_artifact, generate_style_id
+from pipeline.api.job_queue import InMemoryJobQueue, JobStatus, JobPriority
+from pipeline.search.semantic_search import SemanticSearchEngine
+from pipeline.storage import InMemoryVectorStorage, InMemoryStructuredStorage
 
 job_queue = InMemoryJobQueue()
-search_engine = SemanticSearchEngine()
+vector_storage = InMemoryVectorStorage()
+structured_storage = InMemoryStructuredStorage()
+search_engine = SemanticSearchEngine(vector_storage, structured_storage)
 loop = asyncio.new_event_loop()
 
 

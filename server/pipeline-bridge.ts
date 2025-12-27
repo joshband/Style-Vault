@@ -37,7 +37,7 @@ export class PipelineBridge extends EventEmitter {
     }
 
     return new Promise((resolve) => {
-      this.serverProcess = spawn("python3", ["pipeline/server.py", "8765"], {
+      this.serverProcess = spawn("python3", ["-m", "pipeline.server", "8765"], {
         cwd: globalThis.process.cwd(),
         stdio: ["ignore", "pipe", "pipe"],
       });
