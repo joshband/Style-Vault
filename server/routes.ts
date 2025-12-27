@@ -20,6 +20,8 @@ import { registerAdminRoutes } from "./admin-routes";
 import { pipelineBridge } from "./pipeline-bridge";
 import { initializePipelineStorage, getPipelineStorageConfig, pipelineBlobStorage, pipelineVectorStorage } from "./pipeline-storage";
 import { visionService } from "./vision-service";
+import { analyzeImageCombined, enrichMetadataWithVision } from "./combined-analysis";
+import { generateComprehensiveDTCG } from "./comprehensive-dtcg";
 
 function getDefaultMetadataTags(): MetadataTags {
   return {
@@ -429,6 +431,48 @@ export async function registerRoutes(
       console.error("Color extraction error:", error);
       res.status(500).json({
         error: error instanceof Error ? error.message : "Color extraction failed",
+      });
+    }
+  });
+
+  app.post("/api/analyze/comprehensive", async (req, res) => {
+    try {
+      const { image, imageUrl, includeVision = true, includeCv = true } = req.body;
+      
+      if (!image && !imageUrl) {
+        return res.status(400).json({
+          error: "Either 'image' (base64) or 'imageUrl' is required",
+        });
+      }
+      
+      const imageSource = image || imageUrl;
+      
+      const combinedResult = await analyzeImageCombined(imageSource, {
+        includeVision,
+        includeCv,
+      });
+      
+      const comprehensiveDtcg = generateComprehensiveDTCG({
+        cvTokens: combinedResult.cv.success ? combinedResult.cv.tokens : undefined,
+        visionResult: combinedResult.vision,
+      });
+      
+      res.json({
+        success: true,
+        tokens: comprehensiveDtcg,
+        sources: {
+          cv: combinedResult.cv.success,
+          vision: !!combinedResult.vision && !combinedResult.vision.error,
+        },
+        visionMetadata: combinedResult.visionMetadata,
+        mergedColors: combinedResult.mergedColors,
+        processingTimeMs: combinedResult.processingTimeMs,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error("Comprehensive analysis error:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Comprehensive analysis failed",
       });
     }
   });
