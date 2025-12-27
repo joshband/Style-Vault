@@ -209,7 +209,7 @@ export function ExportDialog({ tokens, styleName, trigger }: ExportDialogProps) 
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+      <DialogContent className="max-w-2xl max-h-[85vh] h-[85vh] sm:h-auto flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Download className="w-5 h-5" />
@@ -220,7 +220,7 @@ export function ExportDialog({ tokens, styleName, trigger }: ExportDialogProps) 
           </DialogDescription>
         </DialogHeader>
         
-        <ScrollArea className="flex-1 pr-4 -mr-4">
+        <ScrollArea className="flex-1 min-h-0 pr-4 -mr-4">
           <div className="space-y-4 pb-4">
             {CATEGORY_ORDER.map(category => {
               const info = CATEGORY_INFO[category];
