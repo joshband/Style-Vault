@@ -1181,7 +1181,7 @@ export default ${safeName};`;
                   Applied
                 </div>
               </>
-            ) : assets?.uiConcepts?.status === "generating" ? (
+            ) : assets?.uiConcepts?.status === "generating" || summary.uiConceptsStatus === "generating" ? (
               <div className="flex items-center justify-center h-full text-muted-foreground text-xs gap-2">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 Generating...
