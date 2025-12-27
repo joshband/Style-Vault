@@ -1,136 +1,163 @@
-import { describe, it, expect, vi } from 'vitest';
-
-vi.mock('@/lib/ai', () => ({
-  generateText: vi.fn().mockResolvedValue('Generated Name'),
-}));
+import { describe, it, expect } from 'vitest';
+import { generateRandomStyle } from '../../../server/random-style-generator';
 
 describe('Random Style Generator', () => {
-  describe('Theme Variations', () => {
-    const themes = [
-      'cosmic',
-      'nature',
-      'urban',
-      'vintage',
-      'futuristic',
-      'tropical',
-      'nordic',
-      'industrial',
-      'bohemian',
-      'minimalist',
-      'maximalist',
-      'gothic',
-      'pastel',
-      'neon',
-      'earthy',
-    ];
-
-    it('should support 15 theme variations', () => {
-      expect(themes.length).toBe(15);
+  describe('generateRandomStyle', () => {
+    it('should generate a complete style object', () => {
+      const result = generateRandomStyle();
+      
+      expect(result).toBeDefined();
+      expect(result.name).toBeDefined();
+      expect(typeof result.name).toBe('string');
+      expect(result.name.length).toBeGreaterThan(0);
     });
 
-    themes.forEach((theme) => {
-      it(`should have valid theme: ${theme}`, () => {
-        expect(typeof theme).toBe('string');
-        expect(theme.length).toBeGreaterThan(0);
-      });
-    });
-  });
-
-  describe('Token Structure Validation', () => {
-    it('should generate valid DTCG token structure', () => {
-      const mockTokens = {
-        color: {
-          primary: {
-            base: {
-              $type: 'color',
-              $value: 'oklch(0.65 0.18 250)',
-            },
-          },
-        },
-        spacing: {
-          md: {
-            $type: 'dimension',
-            $value: '16px',
-          },
-        },
-      };
-
-      expect(mockTokens.color).toBeDefined();
-      expect(mockTokens.color.primary.base.$type).toBe('color');
-      expect(mockTokens.color.primary.base.$value).toMatch(/oklch\([\d.]+ [\d.]+ [\d.]+\)/);
-      expect(mockTokens.spacing.md.$type).toBe('dimension');
+    it('should generate a valid description', () => {
+      const result = generateRandomStyle();
+      
+      expect(result.description).toBeDefined();
+      expect(typeof result.description).toBe('string');
+      expect(result.description.length).toBeGreaterThan(0);
     });
 
-    it('should generate OKLCH color values', () => {
-      const oklchPattern = /^oklch\(\s*[\d.]+\s+[\d.]+\s+[\d.]+\s*\)$/;
-      const validColor = 'oklch(0.65 0.18 250)';
-      const invalidColor = 'rgb(255, 0, 0)';
-
-      expect(validColor).toMatch(oklchPattern);
-      expect(invalidColor).not.toMatch(oklchPattern);
-    });
-  });
-
-  describe('Color Harmony Generation', () => {
-    it('should generate complementary colors with 180 degree offset', () => {
-      const baseHue = 250;
-      const complementaryHue = (baseHue + 180) % 360;
-      expect(complementaryHue).toBe(70);
+    it('should generate valid DTCG tokens with schema', () => {
+      const result = generateRandomStyle();
+      
+      expect(result.tokens).toBeDefined();
+      expect(typeof result.tokens).toBe('object');
+      expect(result.tokens.$schema).toContain('design-tokens');
     });
 
-    it('should generate triadic colors with 120 degree offsets', () => {
-      const baseHue = 250;
-      const triad1 = (baseHue + 120) % 360;
-      const triad2 = (baseHue + 240) % 360;
-      expect(triad1).toBe(10);
-      expect(triad2).toBe(130);
+    it('should generate color tokens with OKLCH values', () => {
+      const result = generateRandomStyle();
+      
+      expect(result.tokens.color).toBeDefined();
+      expect(result.tokens.color.primary).toBeDefined();
+      expect(result.tokens.color.primary.$type).toBe('color');
+      expect(result.tokens.color.primary.$value).toMatch(/oklch\([\d.]+ [\d.]+ [\d.]+\)/);
     });
 
-    it('should generate analogous colors with 30 degree offsets', () => {
-      const baseHue = 250;
-      const analog1 = (baseHue + 30) % 360;
-      const analog2 = (baseHue - 30 + 360) % 360;
-      expect(analog1).toBe(280);
-      expect(analog2).toBe(220);
+    it('should generate all core color tokens', () => {
+      const result = generateRandomStyle();
+      
+      expect(result.tokens.color.primary).toBeDefined();
+      expect(result.tokens.color.secondary).toBeDefined();
+      expect(result.tokens.color.tertiary).toBeDefined();
+      expect(result.tokens.color.accent).toBeDefined();
+      expect(result.tokens.color.background).toBeDefined();
+      expect(result.tokens.color.surface).toBeDefined();
     });
-  });
 
-  describe('Spacing Scale Validation', () => {
-    it('should follow a consistent spacing scale', () => {
-      const baseUnit = 4;
-      const expectedScale = {
-        xs: baseUnit, // 4px
-        sm: baseUnit * 2, // 8px
-        md: baseUnit * 4, // 16px
-        lg: baseUnit * 6, // 24px
-        xl: baseUnit * 8, // 32px
-      };
-
-      expect(expectedScale.xs).toBe(4);
-      expect(expectedScale.sm).toBe(8);
-      expect(expectedScale.md).toBe(16);
-      expect(expectedScale.lg).toBe(24);
-      expect(expectedScale.xl).toBe(32);
+    it('should generate valid spacing tokens', () => {
+      const result = generateRandomStyle();
+      
+      expect(result.tokens.spacing).toBeDefined();
+      expect(result.tokens.spacing['1']).toBeDefined();
+      expect(result.tokens.spacing['1'].$type).toBe('dimension');
+      expect(result.tokens.spacing['1'].$value).toMatch(/^\d+px$/);
     });
-  });
 
-  describe('Typography Scale Validation', () => {
-    it('should follow modular typography scale', () => {
-      const baseFontSize = 16;
-      const scale = 1.25; // Major third
+    it('should generate typography tokens', () => {
+      const result = generateRandomStyle();
+      
+      expect(result.tokens.typography).toBeDefined();
+      expect(result.tokens.typography.fontFamily).toBeDefined();
+      expect(result.tokens.typography.fontSize).toBeDefined();
+    });
 
-      const sizes = {
-        xs: Math.round(baseFontSize / (scale * scale)),
-        sm: Math.round(baseFontSize / scale),
-        base: baseFontSize,
-        lg: Math.round(baseFontSize * scale),
-        xl: Math.round(baseFontSize * scale * scale),
-      };
+    it('should generate border radius tokens', () => {
+      const result = generateRandomStyle();
+      
+      expect(result.tokens.borderRadius).toBeDefined();
+      expect(result.tokens.borderRadius.sm).toBeDefined();
+      expect(result.tokens.borderRadius.md).toBeDefined();
+      expect(result.tokens.borderRadius.lg).toBeDefined();
+    });
 
-      expect(sizes.xs).toBeLessThan(sizes.sm);
-      expect(sizes.sm).toBeLessThan(sizes.base);
-      expect(sizes.base).toBeLessThan(sizes.lg);
-      expect(sizes.lg).toBeLessThan(sizes.xl);
+    it('should generate shadow tokens', () => {
+      const result = generateRandomStyle();
+      
+      expect(result.tokens.shadow).toBeDefined();
+      expect(result.tokens.shadow.sm).toBeDefined();
+      expect(result.tokens.shadow.md).toBeDefined();
+      expect(result.tokens.shadow.lg).toBeDefined();
+    });
+
+    it('should generate motion tokens', () => {
+      const result = generateRandomStyle();
+      
+      expect(result.tokens.motion).toBeDefined();
+      expect(result.tokens.motion.duration).toBeDefined();
+      expect(result.tokens.motion.easing).toBeDefined();
+    });
+
+    it('should generate prompt scaffolding', () => {
+      const result = generateRandomStyle();
+      
+      expect(result.promptScaffolding).toBeDefined();
+      expect(result.promptScaffolding.base).toBeDefined();
+      expect(typeof result.promptScaffolding.base).toBe('string');
+      expect(Array.isArray(result.promptScaffolding.modifiers)).toBe(true);
+      expect(result.promptScaffolding.modifiers.length).toBeGreaterThan(0);
+      expect(result.promptScaffolding.negative).toBeDefined();
+    });
+
+    it('should generate metadata tags', () => {
+      const result = generateRandomStyle();
+      
+      expect(result.metadataTags).toBeDefined();
+      expect(Array.isArray(result.metadataTags.mood)).toBe(true);
+      expect(result.metadataTags.mood.length).toBeGreaterThan(0);
+      expect(Array.isArray(result.metadataTags.colorFamily)).toBe(true);
+      expect(Array.isArray(result.metadataTags.lighting)).toBe(true);
+      expect(Array.isArray(result.metadataTags.texture)).toBe(true);
+      expect(Array.isArray(result.metadataTags.era)).toBe(true);
+      expect(Array.isArray(result.metadataTags.keywords)).toBe(true);
+    });
+
+    it('should generate different styles on each call', () => {
+      const style1 = generateRandomStyle();
+      const style2 = generateRandomStyle();
+      const style3 = generateRandomStyle();
+      
+      const allSame = 
+        style1.name === style2.name && 
+        style2.name === style3.name &&
+        style1.tokens.color.primary.$value === style2.tokens.color.primary.$value;
+      
+      expect(allSame).toBe(false);
+    });
+
+    it('should generate OKLCH colors with valid ranges', () => {
+      for (let i = 0; i < 5; i++) {
+        const result = generateRandomStyle();
+        const colorValue = result.tokens.color.primary.$value;
+        
+        const match = colorValue.match(/oklch\(([\d.]+) ([\d.]+) ([\d.]+)\)/);
+        expect(match).not.toBeNull();
+        
+        if (match) {
+          const lightness = parseFloat(match[1]);
+          const chroma = parseFloat(match[2]);
+          const hue = parseFloat(match[3]);
+          
+          expect(lightness).toBeGreaterThanOrEqual(0);
+          expect(lightness).toBeLessThanOrEqual(1);
+          expect(chroma).toBeGreaterThanOrEqual(0);
+          expect(chroma).toBeLessThanOrEqual(0.5);
+          expect(hue).toBeGreaterThanOrEqual(0);
+          expect(hue).toBeLessThanOrEqual(360);
+        }
+      }
+    });
+
+    it('should include visualDNA extension metadata', () => {
+      const result = generateRandomStyle();
+      
+      expect(result.tokens.$extensions).toBeDefined();
+      expect(result.tokens.$extensions.visualDNA).toBeDefined();
+      expect(result.tokens.$extensions.visualDNA.version).toBe('2.0.0');
+      expect(result.tokens.$extensions.visualDNA.source).toBe('random-generator');
     });
   });
 });
