@@ -43,6 +43,17 @@ Preferred communication style: Simple, everyday language.
 - **Features**: Image analysis for style extraction, canonical preview generation, styled image generation, and metadata enrichment.
 - **Token-Weighted Prompts**: AI image generation prioritizes Design Tokens as primary visual directives, with semantic context as secondary guidance.
 
+### Google Cloud Vision API
+- **Service**: `server/vision-service.ts` - Production-grade image analysis using GCP Vision API.
+- **Authentication**: Uses `GOOGLE_CLOUD_CREDENTIALS` secret (service account JSON key).
+- **Capabilities**: Label detection (up to 15 labels with confidence scores), dominant color extraction (10 colors with RGB, score, pixel fraction), object localization with bounding boxes, OCR text detection with locale, safe search moderation, web entity recognition.
+- **Endpoints**:
+  - `GET /api/vision/status` - Check Vision service availability
+  - `POST /api/vision/analyze` - Full analysis (labels, colors, objects, text, safe search, web entities)
+  - `POST /api/vision/labels` - Label detection only
+  - `POST /api/vision/colors` - Dominant color extraction only
+- **Input**: Accepts base64-encoded images or URLs (http://, https://, gs://).
+
 ### Fast Image Generation (Prodia)
 - **Provider**: Prodia AI with Flux Fast Schnell model.
 - **Endpoint**: `POST /api/generate/prodia` - accepts prompt, optional seed, optional styleId.
