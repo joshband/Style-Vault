@@ -1715,6 +1715,150 @@ export async function registerRoutes(
     });
   });
 
+  // Generate canonical previews with Prodia (fast mode)
+  app.post("/api/generate/prodia/previews", async (req, res) => {
+    try {
+      const { styleName, styleDescription, tokens } = req.body;
+
+      if (!styleName || !styleDescription) {
+        return res.status(400).json({ error: "Style name and description required" });
+      }
+
+      const { generateCanonicalPreviewsWithProdia } = await import("./prodia-generation");
+
+      const result = await generateCanonicalPreviewsWithProdia({
+        styleName,
+        styleDescription,
+        tokens,
+      });
+
+      res.json({
+        previews: {
+          portrait: result.portrait,
+          landscape: result.landscape,
+          stillLife: result.stillLife,
+        },
+        allFailed: result.allFailed,
+        processingTimeMs: result.processingTimeMs,
+        model: "flux-schnell",
+      });
+    } catch (error) {
+      console.error("Error in Prodia preview generation:", error);
+      res.status(500).json({
+        error: "Failed to generate previews",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // Generate mood board with Prodia (fast mode)
+  app.post("/api/generate/prodia/mood-board", async (req, res) => {
+    try {
+      const { styleName, styleDescription, tokens, metadataTags } = req.body;
+
+      if (!styleName || !styleDescription) {
+        return res.status(400).json({ error: "Style name and description required" });
+      }
+
+      const { generateMoodBoardWithProdia } = await import("./prodia-generation");
+
+      const result = await generateMoodBoardWithProdia({
+        styleName,
+        styleDescription,
+        tokens: tokens || {},
+        metadataTags,
+      });
+
+      res.json({
+        collage: result.collage,
+        processingTimeMs: result.processingTimeMs,
+        model: "flux-schnell",
+      });
+    } catch (error) {
+      console.error("Error in Prodia mood board generation:", error);
+      res.status(500).json({
+        error: "Failed to generate mood board",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // Generate UI concepts with Prodia (fast mode)
+  app.post("/api/generate/prodia/ui-concepts", async (req, res) => {
+    try {
+      const { styleName, styleDescription, tokens, metadataTags } = req.body;
+
+      if (!styleName || !styleDescription) {
+        return res.status(400).json({ error: "Style name and description required" });
+      }
+
+      const { generateUiConceptsWithProdia } = await import("./prodia-generation");
+
+      const result = await generateUiConceptsWithProdia({
+        styleName,
+        styleDescription,
+        tokens: tokens || {},
+        metadataTags,
+      });
+
+      res.json({
+        softwareApp: result.softwareApp,
+        audioPlugin: result.audioPlugin,
+        dashboard: result.dashboard,
+        processingTimeMs: result.processingTimeMs,
+        model: "flux-schnell",
+      });
+    } catch (error) {
+      console.error("Error in Prodia UI concepts generation:", error);
+      res.status(500).json({
+        error: "Failed to generate UI concepts",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // Generate all assets with Prodia (fast mode - previews, mood board, UI concepts)
+  app.post("/api/generate/prodia/all-assets", async (req, res) => {
+    try {
+      const { styleName, styleDescription, tokens, metadataTags } = req.body;
+
+      if (!styleName || !styleDescription) {
+        return res.status(400).json({ error: "Style name and description required" });
+      }
+
+      const { generateAllAssetsWithProdia } = await import("./prodia-generation");
+
+      const result = await generateAllAssetsWithProdia({
+        styleName,
+        styleDescription,
+        tokens: tokens || {},
+        metadataTags,
+      });
+
+      res.json({
+        previews: {
+          portrait: result.previews.portrait,
+          landscape: result.previews.landscape,
+          stillLife: result.previews.stillLife,
+        },
+        moodBoard: result.moodBoard,
+        uiConcepts: {
+          softwareApp: result.uiConcepts.softwareApp,
+          audioPlugin: result.uiConcepts.audioPlugin,
+          dashboard: result.uiConcepts.dashboard,
+        },
+        processingTimeMs: result.totalProcessingTimeMs,
+        model: "flux-schnell",
+      });
+    } catch (error) {
+      console.error("Error in Prodia all assets generation:", error);
+      res.status(500).json({
+        error: "Failed to generate assets",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
   // Get all generated images (admin only)
   app.get("/api/generated-images", async (req, res) => {
     try {
