@@ -24,6 +24,7 @@ const Compare = lazy(() => import("@/pages/Compare"));
 const Analytics = lazy(() => import("@/pages/Analytics"));
 const Tools = lazy(() => import("@/pages/Tools"));
 const Admin = lazy(() => import("@/pages/Admin"));
+const Features = lazy(() => import("@/pages/features"));
 
 function PageLoader() {
   return (
@@ -50,6 +51,7 @@ function Router() {
         <Route path="/analytics" component={Analytics} />
         <Route path="/tools" component={Tools} />
         <Route path="/admin" component={Admin} />
+        <Route path="/features" component={Features} />
         <Route component={NotFound} />
       </Switch>
     </Suspense>
