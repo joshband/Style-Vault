@@ -19,6 +19,7 @@ import { getCacheStats, getCacheMetrics, resetCacheMetrics } from "./token-cache
 import { registerAdminRoutes } from "./admin-routes";
 import { pipelineBridge } from "./pipeline-bridge";
 import { initializePipelineStorage, getPipelineStorageConfig, pipelineBlobStorage, pipelineVectorStorage } from "./pipeline-storage";
+import { visionService } from "./vision-service";
 
 function getDefaultMetadataTags(): MetadataTags {
   return {
@@ -332,6 +333,102 @@ export async function registerRoutes(
       console.error("Search error:", error);
       res.status(500).json({
         error: error instanceof Error ? error.message : "Search failed",
+      });
+    }
+  });
+
+  // Google Cloud Vision API endpoints
+  app.get("/api/vision/status", async (req, res) => {
+    const status = visionService.getStatus();
+    res.json({
+      available: status.available || visionService.isAvailable(),
+      error: status.error,
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  app.post("/api/vision/analyze", async (req, res) => {
+    try {
+      const { image, imageUrl } = req.body;
+      
+      if (!image && !imageUrl) {
+        return res.status(400).json({
+          error: "Either 'image' (base64) or 'imageUrl' is required",
+        });
+      }
+      
+      const imageSource = imageUrl || image;
+      const result = await visionService.analyzeImage(imageSource);
+      
+      if (result.error) {
+        return res.status(500).json({
+          error: result.error,
+        });
+      }
+      
+      res.json({
+        success: true,
+        analysis: result,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error("Vision analysis error:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Vision analysis failed",
+      });
+    }
+  });
+
+  app.post("/api/vision/labels", async (req, res) => {
+    try {
+      const { image, imageUrl } = req.body;
+      
+      if (!image && !imageUrl) {
+        return res.status(400).json({
+          error: "Either 'image' (base64) or 'imageUrl' is required",
+        });
+      }
+      
+      const imageSource = imageUrl || image;
+      const labels = await visionService.detectLabels(imageSource);
+      
+      res.json({
+        success: true,
+        labels,
+        count: labels.length,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error("Label detection error:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Label detection failed",
+      });
+    }
+  });
+
+  app.post("/api/vision/colors", async (req, res) => {
+    try {
+      const { image, imageUrl } = req.body;
+      
+      if (!image && !imageUrl) {
+        return res.status(400).json({
+          error: "Either 'image' (base64) or 'imageUrl' is required",
+        });
+      }
+      
+      const imageSource = imageUrl || image;
+      const colors = await visionService.extractColors(imageSource);
+      
+      res.json({
+        success: true,
+        colors,
+        count: colors.length,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error("Color extraction error:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Color extraction failed",
       });
     }
   });
