@@ -2761,6 +2761,134 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== Component + Material Intelligence Pipeline ====================
+
+  // Detect UI components in an image
+  app.post("/api/pipeline/components", async (req, res) => {
+    try {
+      const { image, maxSize, minArea, enableClassification } = req.body;
+      
+      if (!image) {
+        return res.status(400).json({ error: "Image data required (base64)" });
+      }
+      
+      const imageBase64 = image.replace(/^data:[^;]+;base64,/, "");
+      
+      const result = await pipelineBridge.detectComponents(imageBase64, {
+        maxSize: maxSize || 1024,
+        minArea: minArea || 400,
+        enableClassification: enableClassification !== false,
+      });
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Component detection error:", error);
+      res.status(500).json({
+        error: "Component detection failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // Extract material signature from an image
+  app.post("/api/pipeline/material-signature", async (req, res) => {
+    try {
+      const { image, components } = req.body;
+      
+      if (!image) {
+        return res.status(400).json({ error: "Image data required (base64)" });
+      }
+      
+      const imageBase64 = image.replace(/^data:[^;]+;base64,/, "");
+      
+      const result = await pipelineBridge.extractMaterialSignature(
+        imageBase64,
+        components || []
+      );
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Material signature error:", error);
+      res.status(500).json({
+        error: "Material signature extraction failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // Full style enrichment pipeline: components + materials + recipe matching
+  app.post("/api/pipeline/enrich-style", async (req, res) => {
+    try {
+      const { image, styleId } = req.body;
+      
+      if (!image) {
+        return res.status(400).json({ error: "Image data required (base64)" });
+      }
+      
+      const imageBase64 = image.replace(/^data:[^;]+;base64,/, "");
+      
+      const result = await pipelineBridge.enrichStyle(imageBase64, styleId);
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Style enrichment error:", error);
+      res.status(500).json({
+        error: "Style enrichment failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // List available material recipes
+  app.get("/api/pipeline/recipes", async (req, res) => {
+    try {
+      const result = await pipelineBridge.listRecipes();
+      res.json(result);
+    } catch (error) {
+      console.error("Recipe list error:", error);
+      res.status(500).json({
+        error: "Failed to list recipes",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // Get a specific material recipe by ID
+  app.get("/api/pipeline/recipes/:id", async (req, res) => {
+    try {
+      const recipe = await pipelineBridge.getRecipe(req.params.id);
+      
+      if (!recipe) {
+        return res.status(404).json({ error: "Recipe not found" });
+      }
+      
+      res.json(recipe);
+    } catch (error) {
+      console.error("Recipe fetch error:", error);
+      res.status(500).json({
+        error: "Failed to fetch recipe",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // Pipeline status check
+  app.get("/api/pipeline/status", async (req, res) => {
+    try {
+      const health = await pipelineBridge.checkHealth();
+      res.json({
+        available: pipelineBridge.isServerAvailable(),
+        ...health,
+      });
+    } catch (error) {
+      res.json({
+        available: false,
+        healthy: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
   return httpServer;
 }
 

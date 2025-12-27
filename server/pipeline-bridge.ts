@@ -278,6 +278,221 @@ except Exception as e:
   getActiveJobCount(): number {
     return 0;
   }
+
+  async detectComponents(
+    imageBase64: string,
+    options: {
+      maxSize?: number;
+      minArea?: number;
+      enableClassification?: boolean;
+    } = {}
+  ): Promise<{
+    candidates: Array<{
+      id: string;
+      bbox: [number, number, number, number];
+      shape: Record<string, number>;
+      visual: Record<string, any>;
+      label: string;
+      confidence: number;
+    }>;
+    count: number;
+    timings: Record<string, number>;
+  }> {
+    if (!this.useHttpServer) {
+      return this.detectComponentsFallback(imageBase64, options);
+    }
+
+    return this.httpRequest("/api/pipeline/components", "POST", {
+      base64: imageBase64,
+      max_size: options.maxSize ?? 1024,
+      min_area: options.minArea ?? 400,
+      enable_classification: options.enableClassification ?? true,
+    });
+  }
+
+  private async detectComponentsFallback(
+    imageBase64: string,
+    options: Record<string, any>
+  ): Promise<any> {
+    return {
+      candidates: [],
+      count: 0,
+      timings: { total_ms: 0 },
+      fallback: true,
+      message: "Pipeline server not available",
+    };
+  }
+
+  async extractMaterialSignature(
+    imageBase64: string,
+    components: Array<{ id: string; bbox: number[] }> = []
+  ): Promise<{
+    material_signals: { global: Record<string, number>; perComponent: Record<string, any> };
+    texture_signals: { global: Record<string, any>; perComponent: Record<string, any> };
+    recipe_match: {
+      global: {
+        recipe_id: string;
+        label: string;
+        confidence: number;
+        description: string;
+        layer_topology: string[];
+        material_tokens: Record<string, any>;
+        texture_tokens: Record<string, any>;
+        opacity_tokens: Record<string, any>;
+        interaction_hypotheses: Array<{ input: string; target: string; curve: string }>;
+      };
+      perComponent: Record<string, any>;
+    };
+    tokens: Record<string, any>;
+    interaction_bindings: Array<{ input: string; target: string; curve: string }>;
+    layer_topology: string[];
+    timings: Record<string, number>;
+  }> {
+    if (!this.useHttpServer) {
+      return this.extractMaterialSignatureFallback(imageBase64);
+    }
+
+    return this.httpRequest("/api/pipeline/material-signature", "POST", {
+      base64: imageBase64,
+      components,
+    });
+  }
+
+  private async extractMaterialSignatureFallback(imageBase64: string): Promise<any> {
+    return {
+      material_signals: {
+        global: {
+          translucency_score: 0.3,
+          specular_density: 0.4,
+          emission_score: 0.2,
+          depth_shadow_complexity: 0.3,
+        },
+        perComponent: {},
+      },
+      texture_signals: {
+        global: {
+          texture_grain: 0.25,
+          microcontrast: 0.3,
+          anisotropy: 0.15,
+          noise_type_hint: "none",
+        },
+        perComponent: {},
+      },
+      recipe_match: {
+        global: {
+          recipe_id: "matte_plastic",
+          label: "Matte Plastic",
+          confidence: 0.5,
+          description: "Default fallback material",
+          layer_topology: ["shadow_soft", "plastic_body", "diffuse_highlight"],
+          material_tokens: {},
+          texture_tokens: {},
+          opacity_tokens: {},
+          interaction_hypotheses: [],
+        },
+        perComponent: {},
+      },
+      tokens: {},
+      interaction_bindings: [],
+      layer_topology: [],
+      timings: { total_ms: 0 },
+      fallback: true,
+    };
+  }
+
+  async enrichStyle(
+    imageBase64: string,
+    styleId?: string
+  ): Promise<{
+    components: { candidates: Array<any>; count: number };
+    material_signature: {
+      signals: { global: Record<string, number>; perComponent: Record<string, any> };
+      texture: { global: Record<string, any>; perComponent: Record<string, any> };
+      recipe: { id: string; label: string; confidence: number; description: string };
+      layer_topology: string[];
+      interaction_bindings: Array<any>;
+    };
+    enriched_tokens: Record<string, any>;
+    lineage: {
+      style_id: string | null;
+      pipeline_version: string;
+      stages: string[];
+      timings: Record<string, number>;
+      timestamp: string;
+    };
+  }> {
+    if (!this.useHttpServer) {
+      return this.enrichStyleFallback(styleId);
+    }
+
+    return this.httpRequest("/api/pipeline/enrich-style", "POST", {
+      base64: imageBase64,
+      style_id: styleId,
+    });
+  }
+
+  private async enrichStyleFallback(styleId?: string): Promise<any> {
+    return {
+      components: { candidates: [], count: 0 },
+      material_signature: {
+        signals: { global: {}, perComponent: {} },
+        texture: { global: {}, perComponent: {} },
+        recipe: {
+          id: "unknown",
+          label: "Unknown",
+          confidence: 0,
+          description: "Pipeline unavailable",
+        },
+        layer_topology: [],
+        interaction_bindings: [],
+      },
+      enriched_tokens: {},
+      lineage: {
+        style_id: styleId || null,
+        pipeline_version: "fallback",
+        stages: [],
+        timings: {},
+        timestamp: new Date().toISOString(),
+      },
+      fallback: true,
+    };
+  }
+
+  async listRecipes(): Promise<{
+    recipes: Array<{ id: string; label: string; description: string }>;
+    count: number;
+  }> {
+    if (!this.useHttpServer) {
+      return {
+        recipes: [
+          { id: "glassmorphic_emissive", label: "Glassmorphic (Emissive)", description: "Frosted glass with internal glow" },
+          { id: "anodized_metal_brushed", label: "Anodized Metal (Brushed)", description: "Brushed aluminum or titanium" },
+          { id: "soft_plastic_led_diffuse", label: "Soft Plastic (LED Diffuse)", description: "Soft-touch plastic with LED glow" },
+          { id: "matte_plastic", label: "Matte Plastic", description: "Standard matte plastic surface" },
+          { id: "neon_emissive", label: "Neon Emissive", description: "Bright neon-like glow" },
+        ],
+        count: 5,
+      };
+    }
+
+    return this.httpRequest("/api/pipeline/recipes");
+  }
+
+  async getRecipe(recipeId: string): Promise<Record<string, any> | null> {
+    if (!this.useHttpServer) {
+      return null;
+    }
+
+    try {
+      return await this.httpRequest(`/api/pipeline/recipes/${recipeId}`);
+    } catch {
+      return null;
+    }
+  }
+
+  isServerAvailable(): boolean {
+    return this.useHttpServer;
+  }
 }
 
 export const pipelineBridge = new PipelineBridge();

@@ -324,12 +324,13 @@ def get_recipe_endpoint(recipe_id: str):
     return jsonify({"error": "Recipe not found"}), 404
 
 
-def run_server(host: str = "0.0.0.0", port: int = 5001):
+def run_server(host: str = "0.0.0.0", port: int = 8765):
     """Run the pipeline server."""
     print(f"Starting Component + Material Intelligence Pipeline on {host}:{port}")
     app.run(host=host, port=port, debug=False)
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PIPELINE_PORT", 5001))
+    import sys
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else int(os.environ.get("PIPELINE_PORT", 8765))
     run_server(port=port)
