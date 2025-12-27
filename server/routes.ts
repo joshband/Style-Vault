@@ -17,6 +17,8 @@ import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integra
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { getCacheStats, getCacheMetrics, resetCacheMetrics } from "./token-cache";
 import { registerAdminRoutes } from "./admin-routes";
+import { pipelineBridge } from "./pipeline-bridge";
+import { initializePipelineStorage, getPipelineStorageConfig, pipelineBlobStorage, pipelineVectorStorage } from "./pipeline-storage";
 
 function getDefaultMetadataTags(): MetadataTags {
   return {
@@ -57,6 +59,17 @@ export async function registerRoutes(
   
   // Register admin routes for metrics, features, and regeneration
   registerAdminRoutes(app);
+
+  // Try to start pipeline server in background (optional - will use fallback if unavailable)
+  pipelineBridge.startServer().then((started) => {
+    if (started) {
+      console.log("[Routes] Pipeline server started successfully");
+    } else {
+      console.log("[Routes] Pipeline server not available, using fallback mode");
+    }
+  }).catch((err) => {
+    console.warn("[Routes] Failed to start pipeline server:", err);
+  });
 
   // Health check endpoint for diagnosing database connectivity
   app.get("/api/health", async (req, res) => {
@@ -164,6 +177,161 @@ export async function registerRoutes(
       res.status(500).json({
         error: "Failed to gather diagnostics",
         message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // Production readiness probe - for container orchestration (k8s, Cloud Run)
+  app.get("/api/ready", async (req, res) => {
+    try {
+      await db.execute(sql`SELECT 1`);
+      
+      res.status(200).json({
+        ready: true,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      res.status(503).json({
+        ready: false,
+        error: "Database not ready",
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
+  // Production liveness probe - for container orchestration
+  app.get("/api/live", (req, res) => {
+    res.status(200).json({
+      live: true,
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  // Pipeline storage configuration endpoint
+  app.get("/api/pipeline/storage", async (req, res) => {
+    try {
+      const config = getPipelineStorageConfig();
+      const status = await initializePipelineStorage();
+      
+      res.json({
+        config: {
+          blob: {
+            bucket: config.blob.bucket ? "configured" : "not configured",
+            privateDir: config.blob.privateDir ? "configured" : "not configured",
+          },
+          database: config.database.connectionString ? "configured" : "not configured",
+          vector: config.vector.enabled ? "enabled" : "disabled",
+        },
+        status,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Failed to get storage config",
+      });
+    }
+  });
+
+  // Pipeline health check - checks if Python pipeline is available
+  app.get("/api/pipeline/health", async (req, res) => {
+    try {
+      const health = await pipelineBridge.checkHealth();
+      res.json({
+        status: health.healthy ? "healthy" : "unhealthy",
+        pipeline: {
+          version: health.pipelineVersion,
+          pythonVersion: health.pythonVersion,
+          activeJobs: pipelineBridge.getActiveJobCount(),
+        },
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      res.status(500).json({
+        status: "unhealthy",
+        error: error instanceof Error ? error.message : "Pipeline unavailable",
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
+  // Validate DTCG tokens using the Python validator
+  app.post("/api/pipeline/validate-tokens", async (req, res) => {
+    try {
+      const { tokens } = req.body;
+      
+      if (!tokens || typeof tokens !== "object") {
+        return res.status(400).json({
+          error: "tokens object is required",
+        });
+      }
+      
+      const result = await pipelineBridge.validateTokens(tokens);
+      res.json({
+        valid: result.valid,
+        tokenCount: result.tokenCount,
+        errors: result.errors,
+      });
+    } catch (error) {
+      console.error("Token validation error:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Validation failed",
+      });
+    }
+  });
+
+  // Assemble a canonical style artifact
+  app.post("/api/pipeline/assemble", async (req, res) => {
+    try {
+      const { tokens, components, styleSemantics, styleId } = req.body;
+      
+      if (!tokens || typeof tokens !== "object") {
+        return res.status(400).json({
+          error: "tokens object is required",
+        });
+      }
+      
+      const result = await pipelineBridge.assembleCanonicalArtifact(
+        tokens,
+        components || [],
+        styleSemantics || {},
+        styleId
+      );
+      
+      res.json({
+        success: result.success,
+        styleId: result.styleId,
+        artifact: result.data,
+      });
+    } catch (error) {
+      console.error("Assembly error:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Assembly failed",
+      });
+    }
+  });
+
+  // Search styles using semantic search
+  app.get("/api/pipeline/search", async (req, res) => {
+    try {
+      const query = req.query.q as string;
+      const limit = parseInt(req.query.limit as string) || 10;
+      
+      if (!query) {
+        return res.status(400).json({
+          error: "q (query) parameter is required",
+        });
+      }
+      
+      const results = await pipelineBridge.searchStyles(query, limit);
+      res.json({
+        query,
+        count: results.length,
+        results,
+      });
+    } catch (error) {
+      console.error("Search error:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Search failed",
       });
     }
   });

@@ -106,9 +106,23 @@ Preferred communication style: Simple, everyday language.
 - **Database**: `style_versions` table for snapshots of style states.
 - **Features**: Tracks versions with change types, allows manual snapshots, and enables reverting to previous versions (owner only).
 
+### Node.js-to-Python Pipeline Integration
+- **Bridge**: `server/pipeline-bridge.ts` - HTTP client to call Python pipeline services
+- **Pipeline Storage**: `server/pipeline-storage.ts` - Adapters connecting Replit Object Storage and PostgreSQL
+- **API Endpoints**:
+  - `GET /api/pipeline/health` - Check Python pipeline status
+  - `POST /api/pipeline/validate-tokens` - Validate DTCG tokens using Python validator
+  - `POST /api/pipeline/assemble` - Assemble canonical style artifacts
+  - `GET /api/pipeline/search` - Semantic search
+  - `GET /api/pipeline/storage` - Storage configuration status
+- **Production Endpoints**:
+  - `GET /api/ready` - Kubernetes/Cloud Run readiness probe
+  - `GET /api/live` - Liveness probe
+
 ### Pipeline Backend Infrastructure (Python)
 - **Location**: `pipeline/` directory with modular Python modules
 - **Version**: Pipeline v1.0.0, Schema v1.0.0, W3C DTCG 2025.10
+- **HTTP Server**: `pipeline/server.py` - Lightweight HTTP API for pipeline operations
 
 #### Stage 9: Normalization Engine (`pipeline/normalize/`)
 - **DTCG Validator**: Validates W3C DTCG 2025.10 tokens, resolves aliases (up to 10 levels), validates color/dimension/shadow formats
