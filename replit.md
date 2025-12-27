@@ -106,12 +106,50 @@ Preferred communication style: Simple, everyday language.
 - **Database**: `style_versions` table for snapshots of style states.
 - **Features**: Tracks versions with change types, allows manual snapshots, and enables reverting to previous versions (owner only).
 
+### Pipeline Backend Infrastructure (Python)
+- **Location**: `pipeline/` directory with modular Python modules
+- **Version**: Pipeline v1.0.0, Schema v1.0.0, W3C DTCG 2025.10
+
+#### Stage 9: Normalization Engine (`pipeline/normalize/`)
+- **DTCG Validator**: Validates W3C DTCG 2025.10 tokens, resolves aliases (up to 10 levels), validates color/dimension/shadow formats
+- **Schema Validator**: JSON schema validation for components, layers, lighting, materials, motion, style semantics
+- **Lineage Tracker**: Full provenance tracking with stage execution records, model versions, intermediate artifacts
+- **Canonical Assembler**: Assembles validated data into canonical style artifacts with flags and validation summary
+
+#### Stage 10: API Service (`pipeline/api/`)
+- **Job Queue**: Async job-based execution with priority ordering, retry logic (max 3), configurable timeouts
+- **Pipeline Orchestrator**: Stage sequencing, result aggregation, parallel execution support
+- **REST Routes**: GCP Cloud Run compatible endpoints (POST /ingest/image, GET /styles/:id, GET /jobs/:id, etc.)
+
+#### Stage 10: Storage Abstraction (`pipeline/storage/`)
+- **Blob Storage**: Protocol for images, masks, depth maps (in-memory for dev, GCP Cloud Storage interface)
+- **Structured Storage**: Protocol for style artifacts, metadata (in-memory for dev, Postgres interface)
+- **Vector Storage**: Protocol for embeddings (in-memory with cosine similarity, pluggable for Pinecone/pgvector)
+- **Unified Storage**: Combines all three with atomic operations
+
+#### Stage 11: Semantic Search (`pipeline/search/`)
+- **Style Indexer**: Indexes styles by tags, components, materials for fast filtering
+- **Search Engine**: Text-based search with pseudo-embeddings, similar style retrieval, component-based search
+- **Explainable Results**: Each search result includes human-readable explanation of match reason
+
+#### Stage 12: Test Suite (`pipeline/tests/`)
+- **Coverage**: 101 pytest tests covering validators, lineage, assembly, job queue, storage, search
+- **Frameworks**: pytest, pytest-asyncio for async tests
+- **Pattern**: Unit tests for each module with comprehensive edge case coverage
+
+#### Stage 13: Safety Hardening (`pipeline/safety/`)
+- **File Validators**: Magic byte detection, size limits (50MB), content type validation, filename sanitization
+- **Rate Limiter**: Sliding window algorithm, per-endpoint configuration, middleware support
+- **Determinism Checker**: Reproducibility verification, output caching, mismatch detection
+- **Schema Versioning**: Version tracking, migration support, backward compatibility
+
 ### Key Design Decisions
 - **Tokens as Source of Truth**: All styles must have complete token definitions for portability and consistency.
 - **Canonical Preview System**: Standardized preview images for cross-style comparison.
 - **Prompt Scaffolding**: Structured prompt templates derived from tokens for consistent style application.
 - **Job-Based Async Operations**: Robust system for long-running tasks with retry and progress tracking.
 - **Background Metadata Enrichment**: AI-powered enrichment of styles with objective and subjective "Visual DNA" descriptors for advanced search and discovery.
+- **Pluggable Storage**: In-memory implementations for development, production-ready interfaces for GCP services.
 
 ## External Dependencies
 
