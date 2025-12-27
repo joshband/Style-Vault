@@ -1,0 +1,205 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - region "Notifications (F8)":
+    - list
+  - generic [ref=e3]:
+    - complementary [ref=e4]:
+      - generic [ref=e5]:
+        - link "Visual DNA Studio" [ref=e7] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e8]: Visual DNA Studio
+        - navigation [ref=e9]:
+          - link "Explore" [ref=e10] [cursor=pointer]:
+            - /url: /
+            - img [ref=e11]
+            - generic [ref=e14]: Explore
+          - link "Create" [ref=e15] [cursor=pointer]:
+            - /url: /create
+            - img [ref=e16]
+            - generic [ref=e21]: Create
+          - link "Remix" [ref=e22] [cursor=pointer]:
+            - /url: /remix
+            - img [ref=e23]
+            - generic [ref=e26]: Remix
+          - link "Tools" [ref=e27] [cursor=pointer]:
+            - /url: /tools
+            - img [ref=e28]
+            - generic [ref=e32]: Tools
+      - generic [ref=e34]: v1.0.0-alpha
+    - main [ref=e35]:
+      - generic [ref=e36]:
+        - generic [ref=e37]:
+          - img [ref=e38]
+          - textbox "Search..." [ref=e41]
+        - link "Sign in" [ref=e43] [cursor=pointer]:
+          - /url: /api/login
+          - img
+          - generic [ref=e44]: Sign in
+      - generic [ref=e46]:
+        - generic [ref=e48]:
+          - generic [ref=e49]:
+            - heading "Style Vault" [level=1] [ref=e50]
+            - paragraph [ref=e51]: 18 community styles
+          - button "Compare" [ref=e52]:
+            - img
+            - text: Compare
+        - generic [ref=e54]:
+          - generic [ref=e55]:
+            - img [ref=e56]
+            - textbox "Search styles..." [ref=e59]
+          - button "Mood" [ref=e60]:
+            - img
+            - text: Mood
+          - button "Color" [ref=e61]:
+            - img
+            - text: Color
+          - combobox [ref=e62]:
+            - img [ref=e63]
+            - generic: Newest first
+            - img [ref=e66]
+        - generic [ref=e68]:
+          - generic [ref=e71]:
+            - generic [ref=e73]:
+              - img [ref=e74]
+              - generic [ref=e77]: DELETE
+            - link "Wired Nostalgia Art This art style blends intricate line work with a soft, muted palette to evoke a nostalgic vision of mid-century technology. Clean outlines define complex analog machinery, rendered in warm, understated hues, creating a mood of whimsical curiosity and functional elegance. Dec 27, 2025" [ref=e78] [cursor=pointer]:
+              - /url: /style/605eccd4-bbac-4a88-8a2b-3ef2b069fb57
+              - generic [ref=e82]:
+                - heading "Wired Nostalgia Art" [level=3] [ref=e83]
+                - paragraph [ref=e84]: This art style blends intricate line work with a soft, muted palette to evoke a nostalgic vision of mid-century technology. Clean outlines define complex analog machinery, rendered in warm, understated hues, creating a mood of whimsical curiosity and functional elegance.
+                - time [ref=e85]: Dec 27, 2025
+          - generic [ref=e88]:
+            - generic [ref=e90]:
+              - img [ref=e91]
+              - generic [ref=e94]: DELETE
+            - link "Neon Control Grid Neon Control Grid This style captures a luminous control panel bathed in the radiant glow of primary colors, where sleek, reflective surfaces meet a bold, retro-futuristic aesthetic. The vibrant, high-contrast palette evokes a sense of energetic engagement and technological wonder. Dec 25, 2025" [ref=e95] [cursor=pointer]:
+              - /url: /style/40a06892-19c6-47e2-ab7b-ce8152d6576f
+              - generic [ref=e96]:
+                - img "Neon Control Grid" [ref=e98]
+                - generic [ref=e99]:
+                  - heading "Neon Control Grid" [level=3] [ref=e100]
+                  - paragraph [ref=e101]: This style captures a luminous control panel bathed in the radiant glow of primary colors, where sleek, reflective surfaces meet a bold, retro-futuristic aesthetic. The vibrant, high-contrast palette evokes a sense of energetic engagement and technological wonder.
+                  - time [ref=e102]: Dec 25, 2025
+          - generic [ref=e105]:
+            - generic [ref=e107]:
+              - img [ref=e108]
+              - generic [ref=e111]: DELETE
+            - link "Vibrant Synth Mosaic Vibrant Synth Mosaic This style pulsates with a vibrant symphony of fuchsia, teal, and gold, conjuring a playful retro-futuristic console. Smooth, glossy surfaces and geometric precision define an orderly yet whimsical digital landscape, bathed in soft, inviting light. Dec 25, 2025" [ref=e112] [cursor=pointer]:
+              - /url: /style/5b397ec2-4253-4bf4-b7b9-f34f5f3cd5f5
+              - generic [ref=e113]:
+                - img "Vibrant Synth Mosaic" [ref=e115]
+                - generic [ref=e116]:
+                  - heading "Vibrant Synth Mosaic" [level=3] [ref=e117]
+                  - paragraph [ref=e118]: This style pulsates with a vibrant symphony of fuchsia, teal, and gold, conjuring a playful retro-futuristic console. Smooth, glossy surfaces and geometric precision define an orderly yet whimsical digital landscape, bathed in soft, inviting light.
+                  - time [ref=e119]: Dec 25, 2025
+          - generic [ref=e122]:
+            - generic [ref=e124]:
+              - img [ref=e125]
+              - generic [ref=e128]: DELETE
+            - link "Gilded Engineering Gilded Engineering A golden symphony of intricate gears and polished dials, this illustration hums with the complex beauty of a forgotten automaton's heart. Bathed in warm, soft light, it evokes an era where antique engineering met sophisticated artistry. Dec 25, 2025" [ref=e129] [cursor=pointer]:
+              - /url: /style/ea5901d9-e7d3-42ec-9c80-182c3f3e9db0
+              - generic [ref=e130]:
+                - img "Gilded Engineering" [ref=e132]
+                - generic [ref=e133]:
+                  - heading "Gilded Engineering" [level=3] [ref=e134]
+                  - paragraph [ref=e135]: A golden symphony of intricate gears and polished dials, this illustration hums with the complex beauty of a forgotten automaton's heart. Bathed in warm, soft light, it evokes an era where antique engineering met sophisticated artistry.
+                  - time [ref=e136]: Dec 25, 2025
+          - generic [ref=e139]:
+            - generic [ref=e141]:
+              - img [ref=e142]
+              - generic [ref=e145]: DELETE
+            - link "Chromatic Console Chromatic Console A vibrant, high-contrast painting celebrates analog audio technology, featuring a dynamic interplay of electric reds and deep blues. This piece evokes a lively, rhythmic energy, blending retro charm with a bold, graphic aesthetic. Dec 25, 2025" [ref=e146] [cursor=pointer]:
+              - /url: /style/64812d1f-f24a-4b16-a41f-c16611d5b31e
+              - generic [ref=e147]:
+                - img "Chromatic Console" [ref=e149]
+                - generic [ref=e150]:
+                  - heading "Chromatic Console" [level=3] [ref=e151]
+                  - paragraph [ref=e152]: A vibrant, high-contrast painting celebrates analog audio technology, featuring a dynamic interplay of electric reds and deep blues. This piece evokes a lively, rhythmic energy, blending retro charm with a bold, graphic aesthetic.
+                  - time [ref=e153]: Dec 25, 2025
+          - generic [ref=e156]:
+            - generic [ref=e158]:
+              - img [ref=e159]
+              - generic [ref=e162]: DELETE
+            - link "Retro-Tech Grid Retro-Tech Grid An intricate grid of retro-futuristic control panels, rich in deep earth tones and metallic accents, conjures a mood of complex ingenuity. Its dense network of dials, buttons, and screens suggests a hidden world of forgotten analog technology. Dec 25, 2025" [ref=e163] [cursor=pointer]:
+              - /url: /style/eecbd01d-d264-485b-870d-9e78025025db
+              - generic [ref=e164]:
+                - img "Retro-Tech Grid" [ref=e166]
+                - generic [ref=e167]:
+                  - heading "Retro-Tech Grid" [level=3] [ref=e168]
+                  - paragraph [ref=e169]: An intricate grid of retro-futuristic control panels, rich in deep earth tones and metallic accents, conjures a mood of complex ingenuity. Its dense network of dials, buttons, and screens suggests a hidden world of forgotten analog technology.
+                  - time [ref=e170]: Dec 25, 2025
+          - generic [ref=e173]:
+            - generic [ref=e175]:
+              - img [ref=e176]
+              - generic [ref=e179]: DELETE
+            - link "Analog Matrix Analog Matrix An intricate realm of analog machinery, where warm, ethereal light sources illuminate a dark, metallic landscape of dials and screens. This evokes a complex, nostalgic, and subtly otherworldly technological mood. Dec 25, 2025" [ref=e180] [cursor=pointer]:
+              - /url: /style/0c2bcd7c-6e58-429f-9185-1c492d1910db
+              - generic [ref=e181]:
+                - img "Analog Matrix" [ref=e183]
+                - generic [ref=e184]:
+                  - heading "Analog Matrix" [level=3] [ref=e185]
+                  - paragraph [ref=e186]: An intricate realm of analog machinery, where warm, ethereal light sources illuminate a dark, metallic landscape of dials and screens. This evokes a complex, nostalgic, and subtly otherworldly technological mood.
+                  - time [ref=e187]: Dec 25, 2025
+          - generic [ref=e190]:
+            - generic [ref=e192]:
+              - img [ref=e193]
+              - generic [ref=e196]: DELETE
+            - link "Electric Brushwork Electric Brushwork This style captures a retro-futuristic control panel through vibrant digital brushstrokes, blending cool metallic hues with pops of glowing primary colors. The mood is a blend of nostalgic technology and energetic function, rendered with a rich, painterly texture. Dec 25, 2025" [ref=e197] [cursor=pointer]:
+              - /url: /style/c47cca18-f584-411b-87d1-acea136ed961
+              - generic [ref=e198]:
+                - img "Electric Brushwork" [ref=e200]
+                - generic [ref=e201]:
+                  - heading "Electric Brushwork" [level=3] [ref=e202]
+                  - paragraph [ref=e203]: This style captures a retro-futuristic control panel through vibrant digital brushstrokes, blending cool metallic hues with pops of glowing primary colors. The mood is a blend of nostalgic technology and energetic function, rendered with a rich, painterly texture.
+                  - time [ref=e204]: Dec 25, 2025
+          - generic [ref=e207]:
+            - generic [ref=e209]:
+              - img [ref=e210]
+              - generic [ref=e213]: DELETE
+            - link "Atomic Console Art Atomic Console Art This whimsical digital painting transports viewers to a nostalgic, retro-futuristic control room, rendered with a muted teal and warm orange palette punctuated by vibrant, primary-colored buttons. The soft, illustrative style and textured background evoke a playful, imaginative exploration of vintage technology. Dec 25, 2025" [ref=e214] [cursor=pointer]:
+              - /url: /style/7a027d8c-71b0-48a8-89ca-7e85f9767162
+              - generic [ref=e215]:
+                - img "Atomic Console Art" [ref=e217]
+                - generic [ref=e218]:
+                  - heading "Atomic Console Art" [level=3] [ref=e219]
+                  - paragraph [ref=e220]: This whimsical digital painting transports viewers to a nostalgic, retro-futuristic control room, rendered with a muted teal and warm orange palette punctuated by vibrant, primary-colored buttons. The soft, illustrative style and textured background evoke a playful, imaginative exploration of vintage technology.
+                  - time [ref=e221]: Dec 25, 2025
+          - generic [ref=e224]:
+            - generic [ref=e226]:
+              - img [ref=e227]
+              - generic [ref=e230]: DELETE
+            - link "Teal Panel Precision Teal Panel Precision A sleek, futuristic control panel rendered in a captivating monochromatic palette of deep teals and vibrant aquas. Sharp, directional lighting casts long shadows, lending a precise, serene, and almost sculptural depth to its geometric forms and tactile details. Dec 25, 2025" [ref=e231] [cursor=pointer]:
+              - /url: /style/ca14625e-c4c6-420c-a90c-2a2da69a2f27
+              - generic [ref=e232]:
+                - img "Teal Panel Precision" [ref=e234]
+                - generic [ref=e235]:
+                  - heading "Teal Panel Precision" [level=3] [ref=e236]
+                  - paragraph [ref=e237]: A sleek, futuristic control panel rendered in a captivating monochromatic palette of deep teals and vibrant aquas. Sharp, directional lighting casts long shadows, lending a precise, serene, and almost sculptural depth to its geometric forms and tactile details.
+                  - time [ref=e238]: Dec 25, 2025
+          - generic [ref=e241]:
+            - generic [ref=e243]:
+              - img [ref=e244]
+              - generic [ref=e247]: DELETE
+            - link "Neon Synthscape Neon Synthscape A kaleidoscopic vision of a sound mixer, rendered in hyper-saturated neon tones and bold outlines, evoking a playful yet electrifying synthwave aesthetic that hums with digital vibrancy. Dec 25, 2025" [ref=e248] [cursor=pointer]:
+              - /url: /style/c4c5a05b-9555-4281-9a73-e922956a0a8b
+              - generic [ref=e249]:
+                - img "Neon Synthscape" [ref=e251]
+                - generic [ref=e252]:
+                  - heading "Neon Synthscape" [level=3] [ref=e253]
+                  - paragraph [ref=e254]: A kaleidoscopic vision of a sound mixer, rendered in hyper-saturated neon tones and bold outlines, evoking a playful yet electrifying synthwave aesthetic that hums with digital vibrancy.
+                  - time [ref=e255]: Dec 25, 2025
+          - generic [ref=e258]:
+            - generic [ref=e260]:
+              - img [ref=e261]
+              - generic [ref=e264]: DELETE
+            - link "Chromatic Audio Burst Chromatic Audio Burst This style captures the effervescent energy of music through a vibrant explosion of pastel hues and electric tones, creating an abstract soundscape that pulses with playful, psychedelic dynamism against a stark, deep background. Dec 25, 2025" [ref=e265] [cursor=pointer]:
+              - /url: /style/eaeae09f-dda5-4ce7-810a-79478b419a8b
+              - generic [ref=e266]:
+                - img "Chromatic Audio Burst" [ref=e268]
+                - generic [ref=e269]:
+                  - heading "Chromatic Audio Burst" [level=3] [ref=e270]
+                  - paragraph [ref=e271]: This style captures the effervescent energy of music through a vibrant explosion of pastel hues and electric tones, creating an abstract soundscape that pulses with playful, psychedelic dynamism against a stark, deep background.
+                  - time [ref=e272]: Dec 25, 2025
+```

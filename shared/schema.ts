@@ -445,3 +445,69 @@ export const insertFeatureToggleSchema = createInsertSchema(featureToggles).omit
 
 export type InsertFeatureToggle = z.infer<typeof insertFeatureToggleSchema>;
 export type FeatureToggle = typeof featureToggles.$inferSelect;
+
+// Test run status types
+export type TestStatus = "pending" | "running" | "passed" | "failed" | "skipped";
+export type TestSeverity = "critical" | "major" | "minor" | "info";
+
+// Test runs table - tracks individual test suite executions
+export const testRuns = pgTable("test_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  status: text("status").$type<TestStatus>().default("pending").notNull(),
+  totalTests: integer("total_tests").default(0).notNull(),
+  passedTests: integer("passed_tests").default(0).notNull(),
+  failedTests: integer("failed_tests").default(0).notNull(),
+  skippedTests: integer("skipped_tests").default(0).notNull(),
+  durationMs: integer("duration_ms"),
+  browser: text("browser"),
+  viewport: text("viewport"),
+  environment: text("environment").default("development"),
+  triggeredBy: text("triggered_by"),
+  screenshotPath: text("screenshot_path"),
+  reportPath: text("report_path"),
+  summary: jsonb("summary").$type<{
+    whatWorks: string[];
+    whatFails: string[];
+    improvements: string[];
+    enhancements: string[];
+  }>(),
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertTestRunSchema = createInsertSchema(testRuns).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertTestRun = z.infer<typeof insertTestRunSchema>;
+export type TestRun = typeof testRuns.$inferSelect;
+
+// Test cases table - individual test results within a run
+export const testCases = pgTable("test_cases", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  runId: varchar("run_id").notNull(),
+  name: text("name").notNull(),
+  suite: text("suite"),
+  status: text("status").$type<TestStatus>().default("pending").notNull(),
+  severity: text("severity").$type<TestSeverity>().default("info"),
+  durationMs: integer("duration_ms"),
+  errorMessage: text("error_message"),
+  errorStack: text("error_stack"),
+  screenshotPath: text("screenshot_path"),
+  category: text("category"),
+  recommendation: text("recommendation"),
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertTestCaseSchema = createInsertSchema(testCases).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertTestCase = z.infer<typeof insertTestCaseSchema>;
+export type TestCase = typeof testCases.$inferSelect;

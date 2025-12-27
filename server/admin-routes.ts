@@ -1,8 +1,11 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
 import { cache, CACHE_KEYS } from "./cache";
-import type { MetricType, InsertAdminMetric, Style, MoodBoardAssets, UiConceptAssets } from "@shared/schema";
+import type { MetricType, InsertAdminMetric, Style, MoodBoardAssets, UiConceptAssets, InsertTestRun, InsertTestCase } from "@shared/schema";
 import { isAuthenticated } from "./replit_integrations/auth";
+import { db } from "./db";
+import { testRuns, testCases } from "@shared/schema";
+import { desc, eq, sql } from "drizzle-orm";
 
 type ImageType = "reference" | "previews" | "mood_board" | "ui_concepts" | "all";
 
@@ -122,6 +125,108 @@ export function registerAdminRoutes(app: Express) {
     } catch (error) {
       console.error("Error recording metric:", error);
       res.status(500).json({ error: "Failed to record metric" });
+    }
+  });
+
+  // ==================== TEST RUNS ====================
+  
+  // Get test run history
+  app.get("/api/admin/test-runs", isAuthenticated, isAdmin, async (req: Request, res: Response) => {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 20;
+      const runs = await db.select().from(testRuns).orderBy(desc(testRuns.createdAt)).limit(limit);
+      res.json(runs);
+    } catch (error) {
+      console.error("Error fetching test runs:", error);
+      res.status(500).json({ error: "Failed to fetch test runs" });
+    }
+  });
+
+  // Get single test run with cases
+  app.get("/api/admin/test-runs/:id", isAuthenticated, isAdmin, async (req: Request, res: Response) => {
+    try {
+      const [run] = await db.select().from(testRuns).where(eq(testRuns.id, req.params.id));
+      if (!run) {
+        return res.status(404).json({ error: "Test run not found" });
+      }
+      const cases = await db.select().from(testCases).where(eq(testCases.runId, req.params.id));
+      res.json({ ...run, testCases: cases });
+    } catch (error) {
+      console.error("Error fetching test run:", error);
+      res.status(500).json({ error: "Failed to fetch test run" });
+    }
+  });
+
+  // Create test run with cases
+  app.post("/api/admin/test-runs", async (req: Request, res: Response) => {
+    try {
+      const { name, browser, viewport, environment, totalTests, passedTests, failedTests, skippedTests, durationMs, summary, testCases: cases } = req.body;
+      
+      const status = failedTests > 0 ? "failed" : "passed";
+      
+      const [run] = await db.insert(testRuns).values({
+        name,
+        status,
+        browser,
+        viewport,
+        environment,
+        totalTests,
+        passedTests,
+        failedTests,
+        skippedTests,
+        durationMs,
+        summary,
+        startedAt: new Date(),
+        completedAt: new Date(),
+      }).returning();
+      
+      if (cases && Array.isArray(cases) && cases.length > 0) {
+        const caseInserts = cases.map((c: any) => ({
+          runId: run.id,
+          name: c.name,
+          suite: c.suite,
+          status: c.status,
+          severity: c.severity || "info",
+          durationMs: c.durationMs,
+          errorMessage: c.errorMessage,
+          errorStack: c.errorStack,
+          screenshotPath: c.screenshotPath,
+          category: c.category,
+          recommendation: c.recommendation,
+        }));
+        await db.insert(testCases).values(caseInserts);
+      }
+      
+      res.json({ runId: run.id });
+    } catch (error) {
+      console.error("Error creating test run:", error);
+      res.status(500).json({ error: "Failed to create test run" });
+    }
+  });
+
+  // Get test metrics summary
+  app.get("/api/admin/test-metrics", isAuthenticated, isAdmin, async (_req: Request, res: Response) => {
+    try {
+      const [stats] = await db.select({
+        totalRuns: sql<number>`count(*)::int`,
+        passedRuns: sql<number>`count(*) filter (where status = 'passed')::int`,
+        failedRuns: sql<number>`count(*) filter (where status = 'failed')::int`,
+        avgDuration: sql<number>`avg(duration_ms)::int`,
+        totalTests: sql<number>`sum(total_tests)::int`,
+        totalPassed: sql<number>`sum(passed_tests)::int`,
+        totalFailed: sql<number>`sum(failed_tests)::int`,
+      }).from(testRuns);
+      
+      const recent = await db.select().from(testRuns).orderBy(desc(testRuns.createdAt)).limit(5);
+      
+      res.json({
+        summary: stats,
+        recentRuns: recent,
+        passRate: stats.totalTests > 0 ? ((stats.totalPassed / stats.totalTests) * 100).toFixed(1) : "0",
+      });
+    } catch (error) {
+      console.error("Error fetching test metrics:", error);
+      res.status(500).json({ error: "Failed to fetch test metrics" });
     }
   });
 
