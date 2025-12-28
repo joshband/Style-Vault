@@ -50,7 +50,7 @@ export interface AssembledTokens {
   color: DTCGTokenGroup;
   spacing: DTCGTokenGroup;
   typography: DTCGTokenGroup;
-  borderRadius: DTCGTokenGroup;
+  radius: DTCGTokenGroup;
   shadow: DTCGTokenGroup;
   opacity: DTCGTokenGroup;
   depth: DTCGTokenGroup;
@@ -220,15 +220,15 @@ function assembleTypographyTokens(): { tokens: DTCGTokenGroup; confidence: numbe
   return { tokens, confidence: DEFAULT_CONFIDENCE.fallback };
 }
 
-function assembleBorderRadiusTokens(borderRadius: (number | string)[] | undefined): { tokens: DTCGTokenGroup; confidence: number } {
+function assembleRadiusTokens(radius: (number | string)[] | undefined): { tokens: DTCGTokenGroup; confidence: number } {
   const tokens: DTCGTokenGroup = {};
 
-  if (borderRadius && Array.isArray(borderRadius) && borderRadius.length > 0) {
+  if (radius && Array.isArray(radius) && radius.length > 0) {
     const radiusNames = ['none', 'sm', 'md', 'lg', 'xl', 'full'];
-    borderRadius.slice(0, 6).forEach((value, i) => {
+    radius.slice(0, 6).forEach((value, i) => {
       const name = radiusNames[i] || `radius${i}`;
       const pxValue = typeof value === 'number' ? value : parseInt(value) || 4;
-      tokens[name] = createToken('dimension', `${pxValue}px`, `Border radius ${name}`, DEFAULT_CONFIDENCE.observed, 'cv', 'corner-detection');
+      tokens[name] = createToken('dimension', `${pxValue}px`, `Radius ${name}`, DEFAULT_CONFIDENCE.observed, 'cv', 'corner-detection');
     });
     return { tokens, confidence: DEFAULT_CONFIDENCE.observed };
   }
@@ -334,7 +334,7 @@ export function assembleTokens(cvResult?: CVExtractionResult, existingTokens?: R
   const colorResult = assembleColorTokens(cv.color, cv.colorAnalysis);
   const spacingResult = assembleSpacingTokens(cv.spacing);
   const typographyResult = assembleTypographyTokens();
-  const borderRadiusResult = assembleBorderRadiusTokens(cv.borderRadius);
+  const radiusResult = assembleRadiusTokens(cv.borderRadius);
   const shadowResult = assembleShadowTokens(cv.elevation);
   const opacityResult = assembleOpacityTokens();
   const depthResult = assembleDepthTokens(cv.elevation);
@@ -344,7 +344,7 @@ export function assembleTokens(cvResult?: CVExtractionResult, existingTokens?: R
     color: colorResult.confidence,
     spacing: spacingResult.confidence,
     typography: typographyResult.confidence,
-    borderRadius: borderRadiusResult.confidence,
+    radius: radiusResult.confidence,
     shadow: shadowResult.confidence,
     opacity: opacityResult.confidence,
     depth: depthResult.confidence,
@@ -359,7 +359,7 @@ export function assembleTokens(cvResult?: CVExtractionResult, existingTokens?: R
     color: colorResult.tokens,
     spacing: spacingResult.tokens,
     typography: typographyResult.tokens,
-    borderRadius: borderRadiusResult.tokens,
+    radius: radiusResult.tokens,
     shadow: shadowResult.tokens,
     opacity: opacityResult.tokens,
     depth: depthResult.tokens,
@@ -380,7 +380,7 @@ export function mergeWithExistingTokens(assembled: AssembledTokens, existing?: R
 
   const merged = { ...assembled };
 
-  for (const category of ['color', 'spacing', 'typography', 'borderRadius', 'shadow', 'opacity', 'depth', 'motion'] as const) {
+  for (const category of ['color', 'spacing', 'typography', 'radius', 'shadow', 'opacity', 'depth', 'motion'] as const) {
     if (existing[category] && typeof existing[category] === 'object') {
       merged[category] = { ...assembled[category], ...existing[category] };
     }
