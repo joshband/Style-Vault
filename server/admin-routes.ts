@@ -707,6 +707,79 @@ export function registerAdminRoutes(app: Express) {
     }
   });
 
+  // Get batch job history
+  app.get("/api/admin/batches", isAuthenticated, isAdmin, async (req: Request, res: Response) => {
+    try {
+      const limit = Math.min(Number(req.query.limit) || 20, 100);
+      const batches = await storage.getRecentBatches(limit);
+      
+      res.json({
+        batches: batches.map(b => ({
+          id: b.id,
+          status: b.status,
+          totalItems: b.totalItems,
+          completedItems: b.completedItems,
+          failedItems: b.failedItems,
+          progress: b.totalItems > 0 ? Math.round((b.completedItems / b.totalItems) * 100) : 0,
+          createdAt: b.createdAt,
+          completedAt: b.completedAt,
+        })),
+        total: batches.length,
+      });
+    } catch (error) {
+      logger.error("Error fetching batch history", error, { module: 'Admin' });
+      res.status(500).json({ error: "Failed to fetch batch history" });
+    }
+  });
+
+  // Resume failed styles from a batch
+  app.post("/api/admin/batches/:batchId/resume", isAuthenticated, isAdmin, async (req: Request, res: Response) => {
+    try {
+      const { batchId } = req.params;
+      
+      const batch = await storage.getBatchById(batchId);
+      if (!batch) {
+        return res.status(404).json({ error: "Batch not found" });
+      }
+      
+      // Get jobs from this batch that failed
+      const jobs = await storage.getJobsByBatchId(batchId);
+      const failedJobs = jobs.filter(j => j.status === "failed");
+      
+      if (failedJobs.length === 0) {
+        return res.json({ message: "No failed jobs to resume", resumedCount: 0 });
+      }
+      
+      // Get unique style IDs from failed jobs
+      const failedStyleIds = Array.from(new Set(failedJobs.map(j => j.styleId).filter((id): id is string => id !== null)));
+      
+      // Check for ongoing regeneration
+      const existingProgress = getRegenerationProgress();
+      if (existingProgress && existingProgress.status === "running") {
+        return res.status(409).json({ 
+          error: "A regeneration is already in progress",
+          currentProgress: {
+            totalStyles: existingProgress.totalStyles,
+            processedStyles: existingProgress.processedStyles,
+          }
+        });
+      }
+      
+      // Start regeneration of failed styles
+      regenerateAllStyles({ styleIds: failedStyleIds })
+        .catch(err => logger.error("Resume batch regeneration failed", err, { module: 'Admin' }));
+      
+      res.json({
+        message: "Resuming regeneration for failed styles",
+        resumedCount: failedStyleIds.length,
+        styleIds: failedStyleIds,
+      });
+    } catch (error) {
+      logger.error("Error resuming batch", error, { module: 'Admin' });
+      res.status(500).json({ error: "Failed to resume batch" });
+    }
+  });
+
   // ==================== IMAGE MIGRATION ENDPOINT ====================
   
   // Migrate all styles from base64 to proper image storage

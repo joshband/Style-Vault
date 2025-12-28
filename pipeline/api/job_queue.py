@@ -133,6 +133,10 @@ class InMemoryJobQueue(JobQueueBackend):
             job for job in self._jobs.values()
             if job.status == JobStatus.PENDING
         ]
+    
+    async def list_jobs(self) -> List[Job]:
+        """Return all jobs."""
+        return list(self._jobs.values())
 
 
 JobHandler = Callable[[Job], Awaitable[Dict[str, Any]]]

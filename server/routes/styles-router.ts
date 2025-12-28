@@ -829,6 +829,19 @@ router.delete("/api/styles/:id/bookmark", isAuthenticated, async (req, res) => {
   }
 });
 
+router.get("/api/styles/:id/ratings", async (req, res) => {
+  try {
+    const avgRating = await storage.getStyleAverageRating(req.params.id);
+    res.json({
+      average: avgRating.average,
+      count: avgRating.count,
+    });
+  } catch (error) {
+    logger.error("Error fetching public ratings", error, { module: 'Styles' });
+    res.status(500).json({ error: "Failed to fetch ratings" });
+  }
+});
+
 router.get("/api/styles/:id/rating", isAuthenticated, async (req, res) => {
   try {
     const userId = (req.user as any)?.claims?.sub;

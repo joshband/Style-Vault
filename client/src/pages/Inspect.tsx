@@ -241,12 +241,9 @@ export default function Inspect() {
         body: JSON.stringify({ rating, review: userReview }),
       });
       if (res.ok) {
-        setUserRating(rating);
-        const ratingsRes = await fetch(`/api/styles/${id}/ratings`);
-        if (ratingsRes.ok) {
-          const data = await ratingsRes.json();
-          setAvgRating({ average: data.average, count: data.count });
-        }
+        const data = await res.json();
+        setUserRating(data.userRating);
+        setAvgRating({ average: data.averageRating, count: data.totalRatings });
       }
     } catch (error) {
       console.error("Failed to submit rating:", error);
@@ -347,7 +344,7 @@ export default function Inspect() {
       try {
         const [bookmarkRes, ratingRes, collectionsRes, styleCollectionsRes] = await Promise.all([
           fetch(`/api/styles/${id}/bookmark`),
-          fetch(`/api/styles/${id}/my-rating`),
+          fetch(`/api/styles/${id}/rating`),
           fetch(`/api/collections`),
           fetch(`/api/styles/${id}/collections`),
         ]);
@@ -360,8 +357,10 @@ export default function Inspect() {
         if (ratingRes.ok) {
           const data = await ratingRes.json();
           if (data) {
-            setUserRating(data.rating);
-            setUserReview(data.review || "");
+            setUserRating(data.userRating);
+            if (data.averageRating !== undefined) {
+              setAvgRating({ average: data.averageRating, count: data.totalRatings });
+            }
           }
         }
         

@@ -70,6 +70,7 @@ export interface IStorage {
   // Batch operations
   createBatch(batch: InsertBatch): Promise<Batch>;
   getBatchById(id: string): Promise<Batch | undefined>;
+  getRecentBatches(limit?: number): Promise<Batch[]>;
   updateBatchProgress(id: string, completedItems: number, failedItems: number): Promise<Batch | undefined>;
   updateBatchStatus(id: string, status: JobStatus): Promise<Batch | undefined>;
 
@@ -723,6 +724,10 @@ export class DatabaseStorage implements IStorage {
   async getBatchById(id: string): Promise<Batch | undefined> {
     const [batch] = await db.select().from(batches).where(eq(batches.id, id));
     return batch;
+  }
+
+  async getRecentBatches(limit: number = 10): Promise<Batch[]> {
+    return db.select().from(batches).orderBy(desc(batches.createdAt)).limit(limit);
   }
 
   async updateBatchProgress(id: string, completedItems: number, failedItems: number): Promise<Batch | undefined> {

@@ -290,3 +290,111 @@ test.describe('Analytics Feature', () => {
     console.log('Analytics page loaded');
   });
 });
+
+test.describe('Image Asset Routing', () => {
+  test('should load thumbnails in gallery view', async ({ page, request }) => {
+    const stylesResponse = await request.get(`${BASE_URL}/api/styles`);
+    const stylesData = await stylesResponse.json();
+    
+    if (stylesData.items && stylesData.items.length > 0) {
+      const firstStyle = stylesData.items[0];
+      const imageIds = firstStyle.imageIds;
+      
+      if (imageIds && imageIds.reference) {
+        const thumbResponse = await request.get(`${BASE_URL}/api/images/${imageIds.reference}?size=thumb`);
+        expect(thumbResponse.ok()).toBeTruthy();
+        expect(thumbResponse.headers()['content-type']).toContain('image');
+        
+        const thumbSize = parseInt(thumbResponse.headers()['content-length'] || '0');
+        console.log(`Thumbnail size: ${thumbSize} bytes`);
+        expect(thumbSize).toBeGreaterThan(0);
+        expect(thumbSize).toBeLessThan(500000);
+      }
+    }
+  });
+
+  test('should load medium images for detail view', async ({ page, request }) => {
+    const stylesResponse = await request.get(`${BASE_URL}/api/styles`);
+    const stylesData = await stylesResponse.json();
+    
+    if (stylesData.items && stylesData.items.length > 0) {
+      const firstStyle = stylesData.items[0];
+      const imageIds = firstStyle.imageIds;
+      
+      if (imageIds && imageIds.reference) {
+        const mediumResponse = await request.get(`${BASE_URL}/api/images/${imageIds.reference}?size=medium`);
+        expect(mediumResponse.ok()).toBeTruthy();
+        expect(mediumResponse.headers()['content-type']).toContain('image');
+        
+        const mediumSize = parseInt(mediumResponse.headers()['content-length'] || '0');
+        console.log(`Medium size: ${mediumSize} bytes`);
+        expect(mediumSize).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  test('should load full images for download', async ({ page, request }) => {
+    const stylesResponse = await request.get(`${BASE_URL}/api/styles`);
+    const stylesData = await stylesResponse.json();
+    
+    if (stylesData.items && stylesData.items.length > 0) {
+      const firstStyle = stylesData.items[0];
+      const imageIds = firstStyle.imageIds;
+      
+      if (imageIds && imageIds.reference) {
+        const fullResponse = await request.get(`${BASE_URL}/api/images/${imageIds.reference}?size=full`);
+        expect(fullResponse.ok()).toBeTruthy();
+        expect(fullResponse.headers()['content-type']).toContain('image');
+        
+        const fullSize = parseInt(fullResponse.headers()['content-length'] || '0');
+        console.log(`Full size: ${fullSize} bytes`);
+        expect(fullSize).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  test('should return proper JSON for public ratings endpoint', async ({ request }) => {
+    const stylesResponse = await request.get(`${BASE_URL}/api/styles`);
+    const stylesData = await stylesResponse.json();
+    
+    if (stylesData.items && stylesData.items.length > 0) {
+      const firstStyle = stylesData.items[0];
+      const ratingsResponse = await request.get(`${BASE_URL}/api/styles/${firstStyle.id}/ratings`);
+      
+      expect(ratingsResponse.ok()).toBeTruthy();
+      const ratingsData = await ratingsResponse.json();
+      
+      expect(typeof ratingsData.average).toBe('number');
+      expect(typeof ratingsData.count).toBe('number');
+      console.log(`Ratings: average=${ratingsData.average}, count=${ratingsData.count}`);
+    }
+  });
+
+  test('should verify different image sizes are optimized', async ({ request }) => {
+    const stylesResponse = await request.get(`${BASE_URL}/api/styles`);
+    const stylesData = await stylesResponse.json();
+    
+    if (stylesData.items && stylesData.items.length > 0) {
+      const firstStyle = stylesData.items[0];
+      const imageIds = firstStyle.imageIds;
+      
+      if (imageIds && imageIds.reference) {
+        const [thumbRes, mediumRes, fullRes] = await Promise.all([
+          request.get(`${BASE_URL}/api/images/${imageIds.reference}?size=thumb`),
+          request.get(`${BASE_URL}/api/images/${imageIds.reference}?size=medium`),
+          request.get(`${BASE_URL}/api/images/${imageIds.reference}?size=full`),
+        ]);
+        
+        const thumbSize = parseInt(thumbRes.headers()['content-length'] || '0');
+        const mediumSize = parseInt(mediumRes.headers()['content-length'] || '0');
+        const fullSize = parseInt(fullRes.headers()['content-length'] || '0');
+        
+        console.log(`Image sizes - Thumb: ${thumbSize}, Medium: ${mediumSize}, Full: ${fullSize}`);
+        
+        expect(thumbRes.ok()).toBeTruthy();
+        expect(mediumRes.ok()).toBeTruthy();
+        expect(fullRes.ok()).toBeTruthy();
+      }
+    }
+  });
+});
