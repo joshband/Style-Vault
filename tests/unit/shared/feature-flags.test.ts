@@ -87,31 +87,35 @@ describe('Feature Flags System', () => {
       });
     });
 
-    it('should have exactly the Phase 1 MVP flags enabled', () => {
-      const phase1EnabledFlags: (keyof FeatureFlags)[] = [
+    it('should have exactly the Stage 1 flags enabled', () => {
+      const stage1EnabledFlags: (keyof FeatureFlags)[] = [
         'vault.enabled',
         'auth.enabled',
         'nav.basic',
         'nav.explore',
         'api.styles.list',
+        'inspect.enabled',
+        'api.styles.detail',
       ];
 
-      phase1EnabledFlags.forEach(key => {
+      stage1EnabledFlags.forEach(key => {
         expect(defaultFeatureFlags[key]).toBe(true);
       });
     });
 
-    it('should have all non-Phase 1 features disabled', () => {
-      const phase1EnabledFlags = new Set([
+    it('should have all non-Stage 1 features disabled', () => {
+      const stage1EnabledFlags = new Set([
         'vault.enabled',
         'auth.enabled',
         'nav.basic',
         'nav.explore',
         'api.styles.list',
+        'inspect.enabled',
+        'api.styles.detail',
       ]);
 
       Object.entries(defaultFeatureFlags).forEach(([key, value]) => {
-        if (!phase1EnabledFlags.has(key)) {
+        if (!stage1EnabledFlags.has(key)) {
           expect(value).toBe(false);
         }
       });
@@ -126,10 +130,14 @@ describe('Feature Flags System', () => {
     });
 
     it('should return false for disabled features', () => {
-      expect(isFeatureEnabled('inspect.enabled')).toBe(false);
       expect(isFeatureEnabled('create.enabled')).toBe(false);
       expect(isFeatureEnabled('compare.enabled')).toBe(false);
       expect(isFeatureEnabled('search.enabled')).toBe(false);
+    });
+
+    it('should return true for Stage 1 newly enabled features', () => {
+      expect(isFeatureEnabled('inspect.enabled')).toBe(true);
+      expect(isFeatureEnabled('api.styles.detail')).toBe(true);
     });
   });
 
@@ -139,7 +147,7 @@ describe('Feature Flags System', () => {
     });
 
     it('should return false when any specified feature is disabled', () => {
-      expect(areAllFeaturesEnabled(['vault.enabled', 'inspect.enabled'])).toBe(false);
+      expect(areAllFeaturesEnabled(['vault.enabled', 'create.enabled'])).toBe(false);
     });
 
     it('should return true for empty array', () => {
@@ -153,7 +161,7 @@ describe('Feature Flags System', () => {
     });
 
     it('should return false when all specified features are disabled', () => {
-      expect(isAnyFeatureEnabled(['inspect.enabled', 'create.enabled'])).toBe(false);
+      expect(isAnyFeatureEnabled(['compare.enabled', 'create.enabled'])).toBe(false);
     });
 
     it('should return false for empty array', () => {
@@ -162,19 +170,20 @@ describe('Feature Flags System', () => {
   });
 
   describe('getEnabledFeatures', () => {
-    it('should return only the Phase 1 enabled features', () => {
+    it('should return all Stage 1 enabled features', () => {
       const enabled = getEnabledFeatures();
       expect(enabled).toContain('vault.enabled');
       expect(enabled).toContain('auth.enabled');
       expect(enabled).toContain('nav.basic');
       expect(enabled).toContain('nav.explore');
       expect(enabled).toContain('api.styles.list');
-      expect(enabled.length).toBe(5);
+      expect(enabled).toContain('inspect.enabled');
+      expect(enabled).toContain('api.styles.detail');
+      expect(enabled.length).toBe(7);
     });
 
     it('should not include any disabled features', () => {
       const enabled = getEnabledFeatures();
-      expect(enabled).not.toContain('inspect.enabled');
       expect(enabled).not.toContain('create.enabled');
       expect(enabled).not.toContain('compare.enabled');
     });
@@ -183,7 +192,6 @@ describe('Feature Flags System', () => {
   describe('getDisabledFeatures', () => {
     it('should return all disabled features', () => {
       const disabled = getDisabledFeatures();
-      expect(disabled).toContain('inspect.enabled');
       expect(disabled).toContain('create.enabled');
       expect(disabled).toContain('compare.enabled');
       expect(disabled).toContain('search.enabled');
@@ -193,6 +201,8 @@ describe('Feature Flags System', () => {
       const disabled = getDisabledFeatures();
       expect(disabled).not.toContain('vault.enabled');
       expect(disabled).not.toContain('auth.enabled');
+      expect(disabled).not.toContain('inspect.enabled');
+      expect(disabled).not.toContain('api.styles.detail');
     });
 
     it('should have total flags = enabled + disabled', () => {
