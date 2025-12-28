@@ -10,6 +10,8 @@ import { extractTokensWithCV, extractTokensWithWalkthrough, convertToDTCG, isCVE
 import { getDefaultMetadataTags } from "./utils";
 import type { UiConceptAssets } from "@shared/schema";
 import { logger } from "../logger";
+import { storeImageToObjectStorage } from "../object-image-service";
+import { isValidImageDataUri } from "../preview-generation";
 
 const router = Router();
 
@@ -234,6 +236,17 @@ router.post("/api/styles", async (req, res) => {
     
     (async () => {
       try {
+        const refImages = style.referenceImages as string[] | null;
+        if (refImages && refImages.length > 0 && isValidImageDataUri(refImages[0])) {
+          try {
+            await storeImageToObjectStorage(refImages[0], "reference", style.id);
+            await storage.updateStyleFull(style.id, { referenceImages: [] as any });
+            logger.info(`Migrated reference image to Object Storage for style: ${style.id}`, { module: 'Styles', styleId: style.id });
+          } catch (storageErr) {
+            logger.error(`Failed to migrate reference image to Object Storage for ${style.id}`, storageErr, { module: 'Styles', styleId: style.id });
+          }
+        }
+
         logger.info(`Starting background mood board generation for style: ${style.id}`, { module: 'Styles', styleId: style.id });
         
         let moodBoard: any;

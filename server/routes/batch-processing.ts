@@ -1,10 +1,11 @@
 import { storage } from "../storage";
 import { cache, CACHE_KEYS } from "../cache";
 import { analyzeImageForStyle } from "../analysis";
-import { generateCanonicalPreviews } from "../preview-generation";
+import { generateCanonicalPreviews, isValidImageDataUri } from "../preview-generation";
 import { queueStyleForEnrichment } from "../metadata-enrichment";
 import { getDefaultMetadataTags, DEFAULT_TOKENS } from "./utils";
 import { logger } from "../logger";
+import { storeImageToObjectStorage } from "../object-image-service";
 
 export async function processBatchInBackground(batchId: string) {
   const pLimit = (await import("p-limit")).default;
@@ -44,11 +45,11 @@ export async function processBatchInBackground(batchId: string) {
         const style = await storage.createStyle({
           name: analysis.styleName || input.name || `Style from ${input.imageId.substring(0, 8)}`,
           description: analysis.description,
-          referenceImages: [input.imageBase64],
+          referenceImages: [],
           previews: {
-            portrait: previews.portrait || "",
-            landscape: previews.landscape || "",
-            stillLife: previews.stillLife || "",
+            portrait: "",
+            landscape: "",
+            stillLife: "",
           },
           tokens: DEFAULT_TOKENS,
           promptScaffolding: {
@@ -61,6 +62,33 @@ export async function processBatchInBackground(batchId: string) {
           moodBoard: { status: "pending", history: [] },
           uiConcepts: { status: "pending", history: [] },
         });
+
+        await storage.updateJobStatus(job.id, "running", {
+          progress: 80,
+          progressMessage: "Storing images to Object Storage...",
+        });
+
+        try {
+          const imageStorePromises: Promise<string>[] = [];
+          
+          if (isValidImageDataUri(input.imageBase64)) {
+            imageStorePromises.push(storeImageToObjectStorage(input.imageBase64, "reference", style.id));
+          }
+          if (isValidImageDataUri(previews.portrait)) {
+            imageStorePromises.push(storeImageToObjectStorage(previews.portrait, "preview_portrait", style.id));
+          }
+          if (isValidImageDataUri(previews.landscape)) {
+            imageStorePromises.push(storeImageToObjectStorage(previews.landscape, "preview_landscape", style.id));
+          }
+          if (isValidImageDataUri(previews.stillLife)) {
+            imageStorePromises.push(storeImageToObjectStorage(previews.stillLife, "preview_still_life", style.id));
+          }
+          
+          await Promise.all(imageStorePromises);
+          logger.info(`Stored ${imageStorePromises.length} images to Object Storage for batch style: ${style.id}`, { module: 'BatchProcessing', styleId: style.id });
+        } catch (storageErr) {
+          logger.error(`Failed to store images to Object Storage for batch style: ${style.id}`, storageErr, { module: 'BatchProcessing', styleId: style.id });
+        }
 
         queueStyleForEnrichment(style.id);
 
