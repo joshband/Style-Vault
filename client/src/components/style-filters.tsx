@@ -116,7 +116,7 @@ export function StyleFilters({ filters, onFiltersChange, className }: StyleFilte
   return (
     <div className={cn("flex flex-col gap-3", className)}>
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[200px] max-w-md">
+        <div className="relative flex-1 min-w-[140px] sm:min-w-[200px] max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Search styles..."
@@ -205,7 +205,7 @@ export function StyleFilters({ filters, onFiltersChange, className }: StyleFilte
 
         <Select value={filters.sortBy} onValueChange={handleSortChange}>
           <SelectTrigger 
-            className="w-[150px]" 
+            className="w-[120px] sm:w-[150px]" 
             data-testid="select-sort"
           >
             <ArrowUpDown className="w-4 h-4 mr-2" />

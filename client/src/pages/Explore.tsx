@@ -21,7 +21,7 @@ interface PaginatedResponse {
 }
 
 const PAGE_SIZE = 12;
-const CARD_MIN_WIDTH = 280;
+const CARD_MIN_WIDTH = 260;
 
 export default function Explore() {
   const queryClient = useQueryClient();
