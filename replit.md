@@ -51,6 +51,7 @@ Preferred communication style: Simple, everyday language.
 - **Pluggable Storage**: Utilizes in-memory storage for development and production-ready interfaces for cloud services.
 - **Python Pipeline Backend**: Modular Python services for advanced functionalities like DTCG validation, canonical assembly, semantic search, safety hardening, and material intelligence.
 - **Material Intelligence Panel**: Interactive UI component in the Style Inspector for analyzing material properties, viewing detected components, and exploring matched recipes with layer topology and interaction bindings.
+- **Image Service Migration**: `server/image-service.ts` functions (storeImage, getImage, migrateStyleImages) are deprecated in favor of `server/object-image-service.ts`. Admin endpoints `/api/admin/migrate-to-object-storage` and `/api/admin/migration-status` facilitate migrating existing `imageAssets` table data to `objectAssets` table with Object Storage backing.
 
 ## External Dependencies
 
