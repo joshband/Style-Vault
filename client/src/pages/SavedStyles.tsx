@@ -223,7 +223,11 @@ function EditCollectionDialog({ collection, open, onOpenChange, onUpdated }: {
         onUpdated(updated);
         notify.success("Collection updated");
         onOpenChange(false);
+      } else {
+        notify.error("Failed to update collection");
       }
+    } catch {
+      notify.error("Failed to update collection");
     } finally {
       setLoading(false);
     }
