@@ -11,7 +11,12 @@ Preferred communication style: Simple, everyday language.
 ### UI/UX Decisions
 - **Framework**: React 18 with TypeScript.
 - **Styling**: Tailwind CSS v4 with shadcn/ui (New York style) for a modern, consistent look.
-- **Animations**: Framer Motion for smooth, engaging user interactions.
+- **Animations**: Framer Motion for smooth page transitions, hover effects, and micro-interactions.
+- **Loading States**: Skeleton loaders with shimmer animations for cards and lists, blur-up lazy image loading with IntersectionObserver.
+- **Empty States**: Illustrated empty state components (NoStylesEmpty, NoBookmarksEmpty, NoSearchResultsEmpty, NoCollectionsEmpty, etc.) with animated icons and helpful CTAs.
+- **Notifications**: Sonner toast system with specialized notifications for styles, collections, exports, and errors.
+- **Onboarding**: First-time user welcome modal with feature highlights (stored in localStorage).
+- **Mobile Responsive**: Responsive grids (260px min-width cards), collapsible sidebar, touch-friendly interactions.
 
 ### Technical Implementations
 - **Frontend**: Utilizes Wouter for routing, TanStack React Query for state management, and Vite for building.
