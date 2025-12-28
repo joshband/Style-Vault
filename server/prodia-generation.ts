@@ -1,6 +1,7 @@
 import { generateWithFluxSchnell, isProdiaEnabled, ProdiaGenerationResult } from "./prodia-service";
 import { storage } from "./storage";
 import { ai, generateWithGemini, generateWithOpenAI, analyzeRenderingStyle, RenderingStyle } from "./replit_integrations/image/client";
+import { withImageGenRetry } from "./retry-utils";
 
 type ProgressCallback = (progress: number, message: string) => Promise<void>;
 type ImageProvider = "gemini" | "openai" | "prodia";
@@ -19,19 +20,20 @@ async function analyzeReferenceImage(base64Image: string): Promise<ImageAnalysis
     const mimeType = mimeMatch?.[1] || "image/jpeg";
     const base64Data = base64Image.replace(/^data:image\/[a-z]+;base64,/, "");
     
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: [{
-        role: "user",
-        parts: [
-          {
-            inlineData: {
-              mimeType,
-              data: base64Data,
+    const response = await withImageGenRetry(
+      () => ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [{
+          role: "user",
+          parts: [
+            {
+              inlineData: {
+                mimeType,
+                data: base64Data,
+              },
             },
-          },
-          {
-            text: `Analyze this image for art style transfer. Return a JSON object with:
+            {
+              text: `Analyze this image for art style transfer. Return a JSON object with:
 {
   "hasSubject": boolean - true if there's a clear identifiable subject/scene,
   "subjectType": "portrait" | "landscape" | "still_life" | "abstract" | "ui" | "other",
@@ -40,10 +42,12 @@ async function analyzeReferenceImage(base64Image: string): Promise<ImageAnalysis
   "artisticStyle": "Brief description of the artistic rendering style (e.g., 'painterly oil', 'digital illustration', 'watercolor wash')"
 }
 Only return valid JSON, no markdown.`,
-          },
-        ],
-      }],
-    });
+            },
+          ],
+        }],
+      }),
+      "Gemini image analysis"
+    );
     
     const text = response.candidates?.[0]?.content?.parts?.[0];
     if (!text || typeof text !== "object" || !("text" in text)) return null;
@@ -215,23 +219,32 @@ async function generateWithStyleTransfer(
       
       switch (provider) {
         case "gemini":
-          imageBase64 = await generateWithGemini(prompt, {
-            referenceImageBase64,
-            renderingStyle: renderingStyle || undefined,
-          });
+          imageBase64 = await withImageGenRetry(
+            () => generateWithGemini(prompt, {
+              referenceImageBase64,
+              renderingStyle: renderingStyle || undefined,
+            }),
+            "Gemini image generation"
+          );
           break;
           
         case "openai":
-          imageBase64 = await generateWithOpenAI(prompt, {
-            renderingStyle: renderingStyle || undefined,
-          });
+          imageBase64 = await withImageGenRetry(
+            () => generateWithOpenAI(prompt, {
+              renderingStyle: renderingStyle || undefined,
+            }),
+            "OpenAI image generation"
+          );
           break;
           
         case "prodia":
           if (!isProdiaEnabled()) {
             throw new Error("Prodia not configured");
           }
-          const prodiaResult = await generateWithFluxSchnell({ prompt });
+          const prodiaResult = await withImageGenRetry(
+            () => generateWithFluxSchnell({ prompt }),
+            "Prodia image generation"
+          );
           if (!prodiaResult.success || !prodiaResult.imageBase64) {
             throw new Error(prodiaResult.error || "Prodia generation failed");
           }
