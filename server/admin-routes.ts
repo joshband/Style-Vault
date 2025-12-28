@@ -9,7 +9,7 @@ import { testRuns, testCases } from "@shared/schema";
 import { desc, eq, sql } from "drizzle-orm";
 import { regenerateAllStyles, regenerateSingleStyle, getRegenerationProgress, cancelRegeneration, generateRegenerationReport, type BatchRegenerationProgress, type RegenerationResult } from "./style-regeneration";
 import { migrateStyleImages } from "./image-service";
-import { storeImageToObjectStorage, getObjectAssetsByStyle } from "./object-image-service";
+import { storeImageToObjectStorage, getObjectAssetsByStyle, migrateStyleToObjectStorage } from "./object-image-service";
 import { imageAssets } from "@shared/schema";
 
 type ImageType = "reference" | "previews" | "mood_board" | "ui_concepts" | "all";
@@ -837,16 +837,16 @@ export function registerAdminRoutes(app: Express) {
             continue;
           }
           
-          // Migrate images
-          const imageIds = await migrateStyleImages(style.id, {
+          // Migrate images to Object Storage
+          const imageIds = await migrateStyleToObjectStorage(style.id, {
             referenceImages: referenceImages || undefined,
             previews: previews || undefined,
             moodBoard: moodBoard || undefined,
             uiConcepts: uiConcepts || undefined,
           });
           
-          // Note: imageIds are stored in the image_assets table automatically by migrateStyleImages
-          // No need to update styles table - the storeImage function links assets to styleId
+          // Note: imageIds are stored in the object_assets table automatically by migrateStyleToObjectStorage
+          // No need to update styles table - the storeImageToObjectStorage function links assets to styleId
           
           // Optionally clear old base64 data to reduce database size
           if (clearOldData) {

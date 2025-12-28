@@ -11,7 +11,7 @@ import { extractTokensWithCV } from "./cv-bridge";
 import { enrichStyleMetadata } from "./metadata-enrichment";
 import { pipelineBridge } from "./pipeline-bridge";
 import { generateMaterialTokensWithAI, type MaterialSignals, type TextureSignals } from "./component-ai-classification";
-import { storeImageToObjectStorage } from "./object-image-service";
+import { storeImageToObjectStorage, getReferenceImageBase64 } from "./object-image-service";
 import crypto from "crypto";
 import type { Style, MetadataTags, InsertStyleVersion, MoodBoardAssets, UiConceptAssets } from "@shared/schema";
 import { logger } from "./logger";
@@ -161,7 +161,14 @@ async function regenerateStyle(style: Style): Promise<RegenerationResult> {
   await saveVersionSnapshot(style.id, beforeSnapshot, "manual_save", "Pre-regeneration snapshot");
   
   const refImages = style.referenceImages as string[] | null;
-  const refImage = refImages && refImages.length > 0 ? refImages[0] : null;
+  let refImage = refImages && refImages.length > 0 ? refImages[0] : null;
+  
+  if (!refImage) {
+    refImage = await getReferenceImageBase64(style.id);
+    if (refImage) {
+      logger.info(`Fetched reference image from Object Storage for style ${style.id}`, { module: 'StyleRegeneration' });
+    }
+  }
   
   let currentTokens = style.tokens as Record<string, any>;
   let materialSignature: any = null;
