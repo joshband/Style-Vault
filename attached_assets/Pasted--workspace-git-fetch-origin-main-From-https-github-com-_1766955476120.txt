@@ -1,0 +1,86 @@
+~/workspace$ git fetch origin main
+From https://github.com/joshband/Style-Vault
+ * branch            main       -> FETCH_HEAD
+ + 4a388e3...6ef4b2c main       -> origin/main  (forced update)
+~/workspace$ git merge origin/main
+Auto-merging .replit
+CONFLICT (content): Merge conflict in .replit
+warning: Cannot merge binary files: client/public/opengraph.jpg (HEAD vs. origin/main)
+Auto-merging client/public/opengraph.jpg
+CONFLICT (content): Merge conflict in client/public/opengraph.jpg
+Auto-merging client/src/App.tsx
+CONFLICT (content): Merge conflict in client/src/App.tsx
+Auto-merging client/src/components/color-palette-swatches.tsx
+CONFLICT (add/add): Merge conflict in client/src/components/color-palette-swatches.tsx
+Auto-merging client/src/components/deploy-dialog.tsx
+CONFLICT (add/add): Merge conflict in client/src/components/deploy-dialog.tsx
+Auto-merging client/src/components/export-dialog.tsx
+CONFLICT (add/add): Merge conflict in client/src/components/export-dialog.tsx
+Auto-merging client/src/components/layout.tsx
+CONFLICT (content): Merge conflict in client/src/components/layout.tsx
+Auto-merging client/src/components/lazy-image.tsx
+CONFLICT (add/add): Merge conflict in client/src/components/lazy-image.tsx
+Auto-merging client/src/components/style-card-skeleton.tsx
+CONFLICT (add/add): Merge conflict in client/src/components/style-card-skeleton.tsx
+Auto-merging client/src/components/style-card.tsx
+CONFLICT (content): Merge conflict in client/src/components/style-card.tsx
+Auto-merging client/src/components/style-filters.tsx
+CONFLICT (add/add): Merge conflict in client/src/components/style-filters.tsx
+Auto-merging client/src/components/token-viewer.tsx
+CONFLICT (content): Merge conflict in client/src/components/token-viewer.tsx
+Auto-merging client/src/lib/exporters/figma-variables.ts
+CONFLICT (add/add): Merge conflict in client/src/lib/exporters/figma-variables.ts
+Auto-merging client/src/lib/exporters/index.ts
+CONFLICT (add/add): Merge conflict in client/src/lib/exporters/index.ts
+Auto-merging client/src/lib/store.ts
+Auto-merging client/src/lib/token-exporters.ts
+CONFLICT (add/add): Merge conflict in client/src/lib/token-exporters.ts
+Auto-merging client/src/lib/token-importers.ts
+CONFLICT (add/add): Merge conflict in client/src/lib/token-importers.ts
+Auto-merging client/src/pages/Author.tsx
+CONFLICT (add/add): Merge conflict in client/src/pages/Author.tsx
+Auto-merging client/src/pages/Explore.tsx
+CONFLICT (add/add): Merge conflict in client/src/pages/Explore.tsx
+Auto-merging client/src/pages/Inspect.tsx
+CONFLICT (add/add): Merge conflict in client/src/pages/Inspect.tsx
+Auto-merging client/src/pages/SavedStyles.tsx
+CONFLICT (add/add): Merge conflict in client/src/pages/SavedStyles.tsx
+Auto-merging package-lock.json
+CONFLICT (content): Merge conflict in package-lock.json
+Auto-merging package.json
+CONFLICT (content): Merge conflict in package.json
+Auto-merging pyproject.toml
+CONFLICT (add/add): Merge conflict in pyproject.toml
+Auto-merging replit.md
+CONFLICT (content): Merge conflict in replit.md
+Auto-merging server/analysis.ts
+Auto-merging server/background-worker.ts
+CONFLICT (add/add): Merge conflict in server/background-worker.ts
+Auto-merging server/cv-bridge.ts
+CONFLICT (add/add): Merge conflict in server/cv-bridge.ts
+Auto-merging server/image-service.ts
+CONFLICT (add/add): Merge conflict in server/image-service.ts
+Auto-merging server/job-runner.ts
+CONFLICT (add/add): Merge conflict in server/job-runner.ts
+Auto-merging server/metadata-enrichment.ts
+CONFLICT (add/add): Merge conflict in server/metadata-enrichment.ts
+Auto-merging server/mood-board-generation.ts
+CONFLICT (add/add): Merge conflict in server/mood-board-generation.ts
+Auto-merging server/object-image-service.ts
+CONFLICT (add/add): Merge conflict in server/object-image-service.ts
+Auto-merging server/preview-generation.ts
+CONFLICT (content): Merge conflict in server/preview-generation.ts
+Auto-merging server/remix.ts
+CONFLICT (add/add): Merge conflict in server/remix.ts
+Auto-merging server/routes.ts
+CONFLICT (content): Merge conflict in server/routes.ts
+Auto-merging server/storage.ts
+CONFLICT (content): Merge conflict in server/storage.ts
+Auto-merging server/token-cache.ts
+CONFLICT (add/add): Merge conflict in server/token-cache.ts
+Auto-merging shared/schema.ts
+CONFLICT (content): Merge conflict in shared/schema.ts
+Auto-merging uv.lock
+CONFLICT (add/add): Merge conflict in uv.lock
+Automatic merge failed; fix conflicts and then commit the result.
+~/workspace$ 
