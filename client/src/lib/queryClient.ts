@@ -46,12 +46,31 @@ export const queryClient = new QueryClient({
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
-      refetchOnWindowFocus: false,
-      staleTime: Infinity,
-      retry: false,
+      refetchOnWindowFocus: true,
+      staleTime: 1000 * 60 * 2,
+      gcTime: 1000 * 60 * 10,
+      retry: 1,
+      retryDelay: 1000,
     },
     mutations: {
       retry: false,
     },
   },
 });
+
+export function invalidateStyleQueries() {
+  queryClient.invalidateQueries({ queryKey: ["/api/styles"] });
+}
+
+export function invalidateUserQueries() {
+  queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
+  queryClient.invalidateQueries({ queryKey: ["/api/my-styles"] });
+  queryClient.invalidateQueries({ queryKey: ["/api/collections"] });
+}
+
+export function prefetchStyle(styleId: string) {
+  queryClient.prefetchQuery({
+    queryKey: ["/api/styles", styleId],
+    staleTime: 1000 * 60 * 5,
+  });
+}

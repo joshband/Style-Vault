@@ -1,14 +1,17 @@
 import { deleteStyleApi, type Style } from "@/lib/store";
 import { StyleCard } from "@/components/style-card";
-import { StyleCardSkeleton } from "@/components/style-card-skeleton";
+import { StyleCardSkeleton, StyleGridSkeleton } from "@/components/style-card-skeleton";
 import { StyleFilters, DEFAULT_FILTERS, type StyleFiltersState } from "@/components/style-filters";
 import { Layout } from "@/components/layout";
 import { motion, AnimatePresence } from "framer-motion";
-import { RefreshCw, PenTool, Loader2, GitCompareArrows, X, Check } from "lucide-react";
+import { RefreshCw, Loader2, GitCompareArrows, X, Check } from "lucide-react";
 import { useCallback, useRef, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
+import { NoStylesEmpty, NoSearchResultsEmpty, ErrorState } from "@/components/empty-state";
+import { PageTransition } from "@/components/page-transition";
+import { notify } from "@/lib/notifications";
 
 interface PaginatedResponse {
   items: Style[];
@@ -99,8 +102,12 @@ export default function Explore() {
 
   const deleteMutation = useMutation({
     mutationFn: deleteStyleApi,
-    onSuccess: () => {
+    onSuccess: (_, deletedId) => {
       queryClient.invalidateQueries({ queryKey: ["/api/styles"] });
+      notify.success("Style deleted");
+    },
+    onError: () => {
+      notify.error("Failed to delete style");
     },
   });
 
@@ -225,77 +232,19 @@ export default function Explore() {
         <StyleFilters filters={filters} onFiltersChange={handleFiltersChange} />
 
         {isError && (
-          <div className="py-16 text-center border border-dashed border-destructive/50 rounded-lg bg-destructive/5">
-            <p className="text-destructive mb-2">Unable to load your styles</p>
-            <p className="text-sm text-muted-foreground mb-4">
-              Please check your connection and try again.
-            </p>
-            <Button 
-              variant="outline" 
-              onClick={handleRetry}
-              data-testid="button-retry-load"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Try Again
-            </Button>
-          </div>
+          <ErrorState 
+            title="Unable to load your styles" 
+            description="Please check your connection and try again."
+            onRetry={handleRetry}
+          />
         )}
 
         {!isError && allStyles.length === 0 && !hasActiveFilters && (
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-            className="py-20 px-6 text-center border border-dashed border-border rounded-xl"
-          >
-            <div className="max-w-md mx-auto space-y-4">
-              <h2 className="text-xl font-serif font-medium text-foreground">
-                What is a style?
-              </h2>
-              <p className="text-muted-foreground leading-relaxed">
-                A style is a reusable visual language — a captured essence of color, mood, texture, and form. 
-                It's not just an image or a prompt. It's a living artifact you can apply to generate 
-                new visuals that feel cohesive and intentional.
-              </p>
-              <div className="pt-4">
-                <Link href="/create">
-                  <Button 
-                    size="lg" 
-                    className="gap-2"
-                    data-testid="button-create-first-style"
-                  >
-                    <PenTool className="w-4 h-4" />
-                    Create your first style
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          </motion.div>
+          <NoStylesEmpty />
         )}
 
         {!isError && allStyles.length === 0 && hasActiveFilters && (
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-            className="py-16 px-6 text-center border border-dashed border-border rounded-xl"
-          >
-            <div className="max-w-md mx-auto space-y-4">
-              <h2 className="text-lg font-medium text-foreground">
-                No styles match your filters
-              </h2>
-              <p className="text-muted-foreground text-sm">
-                Try adjusting your search terms or removing some filters to see more results.
-              </p>
-              <Button 
-                variant="outline" 
-                onClick={() => setFilters(DEFAULT_FILTERS)}
-                data-testid="button-clear-all-filters"
-              >
-                Clear all filters
-              </Button>
-            </div>
-          </motion.div>
+          <NoSearchResultsEmpty onClear={() => setFilters(DEFAULT_FILTERS)} />
         )}
 
         {!isError && allStyles.length > 0 && (
