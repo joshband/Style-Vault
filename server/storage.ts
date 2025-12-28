@@ -154,11 +154,14 @@ export interface IStorage {
 
 export class DatabaseStorage implements IStorage {
   // Style operations
-  async getStyles(): Promise<Style[]> {
-    return db.select().from(styles).orderBy(desc(styles.createdAt));
+  async getStyles(includeArchived = false): Promise<Style[]> {
+    if (includeArchived) {
+      return db.select().from(styles).orderBy(desc(styles.createdAt));
+    }
+    return db.select().from(styles).where(eq(styles.isArchived, false)).orderBy(desc(styles.createdAt));
   }
 
-  async getStyleSummaries(): Promise<StyleSummary[]> {
+  async getStyleSummaries(includeArchived = false): Promise<StyleSummary[]> {
     const allStyles = await db
       .select({
         id: styles.id,
@@ -171,11 +174,13 @@ export class DatabaseStorage implements IStorage {
         previews: styles.previews,
         creatorId: styles.creatorId,
         isPublic: styles.isPublic,
+        isArchived: styles.isArchived,
         creatorFirstName: users.firstName,
         creatorLastName: users.lastName,
       })
       .from(styles)
       .leftJoin(users, eq(styles.creatorId, users.id))
+      .where(includeArchived ? undefined : eq(styles.isArchived, false))
       .orderBy(desc(styles.createdAt));
     
     return allStyles.map(s => {
@@ -219,7 +224,7 @@ export class DatabaseStorage implements IStorage {
       creatorLastName: users.lastName,
     };
     
-    const conditions: any[] = [];
+    const conditions: any[] = [eq(styles.isArchived, false)];
     
     if (cursor) {
       const sortBy = filters?.sortBy || "newest";
@@ -285,7 +290,7 @@ export class DatabaseStorage implements IStorage {
     
     let total: number;
     if (filters?.search || filters?.mood?.length || filters?.colorFamily?.length) {
-      const countConditions: any[] = [];
+      const countConditions: any[] = [eq(styles.isArchived, false)];
       if (filters.search) {
         const searchTerm = `%${filters.search.toLowerCase()}%`;
         countConditions.push(sql`(LOWER(${styles.name}) LIKE ${searchTerm} OR LOWER(${styles.description}) LIKE ${searchTerm} OR EXISTS (SELECT 1 FROM jsonb_array_elements_text(${styles.metadataTags}->'keywords') AS kw WHERE LOWER(kw) LIKE ${searchTerm}))`);
@@ -351,8 +356,10 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async getStyleCount(): Promise<number> {
-    const result = await db.select({ count: sql<number>`count(*)::int` }).from(styles);
+  async getStyleCount(includeArchived = false): Promise<number> {
+    const result = includeArchived
+      ? await db.select({ count: sql<number>`count(*)::int` }).from(styles)
+      : await db.select({ count: sql<number>`count(*)::int` }).from(styles).where(eq(styles.isArchived, false));
     return result[0]?.count ?? 0;
   }
 

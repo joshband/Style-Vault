@@ -166,6 +166,7 @@ export const styles = pgTable("styles", {
   updatedAt: timestamp("updated_at"),
   creatorId: varchar("creator_id"),
   isPublic: boolean("is_public").default(true).notNull(),
+  isArchived: boolean("is_archived").default(false).notNull(),
   shareCode: varchar("share_code").unique(),
   styleSpec: jsonb("style_spec").$type<StyleSpec>(),
   referenceImages: jsonb("reference_images").$type<string[]>().default([]),
