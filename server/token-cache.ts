@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { db } from "./db";
 import { tokenCache, type InsertTokenCache } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import { logger } from "./logger";
 
 const CACHE_EXPIRY_DAYS = 30;
 
@@ -83,22 +84,22 @@ export async function getCachedTokens(imageHash: string): Promise<Record<string,
     
     if (!cached) {
       cacheMetrics.misses++;
-      console.log(`[Token Cache] MISS for hash ${imageHash.substring(0, 8)}...`);
+      logger.debug(`MISS for hash ${imageHash.substring(0, 8)}...`, { module: 'TokenCache' });
       return null;
     }
     
     if (cached.expiresAt && new Date(cached.expiresAt) < new Date()) {
       await db.delete(tokenCache).where(eq(tokenCache.imageHash, imageHash));
       cacheMetrics.misses++;
-      console.log(`[Token Cache] EXPIRED for hash ${imageHash.substring(0, 8)}...`);
+      logger.debug(`EXPIRED for hash ${imageHash.substring(0, 8)}...`, { module: 'TokenCache' });
       return null;
     }
     
     cacheMetrics.hits++;
-    console.log(`[Token Cache] HIT for hash ${imageHash.substring(0, 8)}... (total hits: ${cacheMetrics.hits})`);
+    logger.debug(`HIT for hash ${imageHash.substring(0, 8)}... (total hits: ${cacheMetrics.hits})`, { module: 'TokenCache' });
     return cached.tokens;
   } catch (error) {
-    console.error("[Token Cache] Error reading cache:", error);
+    logger.error("Error reading cache", error, { module: 'TokenCache' });
     return null;
   }
 }
@@ -122,22 +123,22 @@ export async function getCachedStep(
     
     if (!cached) {
       cacheMetrics.stepMisses[stepType]++;
-      console.log(`[CV Cache] MISS ${stepType} for ${imageHash.substring(0, 8)}...`);
+      logger.debug(`MISS ${stepType} for ${imageHash.substring(0, 8)}...`, { module: 'TokenCache', operation: 'cvCache' });
       return null;
     }
     
     if (cached.expiresAt && new Date(cached.expiresAt) < new Date()) {
       await db.delete(tokenCache).where(eq(tokenCache.imageHash, cacheKey));
       cacheMetrics.stepMisses[stepType]++;
-      console.log(`[CV Cache] EXPIRED ${stepType} for ${imageHash.substring(0, 8)}...`);
+      logger.debug(`EXPIRED ${stepType} for ${imageHash.substring(0, 8)}...`, { module: 'TokenCache', operation: 'cvCache' });
       return null;
     }
     
     cacheMetrics.stepHits[stepType]++;
-    console.log(`[CV Cache] HIT ${stepType} for ${imageHash.substring(0, 8)}... (${stepType} hits: ${cacheMetrics.stepHits[stepType]})`);
+    logger.debug(`HIT ${stepType} for ${imageHash.substring(0, 8)}... (${stepType} hits: ${cacheMetrics.stepHits[stepType]})`, { module: 'TokenCache', operation: 'cvCache' });
     return cached.tokens;
   } catch (error) {
-    console.error(`[CV Cache] Error reading ${stepType} cache:`, error);
+    logger.error(`Error reading ${stepType} cache`, error, { module: 'TokenCache', operation: 'cvCache' });
     return null;
   }
 }
@@ -176,9 +177,9 @@ export async function setCachedStep(
         },
       });
     
-    console.log(`[CV Cache] STORED ${stepType} for ${imageHash.substring(0, 8)}... (${processingTimeMs}ms)`);
+    logger.debug(`STORED ${stepType} for ${imageHash.substring(0, 8)}... (${processingTimeMs}ms)`, { module: 'TokenCache', operation: 'cvCache', duration: processingTimeMs });
   } catch (error) {
-    console.error(`[CV Cache] Error storing ${stepType} cache:`, error);
+    logger.error(`Error storing ${stepType} cache`, error, { module: 'TokenCache', operation: 'cvCache' });
   }
 }
 
@@ -209,18 +210,18 @@ export async function setCachedTokens(
         },
       });
     
-    console.log(`[Token Cache] Stored tokens for hash ${imageHash.substring(0, 8)}...`);
+    logger.debug(`Stored tokens for hash ${imageHash.substring(0, 8)}...`, { module: 'TokenCache' });
   } catch (error) {
-    console.error("[Token Cache] Error storing cache:", error);
+    logger.error("Error storing cache", error, { module: 'TokenCache' });
   }
 }
 
 export async function invalidateCache(imageHash: string): Promise<void> {
   try {
     await db.delete(tokenCache).where(eq(tokenCache.imageHash, imageHash));
-    console.log(`[Token Cache] Invalidated cache for hash ${imageHash.substring(0, 8)}...`);
+    logger.debug(`Invalidated cache for hash ${imageHash.substring(0, 8)}...`, { module: 'TokenCache' });
   } catch (error) {
-    console.error("[Token Cache] Error invalidating cache:", error);
+    logger.error("Error invalidating cache", error, { module: 'TokenCache' });
   }
 }
 
@@ -232,7 +233,7 @@ export async function clearExpiredCache(): Promise<number> {
     
     return 0;
   } catch (error) {
-    console.error("[Token Cache] Error clearing expired cache:", error);
+    logger.error("Error clearing expired cache", error, { module: 'TokenCache' });
     return 0;
   }
 }
@@ -242,7 +243,7 @@ export async function getCacheStats(): Promise<{ total: number; hitRate?: number
     const result = await db.select().from(tokenCache);
     return { total: result.length };
   } catch (error) {
-    console.error("[Token Cache] Error getting stats:", error);
+    logger.error("Error getting stats", error, { module: 'TokenCache' });
     return { total: 0 };
   }
 }

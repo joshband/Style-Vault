@@ -4,6 +4,7 @@ import { analyzeImageForStyle } from "../analysis";
 import { generateCanonicalPreviews } from "../preview-generation";
 import { queueStyleForEnrichment } from "../metadata-enrichment";
 import { getDefaultMetadataTags, DEFAULT_TOKENS } from "./utils";
+import { logger } from "../logger";
 
 export async function processBatchInBackground(batchId: string) {
   const pLimit = (await import("p-limit")).default;
@@ -73,7 +74,7 @@ export async function processBatchInBackground(batchId: string) {
 
         return { success: true, styleId: style.id };
       } catch (error) {
-        console.error(`Batch job ${job.id} failed:`, error);
+        logger.error(`Batch job ${job.id} failed`, error, { module: 'BatchProcessing', jobId: job.id });
         await storage.updateJobStatus(job.id, "failed", {
           error: error instanceof Error ? error.message : "Unknown error",
         });
@@ -93,7 +94,7 @@ export async function processBatchInBackground(batchId: string) {
     cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
     
   } catch (error) {
-    console.error("Batch processing failed:", error);
+    logger.error("Batch processing failed", error, { module: 'BatchProcessing' });
     await storage.updateBatchStatus(batchId, "failed");
   }
 }

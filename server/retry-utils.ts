@@ -1,4 +1,5 @@
 import pRetry, { AbortError } from "p-retry";
+import { logger } from "./logger";
 
 export interface RetryConfig {
   retries?: number;
@@ -14,7 +15,7 @@ const DEFAULT_CONFIG: Required<RetryConfig> = {
   maxTimeout: 30000,
   factor: 2,
   onRetry: (error, attempt) => {
-    console.log(`[Retry] Attempt ${attempt} failed: ${error.message}`);
+    logger.warn(`Attempt ${attempt} failed: ${error.message}`, { module: 'RetryUtils' });
   },
 };
 
@@ -90,7 +91,7 @@ export async function withAIRetry<T>(
     maxTimeout: 60000,
     factor: 2.5,
     onRetry: (error, attempt) => {
-      console.log(`[${operationName}] Retry attempt ${attempt}: ${error.message}`);
+      logger.warn(`${operationName} retry attempt ${attempt}: ${error.message}`, { module: 'RetryUtils', operation: operationName });
     },
   });
 }
@@ -105,7 +106,7 @@ export async function withImageGenRetry<T>(
     maxTimeout: 60000,
     factor: 2.5,
     onRetry: (error, attempt) => {
-      console.log(`[${operationName}] Retry attempt ${attempt}: ${error.message}`);
+      logger.warn(`${operationName} retry attempt ${attempt}: ${error.message}`, { module: 'RetryUtils', operation: operationName });
     },
   });
 }

@@ -449,7 +449,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createStyle(insertStyle: InsertStyle): Promise<Style> {
-    const [style] = await db.insert(styles).values(insertStyle).returning();
+    const [style] = await db.insert(styles).values([insertStyle as typeof styles.$inferInsert]).returning();
     return style;
   }
 
@@ -604,7 +604,7 @@ export class DatabaseStorage implements IStorage {
 
   // Job operations for async task tracking
   async createJob(insertJob: InsertJob): Promise<Job> {
-    const [job] = await db.insert(jobs).values(insertJob).returning();
+    const [job] = await db.insert(jobs).values([insertJob as typeof jobs.$inferInsert]).returning();
     return job;
   }
 
@@ -716,7 +716,7 @@ export class DatabaseStorage implements IStorage {
 
   // Batch operations
   async createBatch(insertBatch: InsertBatch): Promise<Batch> {
-    const [batch] = await db.insert(batches).values(insertBatch).returning();
+    const [batch] = await db.insert(batches).values([insertBatch as typeof batches.$inferInsert]).returning();
     return batch;
   }
 
@@ -1223,7 +1223,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createStyleVersion(version: InsertStyleVersion): Promise<StyleVersion> {
-    const [created] = await db.insert(styleVersions).values(version).returning();
+    const [created] = await db.insert(styleVersions).values([version as typeof styleVersions.$inferInsert]).returning();
     return created;
   }
 
@@ -1282,7 +1282,7 @@ export class DatabaseStorage implements IStorage {
 
   // Admin metrics operations
   async recordMetric(metric: InsertAdminMetric): Promise<AdminMetric> {
-    const [created] = await db.insert(adminMetrics).values(metric).returning();
+    const [created] = await db.insert(adminMetrics).values([metric as typeof adminMetrics.$inferInsert]).returning();
     return created;
   }
 
@@ -1400,7 +1400,7 @@ export class DatabaseStorage implements IStorage {
 
   async updateStyleFull(id: string, updates: Partial<InsertStyle>): Promise<Style | undefined> {
     const [updated] = await db.update(styles)
-      .set({ ...updates, updatedAt: new Date() })
+      .set({ ...updates, updatedAt: new Date() } as typeof styles.$inferInsert)
       .where(eq(styles.id, id))
       .returning();
     return updated;

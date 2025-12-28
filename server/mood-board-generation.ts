@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import type { MetadataTags, MoodBoardAssets, UiConceptAssets } from "@shared/schema";
+import { logger } from "./logger";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
@@ -342,7 +343,7 @@ export async function generateMoodBoardCollage(
 
     return { collage: "", status: "failed", history: [] };
   } catch (error) {
-    console.error("Mood board generation failed:", error);
+    logger.error("Mood board generation failed", error, { module: 'MoodBoardGeneration' });
     return { collage: "", status: "failed", history: [] };
   }
 }
@@ -418,7 +419,7 @@ ${prompt}`;
 
     return extractImageFromResponse(response);
   } catch (error) {
-    console.error(`UI concept ${conceptType} generation failed:`, error);
+    logger.error("UI concept generation failed", error, { module: 'MoodBoardGeneration', conceptType });
     return null;
   }
 }

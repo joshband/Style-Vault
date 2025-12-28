@@ -4,6 +4,7 @@ import { sql } from "drizzle-orm";
 import { storage } from "../storage";
 import { isCVExtractionEnabled } from "../cv-bridge";
 import { getCacheStats, getCacheMetrics, resetCacheMetrics } from "../token-cache";
+import { logger } from "../logger";
 
 const router = Router();
 
@@ -24,7 +25,7 @@ router.get("/api/health", async (req, res) => {
       environment: process.env.NODE_ENV || "unknown",
     });
   } catch (error) {
-    console.error("Health check failed:", error);
+    logger.error("Health check failed", error, { module: 'System' });
     res.status(500).json({
       status: "unhealthy",
       database: "disconnected",
@@ -104,7 +105,7 @@ router.get("/api/diagnostics", async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Diagnostics error:", error);
+    logger.error("Diagnostics error", error, { module: 'System' });
     res.status(500).json({
       error: "Failed to gather diagnostics",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -169,14 +170,14 @@ router.get("/api/cache/metrics", async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Cache metrics error:", error);
+    logger.error("Cache metrics error", error, { module: 'System' });
     res.status(500).json({ error: "Failed to get cache metrics" });
   }
 });
 
 router.post("/api/cache/metrics/reset", (req, res) => {
   resetCacheMetrics();
-  console.log("[CV Cache] Metrics reset");
+  logger.info("Cache metrics reset", { module: 'System' });
   res.json({ message: "Cache metrics reset successfully" });
 });
 

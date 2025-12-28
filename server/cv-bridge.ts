@@ -18,6 +18,7 @@ import {
   type AnalysisSettings 
 } from './token-cache';
 import { storage } from './storage';
+import { logger } from './logger';
 
 const getModuleDir = (): string => {
   if (typeof import.meta.url !== 'undefined') {
@@ -153,7 +154,7 @@ export async function extractTokensWithCV(imageBase64: string, useCache: boolean
       const processingTimeMs = Date.now() - startTime;
 
       if (code !== 0) {
-        console.error('[CV Bridge] Python process failed:', stderr);
+        logger.error('Python process failed', new Error(stderr), { module: 'CVBridge' });
         storage.recordMetric({
           type: "token_extraction",
           durationMs: processingTimeMs,
@@ -188,7 +189,7 @@ export async function extractTokensWithCV(imageBase64: string, useCache: boolean
           processingTimeMs,
         });
       } catch (parseError) {
-        console.error('[CV Bridge] Failed to parse output:', stdout);
+        logger.error('Failed to parse output', parseError, { module: 'CVBridge' });
         storage.recordMetric({
           type: "token_extraction",
           durationMs: processingTimeMs,
@@ -204,7 +205,7 @@ export async function extractTokensWithCV(imageBase64: string, useCache: boolean
     });
 
     pythonProcess.on('error', (err) => {
-      console.error('[CV Bridge] Process error:', err);
+      logger.error('Process error', err, { module: 'CVBridge' });
       resolve({
         success: false,
         error: `Process error: ${err.message}`,
@@ -249,7 +250,7 @@ export async function extractTokensWithWalkthrough(imageBase64: string): Promise
       const processingTimeMs = Date.now() - startTime;
 
       if (code !== 0) {
-        console.error('[CV Bridge] Walkthrough process failed:', stderr);
+        logger.error('Walkthrough process failed', new Error(stderr), { module: 'CVBridge' });
         resolve({
           success: false,
           error: stderr || 'CV walkthrough extraction failed',
@@ -267,7 +268,7 @@ export async function extractTokensWithWalkthrough(imageBase64: string): Promise
           processingTimeMs,
         });
       } catch (parseError) {
-        console.error('[CV Bridge] Failed to parse walkthrough output:', stdout.substring(0, 500));
+        logger.error('Failed to parse walkthrough output', parseError, { module: 'CVBridge' });
         resolve({
           success: false,
           error: 'Failed to parse CV walkthrough output',
@@ -277,7 +278,7 @@ export async function extractTokensWithWalkthrough(imageBase64: string): Promise
     });
 
     pythonProcess.on('error', (err: Error) => {
-      console.error('[CV Bridge] Walkthrough process error:', err);
+      logger.error('Walkthrough process error', err, { module: 'CVBridge' });
       resolve({
         success: false,
         error: `Process error: ${err.message}`,
@@ -371,7 +372,7 @@ export function validateExtractedTokens(tokens: CVExtractedTokens): { valid: boo
   const valid = tokens.color && tokens.color.length > 0;
   
   if (warnings.length > 0) {
-    console.log('[CV Validation] Warnings:', warnings.join('; '));
+    logger.warn(`Validation warnings: ${warnings.join('; ')}`, { module: 'CVBridge', operation: 'validation' });
   }
   
   return { valid, warnings };
@@ -384,7 +385,7 @@ export function validateExtractedTokens(tokens: CVExtractedTokens): { valid: boo
 export function convertToDTCG(cvTokens: CVExtractedTokens): Record<string, any> {
   const validation = validateExtractedTokens(cvTokens);
   if (!validation.valid) {
-    console.warn('[CV Bridge] Token validation failed, using defaults with low confidence');
+    logger.warn('Token validation failed, using defaults with low confidence', { module: 'CVBridge' });
   }
   
   const colorNames = ['primary', 'secondary', 'tertiary', 'accent', 'background', 'surface', 'muted', 'subtle'];

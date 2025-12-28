@@ -1,4 +1,5 @@
 import { ImageAnnotatorClient } from "@google-cloud/vision";
+import { logger } from "./logger";
 
 interface VisionColor {
   red: number;
@@ -57,7 +58,7 @@ class GoogleCloudVisionService {
       
       if (!credentialsJson) {
         this.initError = "GOOGLE_CLOUD_CREDENTIALS secret not configured";
-        console.warn("[Vision Service]", this.initError);
+        logger.warn(this.initError, { module: 'VisionService' });
         return false;
       }
 
@@ -72,12 +73,12 @@ class GoogleCloudVisionService {
       });
 
       this.initialized = true;
-      console.log("[Vision Service] Google Cloud Vision initialized successfully");
+      logger.info("Google Cloud Vision initialized successfully", { module: 'VisionService' });
       return true;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to initialize Vision service";
       this.initError = message;
-      console.error("[Vision Service] Initialization error:", this.initError);
+      logger.error("Initialization error", error, { module: 'VisionService' });
       return false;
     }
   }
@@ -195,7 +196,7 @@ class GoogleCloudVisionService {
       return result;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Vision analysis failed";
-      console.error("[Vision Service] Analysis error:", error);
+      logger.error("Analysis error", error, { module: 'VisionService' });
       return { ...result, error: message };
     }
   }

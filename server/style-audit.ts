@@ -1,6 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import vision from "@google-cloud/vision";
 import type { Style } from "@shared/schema";
+import { logger } from "./logger";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
@@ -81,10 +82,16 @@ export interface CodebaseAuditResult {
   summary: string;
 }
 
-function extractColorsFromTokens(tokens: Record<string, any>): string[] {
+interface DTCGTokenNode {
+  $type?: string;
+  $value?: string | number | boolean | object;
+  [key: string]: DTCGTokenNode | string | number | boolean | object | undefined;
+}
+
+function extractColorsFromTokens(tokens: Record<string, DTCGTokenNode>): string[] {
   const colors: string[] = [];
   
-  function traverse(obj: any, path: string = "") {
+  function traverse(obj: DTCGTokenNode, path: string = "") {
     if (!obj || typeof obj !== "object") return;
     
     if (obj.$type === "color" && obj.$value) {
@@ -101,12 +108,12 @@ function extractColorsFromTokens(tokens: Record<string, any>): string[] {
   return colors;
 }
 
-function extractTypographyFromTokens(tokens: Record<string, any>): { fonts: string[]; sizes: string[]; weights: string[] } {
+function extractTypographyFromTokens(tokens: Record<string, DTCGTokenNode>): { fonts: string[]; sizes: string[]; weights: string[] } {
   const fonts: string[] = [];
   const sizes: string[] = [];
   const weights: string[] = [];
   
-  function traverse(obj: any) {
+  function traverse(obj: DTCGTokenNode) {
     if (!obj || typeof obj !== "object") return;
     
     if (obj.$type === "fontFamily" && obj.$value) {
@@ -164,7 +171,7 @@ function findClosestTokenColor(color: string, tokenColors: string[]): { color: s
 
 export async function auditScreenshot(
   imageBase64: string,
-  styleTokens: Record<string, any>,
+  styleTokens: Record<string, DTCGTokenNode>,
   styleName: string
 ): Promise<AuditResult> {
   const tokenColors = extractColorsFromTokens(styleTokens);
@@ -265,12 +272,26 @@ Be specific about locations and provide actionable suggestions. Scores are 0-100
     .replace(/```\n?/g, "")
     .trim();
 
-  let parsed: any;
+  interface AIAuditResponse {
+    colorScore?: number;
+    typographyScore?: number;
+    spacingScore?: number;
+    consistencyScore?: number;
+    colorInconsistencies?: ColorInconsistency[];
+    typographyInconsistencies?: TypographyInconsistency[];
+    spacingInconsistencies?: SpacingInconsistency[];
+    componentInconsistencies?: ComponentInconsistency[];
+    suggestions?: string[];
+    summary?: string;
+    detectedColors?: string[];
+    detectedFonts?: string[];
+  }
+
+  let parsed: AIAuditResponse;
   try {
-    parsed = JSON.parse(cleanedJson);
+    parsed = JSON.parse(cleanedJson) as AIAuditResponse;
   } catch (parseError) {
-    console.error("[StyleAudit] JSON parse error:", parseError);
-    console.error("[StyleAudit] Raw response:", responseText.slice(0, 500));
+    logger.error("JSON parse error in screenshot audit", parseError, { module: 'StyleAudit', responsePreview: responseText.slice(0, 200) });
     parsed = {
       colorScore: 50,
       typographyScore: 50,
@@ -311,7 +332,7 @@ Be specific about locations and provide actionable suggestions. Scores are 0-100
 
 export async function auditCodeSnippet(
   code: string,
-  styleTokens: Record<string, any>,
+  styleTokens: Record<string, DTCGTokenNode>,
   styleName: string,
   fileType: "css" | "tailwind" | "jsx" | "tsx"
 ): Promise<CodebaseAuditResult> {
@@ -387,12 +408,23 @@ Return ONLY valid JSON:
     .replace(/```\n?/g, "")
     .trim();
 
-  let parsed: any;
+  interface AICodeAuditResponse {
+    overallScore?: number;
+    tokenUsage?: {
+      used: string[];
+      unused: string[];
+      undefined: string[];
+    };
+    hardcodedValues?: CodebaseAuditResult["hardcodedValues"];
+    inconsistencies?: CodebaseAuditResult["inconsistencies"];
+    summary?: string;
+  }
+
+  let parsed: AICodeAuditResponse;
   try {
-    parsed = JSON.parse(cleanedJson);
+    parsed = JSON.parse(cleanedJson) as AICodeAuditResponse;
   } catch (parseError) {
-    console.error("[StyleAudit] Code audit JSON parse error:", parseError);
-    console.error("[StyleAudit] Raw response:", responseText.slice(0, 500));
+    logger.error("Code audit JSON parse error", parseError, { module: 'StyleAudit', responsePreview: responseText.slice(0, 200) });
     parsed = {
       overallScore: 50,
       tokenUsage: { used: [], unused: [], undefined: [] },

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { storage } from "../storage";
 import { getTagsSummary } from "../metadata-enrichment";
 import { isAuthenticated } from "../replit_integrations/auth";
+import { logger } from "../logger";
 
 const router = Router();
 
@@ -210,7 +211,7 @@ router.get("/api/analytics/user", isAuthenticated, async (req, res) => {
       generatedAt: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("Error computing user analytics:", error);
+    logger.error("Error computing user analytics", error, { module: 'Analytics' });
     res.status(500).json({ error: "Failed to compute analytics" });
   }
 });
@@ -226,7 +227,7 @@ router.get("/api/analytics/platform", async (req, res) => {
       generatedAt: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("Error computing platform analytics:", error);
+    logger.error("Error computing platform analytics", error, { module: 'Analytics' });
     res.status(500).json({ error: "Failed to compute platform analytics" });
   }
 });
@@ -237,7 +238,7 @@ router.get("/api/tags/summary", async (req, res) => {
     res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
     res.json(summary);
   } catch (error) {
-    console.error("Error fetching tags summary:", error);
+    logger.error("Error fetching tags summary", error, { module: 'Analytics' });
     res.status(500).json({ error: "Failed to fetch tags summary" });
   }
 });
@@ -259,7 +260,7 @@ router.get("/api/analytics", isAuthenticated, async (req, res) => {
       generatedAt: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("Error computing analytics:", error);
+    logger.error("Error computing analytics", error, { module: 'Analytics' });
     res.status(500).json({ error: "Failed to compute analytics" });
   }
 });

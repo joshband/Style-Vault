@@ -14,6 +14,7 @@ import { generateMaterialTokensWithAI, type MaterialSignals, type TextureSignals
 import { storeImage } from "./image-service";
 import crypto from "crypto";
 import type { Style, MetadataTags, InsertStyleVersion, MoodBoardAssets, UiConceptAssets } from "@shared/schema";
+import { logger } from "./logger";
 
 export interface RegenerationStage {
   name: string;
@@ -335,7 +336,7 @@ async function regenerateStyle(style: Style): Promise<RegenerationResult> {
             const portraitId = await storeImage(portraitData, "preview_portrait", style.id);
             storedImageIds.push(portraitId);
           } catch (storeErr) {
-            console.error("[Regeneration] Failed to store portrait:", storeErr);
+            logger.error("Failed to store portrait", storeErr, { module: 'StyleRegeneration', styleId: style.id });
           }
         }
       }
@@ -349,7 +350,7 @@ async function regenerateStyle(style: Style): Promise<RegenerationResult> {
             const landscapeId = await storeImage(landscapeData, "preview_landscape", style.id);
             storedImageIds.push(landscapeId);
           } catch (storeErr) {
-            console.error("[Regeneration] Failed to store landscape:", storeErr);
+            logger.error("Failed to store landscape", storeErr, { module: 'StyleRegeneration', styleId: style.id });
           }
         }
       }
@@ -363,7 +364,7 @@ async function regenerateStyle(style: Style): Promise<RegenerationResult> {
             const stillLifeId = await storeImage(stillLifeData, "preview_still_life", style.id);
             storedImageIds.push(stillLifeId);
           } catch (storeErr) {
-            console.error("[Regeneration] Failed to store still life:", storeErr);
+            logger.error("Failed to store still life", storeErr, { module: 'StyleRegeneration', styleId: style.id });
           }
         }
       }
@@ -759,7 +760,7 @@ export async function regenerateAllStyles(options: {
     results: [],
   };
   
-  console.log(`[Regeneration] Starting batch ${batchId} for ${styles.length} styles`);
+  logger.info("Starting batch regeneration", { module: 'StyleRegeneration', batchId, styleCount: styles.length });
   
   for (let i = 0; i < styles.length; i++) {
     const style = styles[i];
@@ -777,7 +778,7 @@ export async function regenerateAllStyles(options: {
       options.onProgress({ ...activeBatch });
     }
     
-    console.log(`[Regeneration] Processing ${i + 1}/${styles.length}: ${style.name}`);
+    logger.info("Processing style", { module: 'StyleRegeneration', progress: `${i + 1}/${styles.length}`, styleName: style.name });
     
     try {
       const result = await regenerateStyle(style);
@@ -789,11 +790,11 @@ export async function regenerateAllStyles(options: {
         activeBatch.failedStyles++;
       }
       
-      console.log(`[Regeneration] ${result.success ? "✓" : "✗"} ${style.name} (${result.totalDurationMs}ms)`);
+      logger.info("Style regeneration result", { module: 'StyleRegeneration', styleName: style.name, success: result.success, duration: result.totalDurationMs });
       
     } catch (error) {
       activeBatch.failedStyles++;
-      console.error(`[Regeneration] ✗ Error processing ${style.name}:`, error);
+      logger.error("Error processing style", error, { module: 'StyleRegeneration', styleName: style.name });
       
       activeBatch.results.push({
         styleId: style.id,
@@ -829,7 +830,7 @@ export async function regenerateAllStyles(options: {
   
   await storage.updateBatchStatus(batch.id, activeBatch.failedStyles === 0 ? "succeeded" : "succeeded");
   
-  console.log(`[Regeneration] Batch complete: ${activeBatch.successfulStyles}/${activeBatch.totalStyles} successful`);
+  logger.info("Batch complete", { module: 'StyleRegeneration', successful: activeBatch.successfulStyles, total: activeBatch.totalStyles });
   
   return activeBatch;
 }

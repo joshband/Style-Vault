@@ -1,5 +1,6 @@
 import { spawn, ChildProcess } from "child_process";
 import { EventEmitter } from "events";
+import { logger } from "./logger";
 
 export interface PipelineJobResult {
   success: boolean;
@@ -46,7 +47,7 @@ export class PipelineBridge extends EventEmitter {
 
       this.serverProcess.stdout?.on("data", (data: Buffer) => {
         const output = data.toString();
-        console.log(`[Pipeline Server] ${output.trim()}`);
+        logger.info(output.trim(), { module: 'PipelineBridge', operation: 'server' });
         if (output.includes("Running on")) {
           started = true;
           this.useHttpServer = true;
@@ -55,11 +56,11 @@ export class PipelineBridge extends EventEmitter {
       });
 
       this.serverProcess.stderr?.on("data", (data: Buffer) => {
-        console.error(`[Pipeline Server Error] ${data.toString().trim()}`);
+        logger.error(data.toString().trim(), undefined, { module: 'PipelineBridge', operation: 'server' });
       });
 
       this.serverProcess.on("close", (code: number | null) => {
-        console.log(`[Pipeline Server] Exited with code ${code}`);
+        logger.info(`Exited with code ${code}`, { module: 'PipelineBridge', operation: 'server' });
         this.serverProcess = null;
         this.useHttpServer = false;
         if (!started) {
@@ -69,7 +70,7 @@ export class PipelineBridge extends EventEmitter {
 
       setTimeout(() => {
         if (!started) {
-          console.warn("[Pipeline Server] Failed to start within timeout, using fallback");
+          logger.warn("Failed to start within timeout, using fallback", { module: 'PipelineBridge', operation: 'server' });
           resolve(false);
         }
       }, 5000);

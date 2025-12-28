@@ -4,6 +4,7 @@ import { cache, CACHE_KEYS } from "../cache";
 import { generateCanonicalPreviews } from "../preview-generation";
 import { generateStyledImage } from "../image-generation";
 import { getDefaultMetadataTags } from "./utils";
+import { logger } from "../logger";
 
 const router = Router();
 
@@ -56,7 +57,7 @@ router.get("/api/images/:id", async (req, res) => {
     
     res.json(image);
   } catch (error) {
-    console.error("Error serving image:", error);
+    logger.error("Error serving image", error, { module: 'Images' });
     res.status(500).json({ error: "Failed to serve image" });
   }
 });
@@ -98,7 +99,7 @@ router.post("/api/admin/migrate-images", async (req, res) => {
       results,
     });
   } catch (error) {
-    console.error("Migration error:", error);
+    logger.error("Migration error", error, { module: 'Images' });
     res.status(500).json({ error: "Migration failed" });
   }
 });
@@ -112,7 +113,7 @@ router.post("/api/admin/enrich-style-specs", async (req, res) => {
       ...result,
     });
   } catch (error) {
-    console.error("Style spec enrichment error:", error);
+    logger.error("Style spec enrichment error", error, { module: 'Images' });
     res.status(500).json({ error: "Style spec enrichment failed" });
   }
 });
@@ -125,13 +126,13 @@ router.post("/api/admin/regenerate-software-app", async (req, res) => {
       const { generateSingleUiConcept } = await import("../mood-board-generation");
       const { storeImage } = await import("../image-service");
       
-      console.log(`[AdminRegenerate] Starting softwareApp regeneration for ${allStyles.length} styles...`);
+      logger.info(`Starting softwareApp regeneration for ${allStyles.length} styles`, { module: 'Images' });
       let successCount = 0;
       let errorCount = 0;
       
       for (const style of allStyles) {
         try {
-          console.log(`[AdminRegenerate] Generating softwareApp for "${style.name}" (${style.id})...`);
+          logger.info(`Generating softwareApp for "${style.name}"`, { module: 'Images', styleId: style.id });
           const softwareApp = await generateSingleUiConcept({
             styleName: style.name,
             styleDescription: style.description,
@@ -157,19 +158,19 @@ router.post("/api/admin/regenerate-software-app", async (req, res) => {
             }
             
             successCount++;
-            console.log(`[AdminRegenerate] ✓ Completed "${style.name}" (${successCount}/${allStyles.length})`);
+            logger.info(`Completed "${style.name}" (${successCount}/${allStyles.length})`, { module: 'Images', styleId: style.id });
           } else {
             errorCount++;
-            console.log(`[AdminRegenerate] ✗ Failed "${style.name}" - null result`);
+            logger.warn(`Failed "${style.name}" - null result`, { module: 'Images', styleId: style.id });
           }
         } catch (err) {
           errorCount++;
-          console.error(`[AdminRegenerate] ✗ Error for "${style.name}":`, err);
+          logger.error(`Error for "${style.name}"`, err, { module: 'Images', styleId: style.id });
         }
       }
       
       cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
-      console.log(`[AdminRegenerate] Complete! ${successCount} succeeded, ${errorCount} failed.`);
+      logger.info(`Regeneration complete: ${successCount} succeeded, ${errorCount} failed`, { module: 'Images' });
     })();
     
     res.json({
@@ -177,7 +178,7 @@ router.post("/api/admin/regenerate-software-app", async (req, res) => {
       styleCount: allStyles.length,
     });
   } catch (error) {
-    console.error("Software app regeneration error:", error);
+    logger.error("Software app regeneration error", error, { module: 'Images' });
     res.status(500).json({ error: "Software app regeneration failed" });
   }
 });
@@ -230,7 +231,7 @@ router.post("/api/generate-previews", async (req, res) => {
       engine: "gemini",
     });
   } catch (error) {
-    console.error("Error generating previews:", error);
+    logger.error("Error generating previews", error, { module: 'Images' });
     res.status(500).json({
       error: "Failed to generate preview images",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -271,7 +272,7 @@ router.post("/api/generate-image", async (req, res) => {
       imageBase64: result.imageBase64,
     });
   } catch (error) {
-    console.error("Error generating image:", error);
+    logger.error("Error generating image", error, { module: 'Images' });
     res.status(500).json({
       error: "Failed to generate image",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -323,7 +324,7 @@ router.post("/api/generate/prodia", async (req, res) => {
       model: "flux-schnell",
     });
   } catch (error) {
-    console.error("Error in Prodia generation:", error);
+    logger.error("Error in Prodia generation", error, { module: 'Images' });
     res.status(500).json({
       error: "Failed to generate image",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -358,7 +359,7 @@ router.post("/api/generate/prodia/previews", async (req, res) => {
       model: "flux-schnell",
     });
   } catch (error) {
-    console.error("Error in Prodia preview generation:", error);
+    logger.error("Error in Prodia preview generation", error, { module: 'Images' });
     res.status(500).json({
       error: "Failed to generate previews",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -389,7 +390,7 @@ router.post("/api/generate/prodia/mood-board", async (req, res) => {
       model: "flux-schnell",
     });
   } catch (error) {
-    console.error("Error in Prodia mood board generation:", error);
+    logger.error("Error in Prodia mood board generation", error, { module: 'Images' });
     res.status(500).json({
       error: "Failed to generate mood board",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -422,7 +423,7 @@ router.post("/api/generate/prodia/ui-concepts", async (req, res) => {
       model: "flux-schnell",
     });
   } catch (error) {
-    console.error("Error in Prodia UI concepts generation:", error);
+    logger.error("Error in Prodia UI concepts generation", error, { module: 'Images' });
     res.status(500).json({
       error: "Failed to generate UI concepts",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -463,7 +464,7 @@ router.post("/api/generate/prodia/all-assets", async (req, res) => {
       model: "flux-schnell",
     });
   } catch (error) {
-    console.error("Error in Prodia all assets generation:", error);
+    logger.error("Error in Prodia all assets generation", error, { module: 'Images' });
     res.status(500).json({
       error: "Failed to generate assets",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -476,7 +477,7 @@ router.get("/api/generated-images", async (req, res) => {
     const images = await storage.getGeneratedImages();
     res.json(images);
   } catch (error) {
-    console.error("Error fetching generated images:", error);
+    logger.error("Error fetching generated images", error, { module: 'Images' });
     res.status(500).json({
       error: "Failed to fetch generated images",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -489,7 +490,7 @@ router.get("/api/generated-images/style/:styleId", async (req, res) => {
     const images = await storage.getGeneratedImagesByStyle(req.params.styleId);
     res.json(images);
   } catch (error) {
-    console.error("Error fetching generated images:", error);
+    logger.error("Error fetching generated images by style", error, { module: 'Images' });
     res.status(500).json({
       error: "Failed to fetch generated images",
       message: error instanceof Error ? error.message : "Unknown error",

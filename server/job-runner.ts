@@ -1,5 +1,6 @@
 import { storage } from "./storage";
 import type { Job, JobType, JobStatus } from "@shared/schema";
+import { logger } from "./logger";
 
 export interface JobConfig {
   maxRetries?: number;
@@ -63,7 +64,7 @@ export async function startJobInBackground<TInput extends Record<string, any>, T
 
   // Fire-and-forget: start job execution without awaiting
   runJobWithRetries(job.id, executor, { maxRetries, timeoutMs, retryDelayMs })
-    .catch(err => console.error(`Background job ${job.id} failed:`, err));
+    .catch(err => logger.error(`Background job ${job.id} failed`, err, { module: 'JobRunner', jobId: job.id }));
 
   return job;
 }
@@ -110,7 +111,7 @@ export async function runJobWithRetries<TInput extends Record<string, any>, TOut
       return { job: finalJob!, result };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error(`Job ${job.id} failed (attempt ${job.retryCount + 1}/${maxRetries}):`, errorMessage);
+      logger.error(`Job ${job.id} failed (attempt ${job.retryCount + 1}/${maxRetries}): ${errorMessage}`, error, { module: 'JobRunner', jobId: job.id });
 
       if (job.retryCount + 1 >= maxRetries) {
         const finalJob = await storage.updateJobStatus(job.id, "failed", {

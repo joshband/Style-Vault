@@ -2,6 +2,7 @@ import sharp from "sharp";
 import { db } from "./db";
 import { imageAssets, type ImageAssetType, type InsertImageAsset } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
+import { logger } from "./logger";
 
 const THUMB_WIDTH = 300;
 const MEDIUM_WIDTH = 800;
@@ -180,14 +181,14 @@ export async function migrateStyleImages(styleId: string, styleData: {
 
   const tryStoreImage = async (data: string | undefined, type: ImageAssetType): Promise<string | null> => {
     if (!data || !isValidBase64Image(data)) {
-      console.log(`[ImageService] Skipping ${type} - invalid or missing base64 data`);
+      logger.debug(`Skipping ${type} - invalid or missing base64 data`, { module: 'ImageService', styleId });
       return null;
     }
     try {
       const id = await storeImage(data, type, styleId);
       return id;
     } catch (error) {
-      console.error(`[ImageService] Error storing ${type} for style ${styleId}:`, error);
+      logger.error(`Error storing ${type} for style ${styleId}`, error, { module: 'ImageService', styleId });
       return null;
     }
   };

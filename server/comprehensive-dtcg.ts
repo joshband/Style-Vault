@@ -21,9 +21,39 @@ import type { CVExtractedTokens } from "./cv-bridge";
 
 const DTCG_SCHEMA = "https://design-tokens.github.io/community-group/format/2025.10/schema.json";
 
+export interface ShadowValue {
+  offsetX: string;
+  offsetY: string;
+  blur: string;
+  spread: string;
+  color: string;
+  inset?: boolean;
+}
+
+export interface GradientStop {
+  color: string;
+  position: string;
+}
+
+export interface GradientValue {
+  type: "linear" | "radial";
+  angle?: string;
+  stops: GradientStop[];
+}
+
+export type CubicBezierValue = [number, number, number, number];
+
+export type DTCGTokenValue =
+  | string
+  | number
+  | boolean
+  | ShadowValue
+  | GradientValue
+  | CubicBezierValue;
+
 export interface DTCGToken {
   $type: string;
-  $value: any;
+  $value: DTCGTokenValue;
   $description?: string;
   $extensions?: {
     visualDNA: {
@@ -73,7 +103,7 @@ export interface ComprehensiveDTCG {
 
 function createToken(
   type: string,
-  value: any,
+  value: DTCGTokenValue,
   description: string,
   confidence: number,
   source: "cv" | "vision" | "ai" | "inferred" | "merged",
@@ -278,7 +308,14 @@ function assembleSizingTokens(): { tokens: DTCGTokenGroup; confidence: number } 
   return { tokens, confidence: 0.1 };
 }
 
-function assembleTypographyTokens(typographyRecommendations?: any): {
+export interface TypographyRecommendations {
+  heading?: string;
+  body?: string;
+  accent?: string;
+  monospace?: string;
+}
+
+function assembleTypographyTokens(typographyRecommendations?: TypographyRecommendations): {
   tokens: DTCGTokenGroup;
   confidence: number;
 } {
@@ -459,14 +496,20 @@ function assembleBorderWidthTokens(cvStrokes: number[] | undefined): {
   return { tokens, confidence: 0.1 };
 }
 
-function assembleShadowTokens(cvElevation: any | undefined): {
+export interface CVElevationInput {
+  depthScore?: number;
+  layerCount?: number;
+  levels?: { level: number; intensity: number }[];
+}
+
+function assembleShadowTokens(cvElevation: CVElevationInput | undefined): {
   tokens: DTCGTokenGroup;
   confidence: number;
 } {
   const tokens: DTCGTokenGroup = {};
 
   if (cvElevation && typeof cvElevation === "object" && cvElevation.levels) {
-    cvElevation.levels.forEach((level: any, i: number) => {
+    cvElevation.levels.forEach((level: { level: number; intensity: number }, i: number) => {
       tokens[`level-${i + 1}`] = createToken(
         "shadow",
         {
@@ -612,7 +655,7 @@ function assembleOpacityTokens(): { tokens: DTCGTokenGroup; confidence: number }
   return { tokens, confidence: 0.1 };
 }
 
-function assembleDepthTokens(cvElevation: any | undefined): {
+function assembleDepthTokens(cvElevation: CVElevationInput | undefined): {
   tokens: DTCGTokenGroup;
   confidence: number;
 } {

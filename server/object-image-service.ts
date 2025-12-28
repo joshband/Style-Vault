@@ -4,6 +4,7 @@ import { db } from "./db";
 import { objectAssets, type ImageAssetType, type InsertObjectAsset } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { objectStorageClient, ObjectStorageService } from "./replit_integrations/object_storage";
+import { logger } from "./logger";
 
 const THUMB_WIDTH = 300;
 const MEDIUM_WIDTH = 800;
@@ -88,7 +89,7 @@ async function deleteObject(objectPath: string): Promise<void> {
     const file = bucket.file(objectName);
     await file.delete();
   } catch (error) {
-    console.error(`Failed to delete object ${objectPath}:`, error);
+    logger.error(`Failed to delete object ${objectPath}`, error, { module: 'ObjectImageService' });
   }
 }
 
@@ -166,7 +167,7 @@ export async function getImageFromObjectStorage(
       height: asset.originalHeight || undefined,
     };
   } catch (error) {
-    console.error(`Failed to download image ${id}:`, error);
+    logger.error(`Failed to download image ${id}`, error, { module: 'ObjectImageService' });
     return null;
   }
 }

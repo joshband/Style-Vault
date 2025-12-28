@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { pipelineBridge } from "../pipeline-bridge";
 import { initializePipelineStorage, getPipelineStorageConfig } from "../pipeline-storage";
+import { logger } from "../logger";
 
 const router = Router();
 
@@ -66,7 +67,7 @@ router.post("/api/pipeline/validate-tokens", async (req, res) => {
       errors: result.errors,
     });
   } catch (error) {
-    console.error("Token validation error:", error);
+    logger.error("Token validation error", error, { module: 'Pipeline' });
     res.status(500).json({
       error: error instanceof Error ? error.message : "Validation failed",
     });
@@ -96,7 +97,7 @@ router.post("/api/pipeline/assemble", async (req, res) => {
       artifact: result.data,
     });
   } catch (error) {
-    console.error("Assembly error:", error);
+    logger.error("Assembly error", error, { module: 'Pipeline' });
     res.status(500).json({
       error: error instanceof Error ? error.message : "Assembly failed",
     });
@@ -121,7 +122,7 @@ router.get("/api/pipeline/search", async (req, res) => {
       results,
     });
   } catch (error) {
-    console.error("Search error:", error);
+    logger.error("Search error", error, { module: 'Pipeline' });
     res.status(500).json({
       error: error instanceof Error ? error.message : "Search failed",
     });
@@ -146,7 +147,7 @@ router.post("/api/pipeline/detect-components", async (req, res) => {
     
     res.json(result);
   } catch (error) {
-    console.error("Component detection error:", error);
+    logger.error("Component detection error", error, { module: 'Pipeline' });
     res.status(500).json({
       error: "Component detection failed",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -171,7 +172,7 @@ router.post("/api/pipeline/material-signature", async (req, res) => {
     
     res.json(result);
   } catch (error) {
-    console.error("Material signature error:", error);
+    logger.error("Material signature error", error, { module: 'Pipeline' });
     res.status(500).json({
       error: "Material signature extraction failed",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -193,7 +194,7 @@ router.post("/api/pipeline/enrich-style", async (req, res) => {
     
     res.json(result);
   } catch (error) {
-    console.error("Style enrichment error:", error);
+    logger.error("Style enrichment error", error, { module: 'Pipeline' });
     res.status(500).json({
       error: "Style enrichment failed",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -206,7 +207,7 @@ router.get("/api/pipeline/recipes", async (req, res) => {
     const result = await pipelineBridge.listRecipes();
     res.json(result);
   } catch (error) {
-    console.error("Recipe list error:", error);
+    logger.error("Recipe list error", error, { module: 'Pipeline' });
     res.status(500).json({
       error: "Failed to list recipes",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -224,7 +225,7 @@ router.get("/api/pipeline/recipes/:id", async (req, res) => {
     
     res.json(recipe);
   } catch (error) {
-    console.error("Recipe fetch error:", error);
+    logger.error("Recipe fetch error", error, { module: 'Pipeline' });
     res.status(500).json({
       error: "Failed to fetch recipe",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -279,7 +280,7 @@ router.post("/api/pipeline/classify-ai", async (req, res) => {
     
     res.json(result);
   } catch (error) {
-    console.error("AI classification error:", error);
+    logger.error("AI classification error", error, { module: 'Pipeline' });
     res.status(500).json({
       error: "AI classification failed",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -318,7 +319,7 @@ router.post("/api/pipeline/material-tokens-ai", async (req, res) => {
     
     res.json({ tokens });
   } catch (error) {
-    console.error("Material token generation error:", error);
+    logger.error("Material token generation error", error, { module: 'Pipeline' });
     res.status(500).json({
       error: "Material token generation failed",
       message: error instanceof Error ? error.message : "Unknown error",

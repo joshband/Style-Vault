@@ -1,4 +1,5 @@
 import { createProdia } from "prodia/v2";
+import { logger } from "./logger";
 
 export interface ProdiaGenerationOptions {
   prompt: string;
@@ -64,7 +65,7 @@ export async function generateWithFluxSchnell(
       seed: options.seed,
     };
   } catch (error) {
-    console.error("[Prodia] Generation failed:", error);
+    logger.error("Generation failed", error, { module: 'ProdiaService' });
     
     let errorMessage = "Unknown error";
     if (error instanceof Error) {
@@ -117,7 +118,7 @@ export async function generateWithFluxDev(
       seed: options.seed,
     };
   } catch (error) {
-    console.error("[Prodia] Generation failed:", error);
+    logger.error("Generation failed", error, { module: 'ProdiaService' });
     
     return {
       success: false,

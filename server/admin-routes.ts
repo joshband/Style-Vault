@@ -1,6 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
 import { cache, CACHE_KEYS } from "./cache";
+import { logger } from "./logger";
 import type { MetricType, InsertAdminMetric, Style, MoodBoardAssets, UiConceptAssets, InsertTestRun, InsertTestCase } from "@shared/schema";
 import { isAuthenticated } from "./replit_integrations/auth";
 import { db } from "./db";
@@ -84,7 +85,7 @@ export function registerAdminRoutes(app: Express) {
         completedUiConcepts,
       });
     } catch (error) {
-      console.error("Error fetching admin stats:", error);
+      logger.error("Error fetching admin stats", error, { module: 'Admin' });
       res.status(500).json({ error: "Failed to fetch stats" });
     }
   });
@@ -97,7 +98,7 @@ export function registerAdminRoutes(app: Express) {
       const summary = await storage.getMetricsSummary();
       res.json(summary);
     } catch (error) {
-      console.error("Error fetching metrics summary:", error);
+      logger.error("Error fetching metrics summary", error, { module: 'Admin' });
       res.status(500).json({ error: "Failed to fetch metrics summary" });
     }
   });
@@ -113,7 +114,7 @@ export function registerAdminRoutes(app: Express) {
       const metrics = await storage.getMetrics({ type, styleId, limit, since });
       res.json(metrics);
     } catch (error) {
-      console.error("Error fetching metrics:", error);
+      logger.error("Error fetching metrics", error, { module: 'Admin' });
       res.status(500).json({ error: "Failed to fetch metrics" });
     }
   });
@@ -125,7 +126,7 @@ export function registerAdminRoutes(app: Express) {
       const created = await storage.recordMetric(metric);
       res.json(created);
     } catch (error) {
-      console.error("Error recording metric:", error);
+      logger.error("Error recording metric", error, { module: 'Admin' });
       res.status(500).json({ error: "Failed to record metric" });
     }
   });
@@ -139,7 +140,7 @@ export function registerAdminRoutes(app: Express) {
       const runs = await db.select().from(testRuns).orderBy(desc(testRuns.createdAt)).limit(limit);
       res.json(runs);
     } catch (error) {
-      console.error("Error fetching test runs:", error);
+      logger.error("Error fetching test runs", error, { module: 'Admin' });
       res.status(500).json({ error: "Failed to fetch test runs" });
     }
   });
@@ -154,7 +155,7 @@ export function registerAdminRoutes(app: Express) {
       const cases = await db.select().from(testCases).where(eq(testCases.runId, req.params.id));
       res.json({ ...run, testCases: cases });
     } catch (error) {
-      console.error("Error fetching test run:", error);
+      logger.error("Error fetching test run", error, { module: 'Admin' });
       res.status(500).json({ error: "Failed to fetch test run" });
     }
   });
@@ -201,7 +202,7 @@ export function registerAdminRoutes(app: Express) {
       
       res.json({ runId: run.id });
     } catch (error) {
-      console.error("Error creating test run:", error);
+      logger.error("Error creating test run", error, { module: 'Admin' });
       res.status(500).json({ error: "Failed to create test run" });
     }
   });
@@ -227,7 +228,7 @@ export function registerAdminRoutes(app: Express) {
         passRate: stats.totalTests > 0 ? ((stats.totalPassed / stats.totalTests) * 100).toFixed(1) : "0",
       });
     } catch (error) {
-      console.error("Error fetching test metrics:", error);
+      logger.error("Error fetching test metrics", error, { module: 'Admin' });
       res.status(500).json({ error: "Failed to fetch test metrics" });
     }
   });
@@ -240,7 +241,7 @@ export function registerAdminRoutes(app: Express) {
       const toggles = await storage.getAllFeatureToggles();
       res.json(toggles);
     } catch (error) {
-      console.error("Error fetching feature toggles:", error);
+      logger.error("Error fetching feature toggles", error, { module: 'Admin' });
       res.status(500).json({ error: "Failed to fetch feature toggles" });
     }
   });
@@ -254,7 +255,7 @@ export function registerAdminRoutes(app: Express) {
       }
       res.json(toggle);
     } catch (error) {
-      console.error("Error fetching feature toggle:", error);
+      logger.error("Error fetching feature toggle", error, { module: 'Admin' });
       res.status(500).json({ error: "Failed to fetch feature toggle" });
     }
   });
@@ -266,7 +267,7 @@ export function registerAdminRoutes(app: Express) {
       const toggle = await storage.setFeatureToggle(req.params.key, enabled, value);
       res.json(toggle);
     } catch (error) {
-      console.error("Error updating feature toggle:", error);
+      logger.error("Error updating feature toggle", error, { module: 'Admin' });
       res.status(500).json({ error: "Failed to update feature toggle" });
     }
   });
@@ -294,7 +295,7 @@ export function registerAdminRoutes(app: Express) {
       }));
       res.json({ styles: summary, total: summary.length });
     } catch (error) {
-      console.error("Error fetching admin styles:", error);
+      logger.error("Error fetching admin styles", error, { module: 'Admin' });
       res.status(500).json({ error: "Failed to fetch styles" });
     }
   });
@@ -358,7 +359,7 @@ export function registerAdminRoutes(app: Express) {
         jobs,
       });
     } catch (error) {
-      console.error("Error queueing image regeneration:", error);
+      logger.error("Error queueing image regeneration", error, { module: 'Admin' });
       res.status(500).json({ error: "Failed to queue image regeneration" });
     }
   });
@@ -431,7 +432,7 @@ export function registerAdminRoutes(app: Express) {
         jobs,
       });
     } catch (error) {
-      console.error("Error queueing full regeneration:", error);
+      logger.error("Error queueing full regeneration", error, { module: 'Admin' });
       res.status(500).json({ error: "Failed to queue full regeneration" });
     }
   });
@@ -483,7 +484,7 @@ export function registerAdminRoutes(app: Express) {
         jobs,
       });
     } catch (error) {
-      console.error("Error queueing bulk regeneration:", error);
+      logger.error("Error queueing bulk regeneration", error, { module: 'Admin' });
       res.status(500).json({ error: "Failed to queue bulk regeneration" });
     }
   });
@@ -495,7 +496,7 @@ export function registerAdminRoutes(app: Express) {
       const jobs = await storage.getRecentJobs(limit);
       res.json(jobs);
     } catch (error) {
-      console.error("Error fetching admin jobs:", error);
+      logger.error("Error fetching admin jobs", error, { module: 'Admin' });
       res.status(500).json({ error: "Failed to fetch jobs" });
     }
   });
@@ -518,9 +519,9 @@ export function registerAdminRoutes(app: Express) {
 
       // Start regeneration in background
       regenerateAllStyles({ styleIds }).then((result) => {
-        console.log(`[Admin] Comprehensive regeneration complete: ${result.successfulStyles}/${result.totalStyles} successful`);
+        logger.info(`Comprehensive regeneration complete: ${result.successfulStyles}/${result.totalStyles} successful`, { module: 'Admin' });
       }).catch((error) => {
-        console.error("[Admin] Comprehensive regeneration failed:", error);
+        logger.error("Comprehensive regeneration failed", error, { module: 'Admin' });
       });
 
       res.json({
@@ -529,7 +530,7 @@ export function registerAdminRoutes(app: Express) {
         estimatedStyles: styleIds?.length || (await storage.getStyleCount()),
       });
     } catch (error) {
-      console.error("Error starting comprehensive regeneration:", error);
+      logger.error("Error starting comprehensive regeneration", error, { module: 'Admin' });
       res.status(500).json({ error: "Failed to start regeneration" });
     }
   });
@@ -571,7 +572,7 @@ export function registerAdminRoutes(app: Express) {
         })),
       });
     } catch (error) {
-      console.error("Error fetching regeneration progress:", error);
+      logger.error("Error fetching regeneration progress", error, { module: 'Admin' });
       res.status(500).json({ error: "Failed to fetch progress" });
     }
   });
@@ -587,7 +588,7 @@ export function registerAdminRoutes(app: Express) {
         res.status(400).json({ error: "No regeneration in progress to cancel" });
       }
     } catch (error) {
-      console.error("Error cancelling regeneration:", error);
+      logger.error("Error cancelling regeneration", error, { module: 'Admin' });
       res.status(500).json({ error: "Failed to cancel regeneration" });
     }
   });
@@ -607,7 +608,7 @@ export function registerAdminRoutes(app: Express) {
       res.setHeader("Content-Disposition", `attachment; filename="regeneration-report-${new Date().toISOString().split("T")[0]}.md"`);
       res.send(report);
     } catch (error) {
-      console.error("Error generating regeneration report:", error);
+      logger.error("Error generating regeneration report", error, { module: 'Admin' });
       res.status(500).json({ error: "Failed to generate report" });
     }
   });
@@ -657,7 +658,7 @@ export function registerAdminRoutes(app: Express) {
         },
       });
     } catch (error) {
-      console.error("Error regenerating single style:", error);
+      logger.error("Error regenerating single style", error, { module: 'Admin' });
       res.status(500).json({ error: "Failed to regenerate style" });
     }
   });
@@ -701,7 +702,7 @@ export function registerAdminRoutes(app: Express) {
         stages: result.stages,
       });
     } catch (error) {
-      console.error("Error fetching regeneration comparison:", error);
+      logger.error("Error fetching regeneration comparison", error, { module: 'Admin' });
       res.status(500).json({ error: "Failed to fetch comparison" });
     }
   });
@@ -792,7 +793,7 @@ export function registerAdminRoutes(app: Express) {
         } catch (error) {
           failCount++;
           results.push({ styleId: style.id, styleName: style.name, migrated: false, error: String(error) });
-          console.error(`Error migrating style ${style.id}:`, error);
+          logger.error("Error migrating style", error, { module: 'Admin', styleId: style.id });
         }
       }
       
@@ -806,7 +807,7 @@ export function registerAdminRoutes(app: Express) {
         results,
       });
     } catch (error) {
-      console.error("Error during image migration:", error);
+      logger.error("Error during image migration", error, { module: 'Admin' });
       res.status(500).json({ error: "Failed to migrate images" });
     }
   });
@@ -844,7 +845,7 @@ export function registerAdminRoutes(app: Express) {
         },
       });
     } catch (error) {
-      console.error("Error fetching image status:", error);
+      logger.error("Error fetching image status", error, { module: 'Admin' });
       res.status(500).json({ error: "Failed to fetch image status" });
     }
   });
@@ -930,7 +931,7 @@ async function processImageRegeneration(jobs: { styleId: string; styleName: stri
         metadata: { imageTypes },
       });
     } catch (error) {
-      console.error(`Image regeneration failed for ${job.styleName}:`, error);
+      logger.error(`Image regeneration failed for ${job.styleName}`, error, { module: 'Admin', styleId: job.styleId });
       await storage.updateJobStatus(job.jobId, "failed", { error: String(error) });
       
       await storage.recordMetric({
@@ -1106,7 +1107,7 @@ async function processFullRegeneration(
         metadata: { operation: "full", options },
       });
     } catch (error) {
-      console.error(`Full regeneration failed for ${job.styleName}:`, error);
+      logger.error(`Full regeneration failed for ${job.styleName}`, error, { module: 'Admin', styleId: job.styleId });
       await storage.updateJobStatus(job.jobId, "failed", { error: String(error) });
       
       await storage.recordMetric({

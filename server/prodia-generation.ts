@@ -2,6 +2,7 @@ import { generateWithFluxSchnell, isProdiaEnabled, ProdiaGenerationResult } from
 import { storage } from "./storage";
 import { ai, generateWithGemini, generateWithOpenAI, analyzeRenderingStyle, RenderingStyle } from "./replit_integrations/image/client";
 import { withImageGenRetry } from "./retry-utils";
+import { logger } from "./logger";
 
 type ProgressCallback = (progress: number, message: string) => Promise<void>;
 type ImageProvider = "gemini" | "openai" | "prodia";
@@ -55,7 +56,7 @@ Only return valid JSON, no markdown.`,
     const jsonStr = String(text.text).replace(/```json\n?|\n?```/g, "").trim();
     return JSON.parse(jsonStr) as ImageAnalysis;
   } catch (error) {
-    console.error("[Prodia] Failed to analyze reference image:", error);
+    logger.error("Failed to analyze reference image", error, { module: 'ProdiaGeneration' });
     return null;
   }
 }
@@ -255,11 +256,11 @@ async function generateWithStyleTransfer(
           throw new Error(`Unknown provider: ${provider}`);
       }
       
-      console.log(`[MultiProvider] Successfully generated with ${provider}`);
+      logger.info(`Successfully generated with ${provider}`, { module: 'ProdiaGeneration', operation: 'multiProvider' });
       return { success: true, imageBase64, provider };
       
     } catch (error) {
-      console.warn(`[MultiProvider] ${provider} failed:`, error instanceof Error ? error.message : error);
+      logger.warn(`${provider} failed: ${error instanceof Error ? error.message : error}`, { module: 'ProdiaGeneration', operation: 'multiProvider' });
       continue;
     }
   }
@@ -321,7 +322,7 @@ export async function generateCanonicalPreviewsWithProdia(
     await request.onProgress?.(8, "Analyzing reference image...");
     analysis = await analyzeReferenceImage(request.referenceImageBase64);
     if (analysis) {
-      console.log(`[Prodia] Reference image analyzed: ${analysis.subjectType} - ${analysis.sceneDescription?.slice(0, 50)}...`);
+      logger.info(`Reference image analyzed: ${analysis.subjectType} - ${analysis.sceneDescription?.slice(0, 50)}...`, { module: 'ProdiaGeneration' });
     }
   }
   
@@ -354,7 +355,7 @@ export async function generateCanonicalPreviewsWithProdia(
   
   await request.onProgress?.(100, "Preview generation complete");
   
-  console.log(`[Prodia] Generated previews in ${result.processingTimeMs}ms`);
+  logger.info(`Generated previews in ${result.processingTimeMs}ms`, { module: 'ProdiaGeneration', duration: result.processingTimeMs });
   
   // Record metrics
   storage.recordMetric({
@@ -367,7 +368,7 @@ export async function generateCanonicalPreviewsWithProdia(
       landscape: landscapeResult.success,
       stillLife: stillLifeResult.success,
     },
-  }).catch(err => console.error("Failed to record preview metric:", err));
+  }).catch(err => logger.error("Failed to record preview metric", err, { module: 'ProdiaGeneration' }));
   
   return result;
 }
@@ -401,13 +402,13 @@ export async function generateCanonicalPreviewsWithGemini(
     analysis = analysisResult;
     
     if (renderingStyle) {
-      console.log(`[Gemini] Rendering style detected: ${renderingStyle.medium}, ${renderingStyle.technique}`);
-      console.log(`[Gemini] Color palette: ${renderingStyle.colorPalette}`);
-      console.log(`[Gemini] Characteristics: ${renderingStyle.characteristics.join(", ")}`);
+      logger.info(`Rendering style detected: ${renderingStyle.medium}, ${renderingStyle.technique}`, { module: 'ProdiaGeneration', operation: 'gemini' });
+      logger.info(`Color palette: ${renderingStyle.colorPalette}`, { module: 'ProdiaGeneration', operation: 'gemini' });
+      logger.info(`Characteristics: ${renderingStyle.characteristics.join(", ")}`, { module: 'ProdiaGeneration', operation: 'gemini' });
     }
     
     if (analysis) {
-      console.log(`[Gemini] Content analyzed: ${analysis.subjectType} - ${analysis.sceneDescription?.slice(0, 50)}...`);
+      logger.info(`Content analyzed: ${analysis.subjectType} - ${analysis.sceneDescription?.slice(0, 50)}...`, { module: 'ProdiaGeneration', operation: 'gemini' });
     }
   }
   
@@ -468,7 +469,7 @@ export async function generateCanonicalPreviewsWithGemini(
   await request.onProgress?.(100, "Style-accurate preview generation complete");
   
   const providers = [portraitResult.provider, landscapeResult.provider, stillLifeResult.provider];
-  console.log(`[Gemini] Generated previews in ${result.processingTimeMs}ms using providers: ${providers.join(", ")}`);
+  logger.info(`Generated previews in ${result.processingTimeMs}ms using providers: ${providers.join(", ")}`, { module: 'ProdiaGeneration', operation: 'gemini', duration: result.processingTimeMs });
   
   // Record metrics
   storage.recordMetric({
@@ -485,7 +486,7 @@ export async function generateCanonicalPreviewsWithGemini(
       stillLifeProvider: stillLifeResult.provider,
       renderingStyleDetected: !!renderingStyle,
     },
-  }).catch(err => console.error("Failed to record preview metric:", err));
+  }).catch(err => logger.error("Failed to record preview metric", err, { module: 'ProdiaGeneration' }));
   
   return result;
 }
@@ -563,7 +564,7 @@ export async function generateUiConceptsWithGemini(
       audioPlugin: !!results.audioPlugin,
       dashboard: !!results.dashboard,
     },
-  }).catch(err => console.error("Failed to record UI concept metric:", err));
+  }).catch(err => logger.error("Failed to record UI concept metric", err, { module: 'ProdiaGeneration' }));
   
   return {
     softwareApp: results.softwareApp,
@@ -601,7 +602,7 @@ export async function generateMoodBoardWithGemini(
     durationMs: processingTimeMs,
     success: result.success,
     metadata: { generator: result.provider },
-  }).catch(err => console.error("Failed to record mood board metric:", err));
+  }).catch(err => logger.error("Failed to record mood board metric", err, { module: 'ProdiaGeneration' }));
   
   if (!result.success || !result.imageBase64) {
     throw new Error(result.error || "Failed to generate mood board");
@@ -642,7 +643,7 @@ export async function generateMoodBoardWithProdia(
     durationMs: processingTimeMs,
     success: result.success,
     metadata: { generator: "prodia" },
-  }).catch(err => console.error("Failed to record mood board metric:", err));
+  }).catch(err => logger.error("Failed to record mood board metric", err, { module: 'ProdiaGeneration' }));
   
   if (!result.success) {
     throw new Error(result.error || "Failed to generate mood board");
@@ -704,7 +705,7 @@ export async function generateUiConceptsWithProdia(
       audioPlugin: audioPluginResult.success,
       dashboard: dashboardResult.success,
     },
-  }).catch(err => console.error("Failed to record UI concept metric:", err));
+  }).catch(err => logger.error("Failed to record UI concept metric", err, { module: 'ProdiaGeneration' }));
   
   return {
     softwareApp: softwareAppResult.success ? softwareAppResult.imageBase64 : undefined,
@@ -796,7 +797,7 @@ export async function generateAllAssetsWithProdia(request: MoodBoardRequest): Pr
   await request.onProgress?.(100, "All assets generated");
   
   const totalProcessingTimeMs = Date.now() - startTime;
-  console.log(`[Prodia] Generated all assets in ${totalProcessingTimeMs}ms`);
+  logger.info(`Generated all assets in ${totalProcessingTimeMs}ms`, { module: 'ProdiaGeneration', duration: totalProcessingTimeMs });
   
   return {
     previews,

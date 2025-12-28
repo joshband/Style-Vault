@@ -3,6 +3,7 @@ import { storage } from "../storage";
 import { getJobProgress, startJobInBackground, cancelJob, retryJob } from "../job-runner";
 import { analyzeImageForStyle } from "../analysis";
 import { generateCanonicalPreviews } from "../preview-generation";
+import { logger } from "../logger";
 
 const router = Router();
 
@@ -31,7 +32,7 @@ router.get("/api/jobs", async (req, res) => {
       createdAt: job.createdAt,
     })));
   } catch (error) {
-    console.error("Error fetching jobs:", error);
+    logger.error("Error fetching jobs", error, { module: 'Jobs' });
     res.status(500).json({ error: "Failed to fetch jobs" });
   }
 });
@@ -54,7 +55,7 @@ router.get("/api/jobs/:id", async (req, res) => {
       completedAt: job.completedAt,
     });
   } catch (error) {
-    console.error("Error fetching job:", error);
+    logger.error("Error fetching job", error, { module: 'Jobs' });
     res.status(500).json({ error: "Failed to fetch job status" });
   }
 });
@@ -72,7 +73,7 @@ router.post("/api/jobs/:id/cancel", async (req, res) => {
       id: job.id,
     });
   } catch (error) {
-    console.error("Error canceling job:", error);
+    logger.error("Error canceling job", error, { module: 'Jobs' });
     res.status(500).json({ error: "Failed to cancel job" });
   }
 });
@@ -88,7 +89,7 @@ router.get("/api/jobs/active", async (req, res) => {
       createdAt: job.createdAt,
     })));
   } catch (error) {
-    console.error("Error fetching active jobs:", error);
+    logger.error("Error fetching active jobs", error, { module: 'Jobs' });
     res.status(500).json({ error: "Failed to fetch active jobs" });
   }
 });
@@ -112,7 +113,7 @@ router.post("/api/jobs/analyze-image", async (req, res) => {
 
     res.json({ jobId: job.id, status: job.status });
   } catch (error) {
-    console.error("Error creating analysis job:", error);
+    logger.error("Error creating analysis job", error, { module: 'Jobs' });
     res.status(500).json({
       error: "Failed to analyze image",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -175,7 +176,7 @@ router.post("/api/jobs/generate-previews", async (req, res) => {
 
     res.json({ jobId: job.id, status: job.status });
   } catch (error) {
-    console.error("Error creating preview job:", error);
+    logger.error("Error creating preview job", error, { module: 'Jobs' });
     res.status(500).json({
       error: "Failed to generate previews",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -194,7 +195,7 @@ router.get("/api/styles/:id/jobs", async (req, res) => {
       completedAt: job.completedAt,
     })));
   } catch (error) {
-    console.error("Error fetching style jobs:", error);
+    logger.error("Error fetching style jobs", error, { module: 'Jobs' });
     res.status(500).json({ error: "Failed to fetch style jobs" });
   }
 });
@@ -229,7 +230,7 @@ router.post("/api/jobs/:id/retry", async (req, res) => {
       message: "Job queued for retry",
     });
   } catch (error) {
-    console.error("Error retrying job:", error);
+    logger.error("Error retrying job", error, { module: 'Jobs' });
     res.status(500).json({
       error: "Failed to retry job",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -278,7 +279,7 @@ router.post("/api/batch/create", async (req, res) => {
 
     res.json({ batchId: batch.id });
   } catch (error) {
-    console.error("Error creating batch:", error);
+    logger.error("Error creating batch", error, { module: 'Jobs' });
     res.status(500).json({
       error: "Failed to create batch",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -308,7 +309,7 @@ router.get("/api/batch/:id", async (req, res) => {
       })),
     });
   } catch (error) {
-    console.error("Error fetching batch:", error);
+    logger.error("Error fetching batch", error, { module: 'Jobs' });
     res.status(500).json({
       error: "Failed to fetch batch",
       message: error instanceof Error ? error.message : "Unknown error",

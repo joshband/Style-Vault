@@ -2,6 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import { storage } from "./storage";
 import type { Style, MetadataTags, MetadataEnrichmentStatus } from "@shared/schema";
 import { getPLimit } from "./utils/esm-interop";
+import { logger } from "./logger";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
@@ -183,7 +184,7 @@ function parseEnrichmentResponse(text: string): EnrichmentResult | null {
       keywords: normalizeArray(parsed.keywords || []),
     };
   } catch (error) {
-    console.error("Failed to parse enrichment response:", error);
+    logger.error("Failed to parse enrichment response", error, { module: 'MetadataEnrichment' });
     return null;
   }
 }
@@ -195,7 +196,7 @@ export async function enrichStyleMetadata(styleId: string): Promise<boolean> {
     
     const style = await storage.getStyleById(styleId);
     if (!style) {
-      console.error(`Style ${styleId} not found for enrichment`);
+      logger.error("Style not found for enrichment", undefined, { module: 'MetadataEnrichment', styleId });
       await storage.updateStyleEnrichmentStatus(styleId, "failed");
       return false;
     }
@@ -211,7 +212,7 @@ export async function enrichStyleMetadata(styleId: string): Promise<boolean> {
     const enrichmentResult = parseEnrichmentResponse(responseText);
     
     if (!enrichmentResult) {
-      console.error(`Failed to parse enrichment for style ${styleId}`);
+      logger.error("Failed to parse enrichment for style", undefined, { module: 'MetadataEnrichment', styleId });
       await storage.updateStyleEnrichmentStatus(styleId, "failed");
       storage.recordMetric({
         type: "metadata_enrichment",
@@ -230,7 +231,7 @@ export async function enrichStyleMetadata(styleId: string): Promise<boolean> {
     };
     
     await storage.updateStyleMetadata(styleId, updatedTags, "complete");
-    console.log(`Successfully enriched metadata for style ${styleId}`);
+    logger.info("Successfully enriched metadata for style", { module: 'MetadataEnrichment', styleId });
     
     storage.recordMetric({
       type: "metadata_enrichment",
@@ -242,7 +243,7 @@ export async function enrichStyleMetadata(styleId: string): Promise<boolean> {
     
     return true;
   } catch (error) {
-    console.error(`Error enriching style ${styleId}:`, error);
+    logger.error("Error enriching style", error, { module: 'MetadataEnrichment', styleId });
     await storage.updateStyleEnrichmentStatus(styleId, "failed");
     storage.recordMetric({
       type: "metadata_enrichment",
@@ -259,7 +260,7 @@ export async function queueStyleForEnrichment(styleId: string): Promise<void> {
   await storage.updateStyleEnrichmentStatus(styleId, "queued");
   
   setTimeout(() => {
-    enrichStyleMetadata(styleId).catch(console.error);
+    enrichStyleMetadata(styleId).catch(err => logger.error("Async enrichment failed", err, { module: 'MetadataEnrichment', styleId }));
   }, 100);
 }
 
@@ -342,7 +343,7 @@ Respond with ONLY valid JSON:
 export async function generateStyleSpecContent(styleId: string): Promise<StyleSpecContent | null> {
   const style = await storage.getStyleById(styleId);
   if (!style) {
-    console.log(`Style ${styleId} not found for spec generation`);
+    logger.info("Style not found for spec generation", { module: 'MetadataEnrichment', styleId });
     return null;
   }
 
@@ -370,7 +371,7 @@ export async function generateStyleSpecContent(styleId: string): Promise<StyleSp
       try {
         parsed = JSON.parse(jsonMatch[0]) as StyleSpecContent;
       } catch {
-        console.error("Failed to parse JSON from style spec response");
+        logger.error("Failed to parse JSON from style spec response", undefined, { module: 'MetadataEnrichment', styleId });
       }
     }
     
@@ -386,12 +387,12 @@ export async function generateStyleSpecContent(styleId: string): Promise<StyleSp
           usageGuidelines: extractedGuidelines,
           designNotes: extractedNotes,
         };
-        console.log(`Fallback parsing extracted: guidelines=${extractedGuidelines.length} chars, notes=${extractedNotes.length} chars`);
+        logger.info("Fallback parsing extracted", { module: 'MetadataEnrichment', styleId, guidelinesLength: extractedGuidelines.length, notesLength: extractedNotes.length });
       }
     }
     
     if (!parsed) {
-      console.error("Failed to extract JSON from style spec response");
+      logger.error("Failed to extract JSON from style spec response", undefined, { module: 'MetadataEnrichment', styleId });
       return null;
     }
     
@@ -401,13 +402,13 @@ export async function generateStyleSpecContent(styleId: string): Promise<StyleSp
     };
     
     if (validSpec.usageGuidelines.length < 20 && validSpec.designNotes.length < 20) {
-      console.error("Style spec content too short, treating as failure");
+      logger.error("Style spec content too short, treating as failure", undefined, { module: 'MetadataEnrichment', styleId });
       return null;
     }
 
     return validSpec;
   } catch (error) {
-    console.error(`Error generating style spec for ${styleId}:`, error);
+    logger.error("Error generating style spec", error, { module: 'MetadataEnrichment', styleId });
     return null;
   }
 }
@@ -426,7 +427,7 @@ export async function enrichStyleSpec(styleId: string): Promise<boolean> {
   };
 
   await storage.updateStyleSpec(styleId, updatedSpec);
-  console.log(`Generated style spec for: ${style.name}`);
+  logger.info("Generated style spec", { module: 'MetadataEnrichment', styleId, styleName: style.name });
   return true;
 }
 
@@ -438,7 +439,7 @@ export async function enrichAllStyleSpecs(): Promise<{ processed: number; succes
     return !spec?.usageGuidelines || !spec?.designNotes;
   });
 
-  console.log(`Found ${stylesWithoutSpec.length} styles needing spec generation`);
+  logger.info("Found styles needing spec generation", { module: 'MetadataEnrichment', count: stylesWithoutSpec.length });
   
   const limit = await getPLimit(2);
   const errors: string[] = [];

@@ -2,6 +2,7 @@ import { objectStorageClient } from "./replit_integrations/object_storage/object
 import { storage } from "./storage";
 import { db } from "./db";
 import { sql } from "drizzle-orm";
+import { logger } from "./logger";
 
 const BUCKET_ID = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID || "";
 const PRIVATE_DIR = process.env.PRIVATE_OBJECT_DIR || "";
@@ -81,7 +82,7 @@ export class PipelineBlobStorage {
       const [contents] = await file.download();
       return contents;
     } catch (error) {
-      console.error(`Failed to download ${key}:`, error);
+      logger.error(`Failed to download ${key}`, error, { module: 'PipelineStorage' });
       return null;
     }
   }
@@ -93,7 +94,7 @@ export class PipelineBlobStorage {
       await file.delete();
       return true;
     } catch (error) {
-      console.error(`Failed to delete ${key}:`, error);
+      logger.error(`Failed to delete ${key}`, error, { module: 'PipelineStorage' });
       return false;
     }
   }
@@ -126,7 +127,7 @@ export class PipelineBlobStorage {
 
       return url;
     } catch (error) {
-      console.error(`Failed to get signed URL for ${key}:`, error);
+      logger.error(`Failed to get signed URL for ${key}`, error, { module: 'PipelineStorage' });
       return null;
     }
   }
@@ -137,7 +138,7 @@ export class PipelineBlobStorage {
       const [files] = await this.bucket.getFiles({ prefix: fullPrefix });
       return files.map(f => f.name.replace(`${this.baseDir}/`, ""));
     } catch (error) {
-      console.error(`Failed to list files with prefix ${prefix}:`, error);
+      logger.error(`Failed to list files with prefix ${prefix}`, error, { module: 'PipelineStorage' });
       return [];
     }
   }
@@ -159,7 +160,7 @@ export class PipelineStructuredStorage {
       
       return true;
     } catch (error) {
-      console.error(`Failed to save style artifact ${styleId}:`, error);
+      logger.error(`Failed to save style artifact ${styleId}`, error, { module: 'PipelineStorage', styleId });
       return false;
     }
   }
@@ -181,7 +182,7 @@ export class PipelineStructuredStorage {
         createdAt: style.createdAt,
       };
     } catch (error) {
-      console.error(`Failed to get style artifact ${styleId}:`, error);
+      logger.error(`Failed to get style artifact ${styleId}`, error, { module: 'PipelineStorage', styleId });
       return null;
     }
   }
@@ -197,7 +198,7 @@ export class PipelineStructuredStorage {
         name: s.name,
       }));
     } catch (error) {
-      console.error("Failed to list styles:", error);
+      logger.error("Failed to list styles", error, { module: 'PipelineStorage' });
       return [];
     }
   }
@@ -234,9 +235,9 @@ export class PipelineVectorStorage {
       `);
       
       this.initialized = true;
-      console.log("[PipelineVectorStorage] Initialized with pgvector");
+      logger.info("Initialized with pgvector", { module: 'PipelineVectorStorage' });
     } catch (error) {
-      console.warn("[PipelineVectorStorage] pgvector not available, using fallback");
+      logger.warn("pgvector not available, using fallback", { module: 'PipelineVectorStorage' });
     }
   }
 
@@ -264,7 +265,7 @@ export class PipelineVectorStorage {
       
       return true;
     } catch (error) {
-      console.error(`Failed to upsert embedding for ${id}:`, error);
+      logger.error(`Failed to upsert embedding for ${id}`, error, { module: 'PipelineVectorStorage' });
       return false;
     }
   }
@@ -296,7 +297,7 @@ export class PipelineVectorStorage {
         metadata: row.metadata,
       }));
     } catch (error) {
-      console.error("Vector search failed:", error);
+      logger.error("Vector search failed", error, { module: 'PipelineVectorStorage' });
       return [];
     }
   }
@@ -308,7 +309,7 @@ export class PipelineVectorStorage {
       `);
       return true;
     } catch (error) {
-      console.error(`Failed to delete embedding ${id}:`, error);
+      logger.error(`Failed to delete embedding ${id}`, error, { module: 'PipelineVectorStorage' });
       return false;
     }
   }
@@ -331,31 +332,31 @@ export async function initializePipelineStorage(): Promise<{
 
   try {
     results.blob = Boolean(BUCKET_ID);
-    console.log(`[Pipeline Storage] Blob storage: ${results.blob ? "ready" : "not configured"}`);
+    logger.info(`Blob storage: ${results.blob ? "ready" : "not configured"}`, { module: 'PipelineStorage' });
   } catch (error) {
-    console.error("[Pipeline Storage] Blob storage initialization failed:", error);
+    logger.error("Blob storage initialization failed", error, { module: 'PipelineStorage' });
   }
 
   try {
     await db.execute(sql`SELECT 1`);
     results.structured = true;
-    console.log("[Pipeline Storage] Structured storage: ready");
+    logger.info("Structured storage: ready", { module: 'PipelineStorage' });
   } catch (error) {
-    console.error("[Pipeline Storage] Structured storage initialization failed:", error);
+    logger.error("Structured storage initialization failed", error, { module: 'PipelineStorage' });
   }
 
   try {
     await db.execute(sql`CREATE EXTENSION IF NOT EXISTS vector`);
     await db.execute(sql`SELECT 'test'::vector(3)`);
     results.vector = true;
-    console.log("[Pipeline Storage] Vector storage: ready (pgvector enabled)");
+    logger.info("Vector storage: ready (pgvector enabled)", { module: 'PipelineStorage' });
   } catch (error: any) {
     results.vector = false;
     const message = error?.message || String(error);
     if (message.includes("type \"vector\" does not exist")) {
-      console.warn("[Pipeline Storage] Vector storage not available (pgvector extension not installed)");
+      logger.warn("Vector storage not available (pgvector extension not installed)", { module: 'PipelineStorage' });
     } else {
-      console.warn(`[Pipeline Storage] Vector storage initialization failed: ${message}`);
+      logger.warn(`Vector storage initialization failed: ${message}`, { module: 'PipelineStorage' });
     }
   }
 

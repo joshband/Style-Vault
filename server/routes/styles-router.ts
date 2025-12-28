@@ -9,6 +9,7 @@ import { queueStyleForEnrichment } from "../metadata-enrichment";
 import { extractTokensWithCV, extractTokensWithWalkthrough, convertToDTCG, isCVExtractionEnabled } from "../cv-bridge";
 import { getDefaultMetadataTags } from "./utils";
 import type { UiConceptAssets } from "@shared/schema";
+import { logger } from "../logger";
 
 const router = Router();
 
@@ -30,7 +31,7 @@ router.get("/api/styles/summaries", async (req, res) => {
     res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
     res.json(visibleStyles);
   } catch (error) {
-    console.error("Error fetching style summaries:", error);
+    logger.error("Error fetching style summaries", error, { module: 'Styles' });
     res.status(500).json({
       error: "Failed to fetch styles",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -102,7 +103,7 @@ router.get("/api/styles", async (req, res) => {
     res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
     res.json(visibleStyles);
   } catch (error) {
-    console.error("Error fetching styles:", error);
+    logger.error("Error fetching styles", error, { module: 'Styles' });
     res.status(500).json({
       error: "Failed to fetch styles",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -130,7 +131,7 @@ router.get("/api/styles/:id", async (req, res) => {
     res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
     res.json(style);
   } catch (error) {
-    console.error("Error fetching style:", error);
+    logger.error("Error fetching style", error, { module: 'Styles' });
     res.status(500).json({
       error: "Failed to fetch style",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -154,7 +155,7 @@ router.get("/api/styles/:id/summary", async (req, res) => {
     res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
     res.json({ ...summary, imageIds, neighbors });
   } catch (error) {
-    console.error("Error fetching style summary:", error);
+    logger.error("Error fetching style summary", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to fetch style summary" });
   }
 });
@@ -171,7 +172,7 @@ router.get("/api/styles/:id/tokens", async (req, res) => {
     res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
     res.json({ tokens: style.tokens });
   } catch (error) {
-    console.error("Error fetching style tokens:", error);
+    logger.error("Error fetching style tokens", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to fetch style tokens" });
   }
 });
@@ -189,10 +190,10 @@ router.get("/api/styles/:id/metadata", async (req, res) => {
     res.json({
       metadataTags: style.metadataTags,
       promptScaffolding: style.promptScaffolding,
-      spec: style.spec,
+      spec: style.styleSpec,
     });
   } catch (error) {
-    console.error("Error fetching style metadata:", error);
+    logger.error("Error fetching style metadata", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to fetch style metadata" });
   }
 });
@@ -213,7 +214,7 @@ router.get("/api/styles/:id/assets", async (req, res) => {
       previews: style.previews,
     });
   } catch (error) {
-    console.error("Error fetching style assets:", error);
+    logger.error("Error fetching style assets", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to fetch style assets" });
   }
 });
@@ -233,7 +234,7 @@ router.post("/api/styles", async (req, res) => {
     
     (async () => {
       try {
-        console.log(`Starting background mood board generation for style: ${style.id}`);
+        logger.info(`Starting background mood board generation for style: ${style.id}`, { module: 'Styles', styleId: style.id });
         
         let moodBoard: any;
         let uiConcepts: any;
@@ -247,13 +248,13 @@ router.post("/api/styles", async (req, res) => {
               styleName: style.name,
               styleDescription: style.description,
               tokens: style.tokens || {},
-              metadataTags: style.metadataTags || getDefaultMetadataTags(),
+              metadataTags: (style.metadataTags || getDefaultMetadataTags()) as unknown as Record<string, string[]>,
             }),
             generateUiConceptsWithProdia({
               styleName: style.name,
               styleDescription: style.description,
               tokens: style.tokens || {},
-              metadataTags: style.metadataTags || getDefaultMetadataTags(),
+              metadataTags: (style.metadataTags || getDefaultMetadataTags()) as unknown as Record<string, string[]>,
             }),
           ]);
           
@@ -271,7 +272,7 @@ router.post("/api/styles", async (req, res) => {
             history: [],
           };
           
-          console.log(`[Prodia] Generated mood board and UI concepts in ${moodBoardResult.processingTimeMs + uiResult.processingTimeMs}ms`);
+          logger.info(`Generated mood board and UI concepts`, { module: 'Styles', duration: moodBoardResult.processingTimeMs + uiResult.processingTimeMs });
         } else {
           const result = await generateAllMoodBoardAssets({
             styleName: style.name,
@@ -287,7 +288,7 @@ router.post("/api/styles", async (req, res) => {
         await storage.updateStyleMoodBoard(style.id, moodBoard, uiConcepts);
         cache.delete(CACHE_KEYS.STYLE_DETAIL(style.id));
         cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
-        console.log(`Mood board generation complete for style: ${style.id}`);
+        logger.info(`Mood board generation complete for style: ${style.id}`, { module: 'Styles', styleId: style.id });
         
         try {
           const { storeImage } = await import("../image-service");
@@ -307,14 +308,14 @@ router.post("/api/styles", async (req, res) => {
           }
           
           await Promise.all(storePromises);
-          console.log(`[Storage] Stored ${storePromises.length} images for style: ${style.id}`);
+          logger.info(`Stored ${storePromises.length} images for style: ${style.id}`, { module: 'Styles', styleId: style.id });
         } catch (storageError) {
-          console.error(`Failed to store images for ${style.id}:`, storageError);
+          logger.error(`Failed to store images for ${style.id}`, storageError, { module: 'Styles', styleId: style.id });
         }
         
         queueStyleForEnrichment(style.id);
       } catch (error) {
-        console.error(`Background mood board generation failed for ${style.id}:`, error);
+        logger.error(`Background mood board generation failed for ${style.id}`, error, { module: 'Styles', styleId: style.id });
         await storage.updateStyleMoodBoard(
           style.id,
           { collage: "", status: "failed", history: [] },
@@ -327,7 +328,7 @@ router.post("/api/styles", async (req, res) => {
     
     res.status(201).json(style);
   } catch (error) {
-    console.error("Error creating style:", error);
+    logger.error("Error creating style", error, { module: 'Styles' });
     res.status(500).json({
       error: "Failed to create style",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -354,7 +355,7 @@ router.delete("/api/styles/:id", async (req, res) => {
     
     res.status(204).send();
   } catch (error) {
-    console.error("Error deleting style:", error);
+    logger.error("Error deleting style", error, { module: 'Styles' });
     res.status(500).json({
       error: "Failed to delete style",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -388,7 +389,7 @@ router.patch("/api/styles/:id/spec", async (req, res) => {
     
     res.json(updated);
   } catch (error) {
-    console.error("Error updating style spec:", error);
+    logger.error("Error updating style spec", error, { module: 'Styles' });
     res.status(500).json({
       error: "Failed to update style spec",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -436,7 +437,7 @@ router.post("/api/styles/:id/share", async (req, res) => {
     
     res.json({ shareCode });
   } catch (error) {
-    console.error("Error generating share code:", error);
+    logger.error("Error generating share code", error, { module: 'Styles' });
     res.status(500).json({
       error: "Failed to generate share code",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -455,7 +456,7 @@ router.get("/api/shared/:code", async (req, res) => {
     
     res.json(style);
   } catch (error) {
-    console.error("Error fetching shared style:", error);
+    logger.error("Error fetching shared style", error, { module: 'Styles' });
     res.status(500).json({
       error: "Failed to fetch style",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -474,7 +475,7 @@ router.post("/api/analyze-image", async (req, res) => {
     const analysis = await analyzeImageForStyle(imageBase64);
     res.json(analysis);
   } catch (error) {
-    console.error("Error analyzing image:", error);
+    logger.error("Error analyzing image", error, { module: 'Styles' });
     res.status(500).json({
       error: "Failed to analyze image",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -534,7 +535,7 @@ router.post("/api/analyze-image-cv", async (req, res) => {
       });
     }
   } catch (error) {
-    console.error("Error in CV analysis:", error);
+    logger.error("Error in CV analysis", error, { module: 'Styles' });
     res.status(500).json({
       error: "Failed to analyze image with CV",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -557,7 +558,7 @@ router.post("/api/style/typography", async (req, res) => {
     let signalResult = await extractStyleSignals(imageBase64);
     
     if (!signalResult.success || !signalResult.signals) {
-      console.warn("[Typography] CV extraction failed, using fallback");
+      logger.warn("CV extraction failed, using fallback", { module: 'Styles' });
       signalResult = await extractStyleSignalsFallback(imageBase64);
     }
 
@@ -584,7 +585,7 @@ router.post("/api/style/typography", async (req, res) => {
       processingTimeMs: signalResult.processingTimeMs,
     });
   } catch (error) {
-    console.error("Error in typography recommendation:", error);
+    logger.error("Error in typography recommendation", error, { module: 'Styles' });
     res.status(500).json({
       error: "Failed to generate typography recommendations",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -598,7 +599,7 @@ router.get("/api/styles/:id/image-ids", async (req, res) => {
     const imageIds = await getImagesByStyle(req.params.id);
     res.json(imageIds);
   } catch (error) {
-    console.error("Error getting image IDs:", error);
+    logger.error("Error getting image IDs", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to get image IDs" });
   }
 });
@@ -615,7 +616,7 @@ router.post("/api/styles/remix", async (req, res) => {
     const result = await remixStyles({ styleIds, weights, name });
     res.json(result);
   } catch (error) {
-    console.error("Remix error:", error);
+    logger.error("Remix error", error, { module: 'Styles' });
     res.status(500).json({ 
       error: error instanceof Error ? error.message : "Failed to remix styles" 
     });
@@ -682,7 +683,7 @@ router.post("/api/styles/remix/save", isAuthenticated, async (req, res) => {
     
     res.status(201).json(newStyle);
   } catch (error) {
-    console.error("Error saving remix:", error);
+    logger.error("Error saving remix", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to save remixed style" });
   }
 });
@@ -695,7 +696,7 @@ router.get("/api/styles/:id/visibility", async (req, res) => {
     }
     res.json({ isPublic: style.isPublic });
   } catch (error) {
-    console.error("Error fetching style visibility:", error);
+    logger.error("Error fetching style visibility", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to fetch visibility" });
   }
 });
@@ -724,7 +725,7 @@ router.patch("/api/styles/:id/visibility", isAuthenticated, async (req, res) => 
     
     res.json({ isPublic: updated.isPublic });
   } catch (error) {
-    console.error("Error updating style visibility:", error);
+    logger.error("Error updating style visibility", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to update visibility" });
   }
 });
@@ -738,7 +739,7 @@ router.get("/api/creators/:userId", async (req, res) => {
     
     res.json(creatorInfo);
   } catch (error) {
-    console.error("Error fetching creator info:", error);
+    logger.error("Error fetching creator info", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to fetch creator info" });
   }
 });
@@ -756,7 +757,7 @@ router.get("/api/creators/:userId/styles", async (req, res) => {
     
     res.json(visibleStyles);
   } catch (error) {
-    console.error("Error fetching creator styles:", error);
+    logger.error("Error fetching creator styles", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to fetch creator styles" });
   }
 });
@@ -773,7 +774,7 @@ router.patch("/api/user/profile", isAuthenticated, async (req, res) => {
     
     res.json(updated);
   } catch (error) {
-    console.error("Error updating user profile:", error);
+    logger.error("Error updating user profile", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to update profile" });
   }
 });
@@ -784,7 +785,7 @@ router.get("/api/bookmarks", isAuthenticated, async (req, res) => {
     const bookmarkedStyles = await storage.getBookmarkedStyleSummaries(userId);
     res.json(bookmarkedStyles);
   } catch (error) {
-    console.error("Error fetching bookmarks:", error);
+    logger.error("Error fetching bookmarks", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to fetch bookmarks" });
   }
 });
@@ -795,7 +796,7 @@ router.get("/api/styles/:id/bookmark", isAuthenticated, async (req, res) => {
     const isBookmarked = await storage.isStyleBookmarked(userId, req.params.id);
     res.json({ bookmarked: isBookmarked });
   } catch (error) {
-    console.error("Error checking bookmark:", error);
+    logger.error("Error checking bookmark", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to check bookmark status" });
   }
 });
@@ -812,7 +813,7 @@ router.post("/api/styles/:id/bookmark", isAuthenticated, async (req, res) => {
     await storage.createBookmark({ userId, styleId: req.params.id });
     res.json({ bookmarked: true });
   } catch (error) {
-    console.error("Error creating bookmark:", error);
+    logger.error("Error creating bookmark", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to create bookmark" });
   }
 });
@@ -823,7 +824,7 @@ router.delete("/api/styles/:id/bookmark", isAuthenticated, async (req, res) => {
     await storage.deleteBookmark(userId, req.params.id);
     res.json({ bookmarked: false });
   } catch (error) {
-    console.error("Error deleting bookmark:", error);
+    logger.error("Error deleting bookmark", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to delete bookmark" });
   }
 });
@@ -842,7 +843,7 @@ router.get("/api/styles/:id/rating", isAuthenticated, async (req, res) => {
       totalRatings: avgRating.count,
     });
   } catch (error) {
-    console.error("Error fetching rating:", error);
+    logger.error("Error fetching rating", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to fetch rating" });
   }
 });
@@ -865,7 +866,7 @@ router.post("/api/styles/:id/rating", isAuthenticated, async (req, res) => {
       totalRatings: avgRating.count,
     });
   } catch (error) {
-    console.error("Error updating rating:", error);
+    logger.error("Error updating rating", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to update rating" });
   }
 });
@@ -882,7 +883,7 @@ router.delete("/api/styles/:id/rating", isAuthenticated, async (req, res) => {
       totalRatings: avgRating.count,
     });
   } catch (error) {
-    console.error("Error deleting rating:", error);
+    logger.error("Error deleting rating", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to delete rating" });
   }
 });
@@ -893,7 +894,7 @@ router.get("/api/collections", isAuthenticated, async (req, res) => {
     const collections = await storage.getCollectionsByUser(userId);
     res.json(collections);
   } catch (error) {
-    console.error("Error fetching collections:", error);
+    logger.error("Error fetching collections", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to fetch collections" });
   }
 });
@@ -915,7 +916,7 @@ router.post("/api/collections", isAuthenticated, async (req, res) => {
     
     res.status(201).json(collection);
   } catch (error) {
-    console.error("Error creating collection:", error);
+    logger.error("Error creating collection", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to create collection" });
   }
 });
@@ -934,7 +935,7 @@ router.get("/api/collections/:id", isAuthenticated, async (req, res) => {
     
     res.json(collection);
   } catch (error) {
-    console.error("Error fetching collection:", error);
+    logger.error("Error fetching collection", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to fetch collection" });
   }
 });
@@ -955,7 +956,7 @@ router.patch("/api/collections/:id", isAuthenticated, async (req, res) => {
     const updated = await storage.updateCollection(req.params.id, { name, description });
     res.json(updated);
   } catch (error) {
-    console.error("Error updating collection:", error);
+    logger.error("Error updating collection", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to update collection" });
   }
 });
@@ -975,7 +976,7 @@ router.delete("/api/collections/:id", isAuthenticated, async (req, res) => {
     await storage.deleteCollection(req.params.id);
     res.json({ success: true });
   } catch (error) {
-    console.error("Error deleting collection:", error);
+    logger.error("Error deleting collection", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to delete collection" });
   }
 });
@@ -995,7 +996,7 @@ router.get("/api/collections/:id/styles", isAuthenticated, async (req, res) => {
     const styles = await storage.getCollectionStyleSummaries(req.params.id);
     res.json(styles);
   } catch (error) {
-    console.error("Error fetching collection styles:", error);
+    logger.error("Error fetching collection styles", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to fetch collection styles" });
   }
 });
@@ -1021,7 +1022,7 @@ router.post("/api/collections/:id/styles", isAuthenticated, async (req, res) => 
     const item = await storage.addStyleToCollection(req.params.id, styleId);
     res.status(201).json(item);
   } catch (error) {
-    console.error("Error adding style to collection:", error);
+    logger.error("Error adding style to collection", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to add style to collection" });
   }
 });
@@ -1041,7 +1042,7 @@ router.delete("/api/collections/:id/styles/:styleId", isAuthenticated, async (re
     await storage.removeStyleFromCollection(req.params.id, req.params.styleId);
     res.json({ success: true });
   } catch (error) {
-    console.error("Error removing style from collection:", error);
+    logger.error("Error removing style from collection", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to remove style from collection" });
   }
 });
@@ -1052,7 +1053,7 @@ router.get("/api/styles/:id/collections", isAuthenticated, async (req, res) => {
     const containingCollections = await storage.getCollectionsContainingStyle(userId, req.params.id);
     res.json(containingCollections);
   } catch (error) {
-    console.error("Error fetching style collections:", error);
+    logger.error("Error fetching style collections", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to fetch collections" });
   }
 });
@@ -1062,7 +1063,7 @@ router.get("/api/styles/:id/versions", async (req, res) => {
     const versions = await storage.getStyleVersions(req.params.id);
     res.json(versions);
   } catch (error) {
-    console.error("Error fetching style versions:", error);
+    logger.error("Error fetching style versions", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to fetch versions" });
   }
 });
@@ -1075,7 +1076,7 @@ router.get("/api/styles/:id/versions/:versionId", async (req, res) => {
     }
     res.json(version);
   } catch (error) {
-    console.error("Error fetching style version:", error);
+    logger.error("Error fetching style version", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to fetch version" });
   }
 });
@@ -1109,7 +1110,7 @@ router.post("/api/styles/:id/versions", isAuthenticated, async (req, res) => {
 
     res.json(version);
   } catch (error) {
-    console.error("Error creating style version:", error);
+    logger.error("Error creating style version", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to create version" });
   }
 });
@@ -1150,7 +1151,7 @@ router.post("/api/styles/:id/versions/:versionId/revert", isAuthenticated, async
 
     res.json(updated);
   } catch (error) {
-    console.error("Error reverting style version:", error);
+    logger.error("Error reverting style version", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to revert version" });
   }
 });
@@ -1177,7 +1178,6 @@ router.post("/api/styles/:id/generate-mood-board", async (req, res) => {
     
     if (existingUiConcepts.status === "complete" && (existingUiConcepts.softwareApp || existingUiConcepts.audioPlugin || existingUiConcepts.dashboard)) {
       uiConceptsHistory.unshift({
-        softwareApp: existingUiConcepts.softwareApp,
         audioPlugin: existingUiConcepts.audioPlugin,
         dashboard: existingUiConcepts.dashboard,
         componentLibrary: existingUiConcepts.componentLibrary,
@@ -1220,7 +1220,7 @@ router.post("/api/styles/:id/generate-mood-board", async (req, res) => {
       uiConcepts: uiConceptsWithHistory,
     });
   } catch (error) {
-    console.error("Error generating mood board:", error);
+    logger.error("Error generating mood board", error, { module: 'Styles' });
     res.status(500).json({
       error: "Failed to generate mood board",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -1246,15 +1246,15 @@ router.get("/api/styles/:id/mood-board-status", async (req, res) => {
       },
       uiConcepts: {
         status: uiConcepts.status,
-        hasSoftwareApp: !!uiConcepts.softwareApp,
-        hasAudioPlugin: !!uiConcepts.audioPlugin,
-        hasDashboard: !!uiConcepts.dashboard,
-        hasComponentLibrary: !!uiConcepts.componentLibrary,
-        historyCount: uiConcepts.history?.length || 0,
+        hasSoftwareApp: !!(uiConcepts as any).softwareApp,
+        hasAudioPlugin: !!(uiConcepts as any).audioPlugin,
+        hasDashboard: !!(uiConcepts as any).dashboard,
+        hasComponentLibrary: !!(uiConcepts as any).componentLibrary,
+        historyCount: (uiConcepts as any).history?.length || 0,
       },
     });
   } catch (error) {
-    console.error("Error getting mood board status:", error);
+    logger.error("Error getting mood board status", error, { module: 'Styles' });
     res.status(500).json({
       error: "Failed to get mood board status",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -1268,7 +1268,7 @@ router.post("/api/styles/generate-random", async (req, res) => {
     const style = await generateRandomStyle();
     res.json(style);
   } catch (error) {
-    console.error("Error generating random style:", error);
+    logger.error("Error generating random style", error, { module: 'Styles' });
     res.status(500).json({
       error: "Failed to generate random style",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -1306,7 +1306,7 @@ router.post("/api/styles/:id/cv-tokens", async (req, res) => {
       processingTimeMs: result.processingTimeMs,
     });
   } catch (error) {
-    console.error("Error extracting CV tokens for style:", error);
+    logger.error("Error extracting CV tokens for style", error, { module: 'Styles' });
     res.status(500).json({
       error: "Failed to extract CV tokens",
       message: error instanceof Error ? error.message : "Unknown error",

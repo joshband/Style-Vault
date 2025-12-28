@@ -2,6 +2,7 @@ import { Router } from "express";
 import { visionService } from "../vision-service";
 import { analyzeImageCombined } from "../combined-analysis";
 import { generateComprehensiveDTCG } from "../comprehensive-dtcg";
+import { logger } from "../logger";
 
 const router = Router();
 
@@ -39,7 +40,7 @@ router.post("/api/vision/analyze", async (req, res) => {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("Vision analysis error:", error);
+    logger.error("Vision analysis error", error, { module: 'Vision' });
     res.status(500).json({
       error: error instanceof Error ? error.message : "Vision analysis failed",
     });
@@ -66,7 +67,7 @@ router.post("/api/vision/labels", async (req, res) => {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("Label detection error:", error);
+    logger.error("Label detection error", error, { module: 'Vision' });
     res.status(500).json({
       error: error instanceof Error ? error.message : "Label detection failed",
     });
@@ -93,7 +94,7 @@ router.post("/api/vision/colors", async (req, res) => {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("Color extraction error:", error);
+    logger.error("Color extraction error", error, { module: 'Vision' });
     res.status(500).json({
       error: error instanceof Error ? error.message : "Color extraction failed",
     });
@@ -135,7 +136,7 @@ router.post("/api/analyze/comprehensive", async (req, res) => {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("Comprehensive analysis error:", error);
+    logger.error("Comprehensive analysis error", error, { module: 'Vision' });
     res.status(500).json({
       error: error instanceof Error ? error.message : "Comprehensive analysis failed",
     });

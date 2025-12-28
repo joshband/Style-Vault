@@ -14,9 +14,27 @@ export interface ConfidenceMetadata {
   method?: string;
 }
 
+export interface ShadowValue {
+  offsetX: string;
+  offsetY: string;
+  blur: string;
+  spread: string;
+  color: string;
+  inset?: boolean;
+}
+
+export type CubicBezierValue = [number, number, number, number];
+
+export type DTCGTokenValue = 
+  | string 
+  | number 
+  | boolean 
+  | ShadowValue 
+  | CubicBezierValue;
+
 export interface DTCGToken {
   $type: string;
-  $value: any;
+  $value: DTCGTokenValue;
   $description?: string;
   $extensions?: {
     visualDNA: ConfidenceMetadata;
@@ -47,14 +65,32 @@ export interface AssembledTokens {
   };
 }
 
+export interface CVColorInput {
+  oklch?: string;
+  hex?: string;
+  confidence?: number;
+}
+
+export interface CVColorAnalysis {
+  harmony?: string;
+  temperature?: string;
+  contrast?: number;
+}
+
+export interface CVElevationInput {
+  depthScore?: number;
+  layerCount?: number;
+  levels?: { level: number; intensity: number }[];
+}
+
 export interface CVExtractionResult {
-  color?: any[];
-  colorAnalysis?: any;
-  spacing?: any;
-  borderRadius?: any;
-  grid?: any;
-  elevation?: any;
-  strokeWidth?: any;
+  color?: (string | CVColorInput)[];
+  colorAnalysis?: CVColorAnalysis;
+  spacing?: (number | string)[];
+  borderRadius?: (number | string)[];
+  grid?: { columns?: number; rows?: number };
+  elevation?: CVElevationInput;
+  strokeWidth?: number[];
   meta?: {
     method?: string;
     confidence?: string;
@@ -71,7 +107,7 @@ const DEFAULT_CONFIDENCE = {
 
 function createToken(
   type: string,
-  value: any,
+  value: DTCGTokenValue,
   description: string,
   confidence: number,
   source: 'cv' | 'ai' | 'inferred',
@@ -92,8 +128,8 @@ function createToken(
 }
 
 function assembleColorTokens(
-  colors: any[] | undefined,
-  colorAnalysis: any | undefined
+  colors: (string | CVColorInput)[] | undefined,
+  colorAnalysis: CVColorAnalysis | undefined
 ): { tokens: DTCGTokenGroup; confidence: number } {
   const tokens: DTCGTokenGroup = {};
   let totalConfidence = 0;
@@ -129,7 +165,7 @@ function assembleColorTokens(
   return { tokens, confidence: tokenCount > 0 ? totalConfidence / tokenCount : DEFAULT_CONFIDENCE.fallback };
 }
 
-function assembleSpacingTokens(spacing: any | undefined): { tokens: DTCGTokenGroup; confidence: number } {
+function assembleSpacingTokens(spacing: (number | string)[] | undefined): { tokens: DTCGTokenGroup; confidence: number } {
   const tokens: DTCGTokenGroup = {};
   
   if (spacing && Array.isArray(spacing) && spacing.length > 0) {
@@ -184,7 +220,7 @@ function assembleTypographyTokens(): { tokens: DTCGTokenGroup; confidence: numbe
   return { tokens, confidence: DEFAULT_CONFIDENCE.fallback };
 }
 
-function assembleBorderRadiusTokens(borderRadius: any | undefined): { tokens: DTCGTokenGroup; confidence: number } {
+function assembleBorderRadiusTokens(borderRadius: (number | string)[] | undefined): { tokens: DTCGTokenGroup; confidence: number } {
   const tokens: DTCGTokenGroup = {};
 
   if (borderRadius && Array.isArray(borderRadius) && borderRadius.length > 0) {
@@ -207,12 +243,12 @@ function assembleBorderRadiusTokens(borderRadius: any | undefined): { tokens: DT
   return { tokens, confidence: DEFAULT_CONFIDENCE.fallback };
 }
 
-function assembleShadowTokens(elevation: any | undefined): { tokens: DTCGTokenGroup; confidence: number } {
+function assembleShadowTokens(elevation: CVElevationInput | undefined): { tokens: DTCGTokenGroup; confidence: number } {
   const tokens: DTCGTokenGroup = {};
 
   if (elevation && typeof elevation === 'object') {
     if (elevation.levels && Array.isArray(elevation.levels)) {
-      elevation.levels.forEach((level: any, i: number) => {
+      elevation.levels.forEach((level: { level: number; intensity: number }, i: number) => {
         const name = `level${i + 1}`;
         tokens[name] = createToken(
           'shadow',
@@ -254,7 +290,7 @@ function assembleOpacityTokens(): { tokens: DTCGTokenGroup; confidence: number }
   return { tokens, confidence: DEFAULT_CONFIDENCE.fallback };
 }
 
-function assembleDepthTokens(elevation: any | undefined): { tokens: DTCGTokenGroup; confidence: number } {
+function assembleDepthTokens(elevation: CVElevationInput | undefined): { tokens: DTCGTokenGroup; confidence: number } {
   const tokens: DTCGTokenGroup = {};
 
   if (elevation && typeof elevation === 'object' && elevation.depthScore !== undefined) {
@@ -292,7 +328,7 @@ function assembleMotionTokens(): { tokens: DTCGTokenGroup; confidence: number } 
   return { tokens, confidence: DEFAULT_CONFIDENCE.fallback };
 }
 
-export function assembleTokens(cvResult?: CVExtractionResult, existingTokens?: Record<string, any>): AssembledTokens {
+export function assembleTokens(cvResult?: CVExtractionResult, existingTokens?: Record<string, DTCGTokenGroup>): AssembledTokens {
   const cv = cvResult || {};
   
   const colorResult = assembleColorTokens(cv.color, cv.colorAnalysis);
@@ -339,7 +375,7 @@ export function assembleTokens(cvResult?: CVExtractionResult, existingTokens?: R
   };
 }
 
-export function mergeWithExistingTokens(assembled: AssembledTokens, existing?: Record<string, any>): AssembledTokens {
+export function mergeWithExistingTokens(assembled: AssembledTokens, existing?: Record<string, DTCGTokenGroup>): AssembledTokens {
   if (!existing) return assembled;
 
   const merged = { ...assembled };
