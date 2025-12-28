@@ -19,6 +19,13 @@ interface EnrichmentResult {
   lighting: string[];
   texture: string[];
   
+  // Extended visual characteristics
+  depth: string[];
+  shadow: string[];
+  material: string[];
+  atmosphere: string[];
+  environment: string[];
+  
   // Art historical context
   era: string[];
   artPeriod: string[];
@@ -70,6 +77,11 @@ Respond with ONLY valid JSON in this exact format:
   "colorFamily": ["tag1", "tag2"],
   "lighting": ["tag1", "tag2"],
   "texture": ["tag1", "tag2"],
+  "depth": ["tag1", "tag2"],
+  "shadow": ["tag1", "tag2"],
+  "material": ["tag1", "tag2"],
+  "atmosphere": ["tag1", "tag2"],
+  "environment": ["tag1", "tag2"],
   "era": ["tag1", "tag2"],
   "artPeriod": ["tag1", "tag2"],
   "historicalInfluences": ["influence1", "influence2"],
@@ -92,8 +104,13 @@ Respond with ONLY valid JSON in this exact format:
 == OBJECTIVE CHARACTERISTICS ==
 - mood: emotional qualities (e.g., "serene", "melancholic", "energetic", "nostalgic", "whimsical")
 - colorFamily: color palettes (e.g., "earth-tones", "pastels", "monochrome", "jewel-tones")
-- lighting: lighting characteristics (e.g., "soft-diffused", "dramatic-chiaroscuro", "golden-hour")
-- texture: surface qualities (e.g., "smooth", "grainy", "impasto", "organic")
+- lighting: lighting characteristics (e.g., "soft-diffused", "dramatic-chiaroscuro", "golden-hour", "rim-lighting", "volumetric")
+- texture: surface qualities (e.g., "smooth", "grainy", "impasto", "organic", "brushed-metal", "velvet")
+- depth: spatial depth perception (e.g., "shallow-flat", "deep-layered", "infinite-perspective", "intimate-close", "aerial-view")
+- shadow: shadow characteristics (e.g., "soft-ambient", "hard-cast", "dramatic-noir", "minimal-shadowless", "colored-shadows")
+- material: surface materials present (e.g., "glass", "metal", "fabric", "stone", "plastic", "wood", "ceramic")
+- atmosphere: atmospheric quality (e.g., "misty-hazy", "clear-crisp", "dusty", "humid", "smoky", "ethereal")
+- environment: environmental context (e.g., "indoor-studio", "outdoor-natural", "urban", "industrial", "domestic", "fantastical")
 - era: time period (e.g., "1920s", "1970s", "contemporary", "renaissance")
 - artPeriod: art movements (e.g., "art-deco", "impressionism", "bauhaus", "minimalism")
 - historicalInfluences: design schools/movements (e.g., "japanese-woodblock", "swiss-style", "memphis-design")
@@ -151,6 +168,13 @@ function parseEnrichmentResponse(text: string): EnrichmentResult | null {
       colorFamily: normalizeArray(parsed.colorFamily || []),
       lighting: normalizeArray(parsed.lighting || []),
       texture: normalizeArray(parsed.texture || []),
+      
+      // Extended visual characteristics
+      depth: normalizeArray(parsed.depth || []),
+      shadow: normalizeArray(parsed.shadow || []),
+      material: normalizeArray(parsed.material || []),
+      atmosphere: normalizeArray(parsed.atmosphere || []),
+      environment: normalizeArray(parsed.environment || []),
       
       // Art historical context
       era: normalizeArray(parsed.era || []),
@@ -361,7 +385,7 @@ export async function generateStyleSpecContent(styleId: string): Promise<StyleSp
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: prompt,
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
       config: {
         temperature: 0.7,
         topP: 0.9,

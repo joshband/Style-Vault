@@ -505,6 +505,12 @@ export class DatabaseStorage implements IStorage {
       colorFamily: metadataTags.colorFamily || [],
       lighting: metadataTags.lighting || [],
       texture: metadataTags.texture || [],
+      // Extended visual characteristics
+      depth: metadataTags.depth || [],
+      shadow: metadataTags.shadow || [],
+      material: metadataTags.material || [],
+      atmosphere: metadataTags.atmosphere || [],
+      environment: metadataTags.environment || [],
       // Art historical context
       era: metadataTags.era || [],
       artPeriod: metadataTags.artPeriod || [],

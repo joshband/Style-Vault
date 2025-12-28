@@ -74,6 +74,13 @@ export interface MetadataTags {
   lighting: string[];
   texture: string[];
   
+  // Extended visual characteristics
+  depth: string[];
+  shadow: string[];
+  material: string[];
+  atmosphere: string[];
+  environment: string[];
+  
   // Art historical context
   era: string[];
   artPeriod: string[];
@@ -178,6 +185,11 @@ export const styles = pgTable("styles", {
     colorFamily: [],
     lighting: [],
     texture: [],
+    depth: [],
+    shadow: [],
+    material: [],
+    atmosphere: [],
+    environment: [],
     era: [],
     artPeriod: [],
     historicalInfluences: [],

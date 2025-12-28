@@ -5,7 +5,7 @@ import { insertStyleSchema } from "@shared/schema";
 import { isAuthenticated } from "../replit_integrations/auth";
 import { analyzeImageForStyle } from "../analysis";
 import { generateAllMoodBoardAssets } from "../mood-board-generation";
-import { queueStyleForEnrichment } from "../metadata-enrichment";
+import { queueStyleForEnrichment, enrichStyleMetadata, enrichStyleSpec } from "../metadata-enrichment";
 import { extractTokensWithCV, extractTokensWithWalkthrough, convertToDTCG, isCVExtractionEnabled } from "../cv-bridge";
 import { getDefaultMetadataTags } from "./utils";
 import type { UiConceptAssets } from "@shared/schema";
@@ -218,6 +218,46 @@ router.get("/api/styles/:id/assets", async (req, res) => {
   } catch (error) {
     logger.error("Error fetching style assets", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to fetch style assets" });
+  }
+});
+
+router.post("/api/styles/:id/enrich", async (req, res) => {
+  try {
+    const styleId = req.params.id;
+    const style = await storage.getStyleById(styleId);
+    
+    if (!style) {
+      return res.status(404).json({ error: "Style not found" });
+    }
+    
+    logger.info("Starting synchronous metadata enrichment", { module: 'Styles', styleId });
+    
+    const metadataSuccess = await enrichStyleMetadata(styleId);
+    let specSuccess = false;
+    
+    if (metadataSuccess) {
+      specSuccess = await enrichStyleSpec(styleId);
+    }
+    
+    cache.delete(CACHE_KEYS.STYLE_DETAIL(styleId));
+    cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
+    
+    const updatedStyle = await storage.getStyleById(styleId);
+    
+    res.json({
+      success: metadataSuccess && specSuccess,
+      metadataSuccess,
+      specSuccess,
+      metadataTags: updatedStyle?.metadataTags,
+      styleSpec: updatedStyle?.styleSpec,
+      enrichmentStatus: updatedStyle?.metadataEnrichmentStatus,
+    });
+  } catch (error) {
+    logger.error("Error enriching style", error, { module: 'Styles' });
+    res.status(500).json({
+      error: "Failed to enrich style",
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
   }
 });
 
@@ -668,6 +708,11 @@ router.post("/api/styles/remix/save", isAuthenticated, async (req, res) => {
         colorFamily: [],
         lighting: [],
         texture: [],
+        depth: [],
+        shadow: [],
+        material: [],
+        atmosphere: [],
+        environment: [],
         era: [],
         artPeriod: [],
         historicalInfluences: [],
