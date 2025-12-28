@@ -1,0 +1,77 @@
+{
+  "totalFiles": 233,
+  "totalLines": 55477,
+  "filesByType": {
+    ".js": 5,
+    ".tsx": 102,
+    ".ts": 126
+  },
+  "linesByType": {
+    ".js": 836,
+    ".tsx": 23331,
+    ".ts": 31310
+  },
+  "largestFiles": [
+    {
+      "path": "server/routes.ts",
+      "lines": 3496
+    },
+    {
+      "path": "client/src/pages/Inspect.tsx",
+      "lines": 1784
+    },
+    {
+      "path": "client/src/pages/Author.tsx",
+      "lines": 1491
+    },
+    {
+      "path": "server/storage.ts",
+      "lines": 1411
+    },
+    {
+      "path": "server/admin-routes.ts",
+      "lines": 1123
+    },
+    {
+      "path": "client/src/components/deploy-dialog.tsx",
+      "lines": 922
+    },
+    {
+      "path": "server/style-regeneration.ts",
+      "lines": 850
+    },
+    {
+      "path": "server/comprehensive-dtcg.ts",
+      "lines": 804
+    },
+    {
+      "path": "server/prodia-generation.ts",
+      "lines": 795
+    },
+    {
+      "path": "client/src/pages/Admin.tsx",
+      "lines": 761
+    }
+  ],
+  "unusedExports": [],
+  "duplicateCode": [],
+  "bundleMetrics": {
+    "estimatedSize": "568M",
+    "dependencies": 91,
+    "devDependencies": 22
+  },
+  "codeQuality": {
+    "score": 82,
+    "issues": [
+      "22 files exceed 500 lines - consider splitting",
+      "193 usages of 'any' type - consider stricter typing",
+      "113 console.log statements found - consider removing for production"
+    ],
+    "strengths": [
+      "TypeScript used for 102 React components",
+      "TypeScript used for 126 modules",
+      "Good separation of client, server, and shared code",
+      "21 test files found"
+    ]
+  }
+}
