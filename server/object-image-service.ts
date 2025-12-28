@@ -2,7 +2,7 @@ import sharp from "sharp";
 import crypto from "crypto";
 import { db } from "./db";
 import { objectAssets, type ImageAssetType, type InsertObjectAsset } from "@shared/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { objectStorageClient, ObjectStorageService } from "./replit_integrations/object_storage";
 import { logger } from "./logger";
 
@@ -200,12 +200,16 @@ export async function getImageUrlFromObjectStorage(
 }
 
 export async function getObjectAssetsByStyle(
-  styleId: string
+  styleId: string | null
 ): Promise<Record<ImageAssetType, string>> {
+  const whereClause = styleId === null 
+    ? sql`${objectAssets.styleId} IS NULL`
+    : eq(objectAssets.styleId, styleId);
+    
   const assets = await db
     .select({ id: objectAssets.id, type: objectAssets.type })
     .from(objectAssets)
-    .where(eq(objectAssets.styleId, styleId));
+    .where(whereClause);
 
   const result: Record<string, string> = {};
   for (const asset of assets) {

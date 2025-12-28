@@ -898,10 +898,13 @@ export function registerAdminRoutes(app: Express) {
         .from(imageAssets)
         .limit(limit);
       
-      // Group by styleId
-      const assetsByStyle = new Map<string, typeof assetsToMigrate>();
+      // Type for image asset
+      type ImageAsset = typeof assetsToMigrate[0];
+      
+      // Group by styleId with proper typing
+      const assetsByStyle = new Map<string, ImageAsset[]>();
       for (const asset of assetsToMigrate) {
-        const key = asset.styleId || 'orphan';
+        const key = asset.styleId || '__orphan__';
         if (styleIds && !styleIds.includes(key)) continue;
         if (!assetsByStyle.has(key)) {
           assetsByStyle.set(key, []);
@@ -922,15 +925,24 @@ export function registerAdminRoutes(app: Express) {
       let skipCount = 0;
       let failCount = 0;
       
-      for (const [styleId, assets] of Array.from(assetsByStyle.entries())) {
+      // Process each style group
+      for (const [styleKey, assets] of Array.from(assetsByStyle.entries())) {
+        // Preload existing object assets for this style ONCE per style (not per asset)
+        const isOrphan = styleKey === '__orphan__';
+        const existingObjectAssets = await getObjectAssetsByStyle(isOrphan ? null : styleKey);
+        
+        // Track which types we've already migrated in this batch to avoid duplicates
+        const migratedTypesThisBatch = new Set<string>();
+        
         for (const asset of assets) {
           try {
-            // Check if already migrated to object storage
-            const existingObjectAssets = await getObjectAssetsByStyle(styleId === 'orphan' ? '' : styleId);
-            if (existingObjectAssets[asset.type as keyof typeof existingObjectAssets]) {
+            const assetType = asset.type as keyof typeof existingObjectAssets;
+            
+            // Check if already migrated to object storage OR migrated earlier in this batch
+            if (existingObjectAssets[assetType] || migratedTypesThisBatch.has(asset.type)) {
               skipCount++;
               results.push({
-                styleId,
+                styleId: styleKey,
                 assetId: asset.id,
                 type: asset.type,
                 migrated: false,
@@ -941,7 +953,7 @@ export function registerAdminRoutes(app: Express) {
             
             if (dryRun) {
               results.push({
-                styleId,
+                styleId: styleKey,
                 assetId: asset.id,
                 type: asset.type,
                 migrated: false,
@@ -954,12 +966,15 @@ export function registerAdminRoutes(app: Express) {
             const newAssetId = await storeImageToObjectStorage(
               asset.originalData,
               asset.type as any,
-              styleId === 'orphan' ? undefined : styleId
+              isOrphan ? undefined : styleKey
             );
+            
+            // Track that we migrated this type to prevent duplicates within same batch
+            migratedTypesThisBatch.add(asset.type);
             
             successCount++;
             results.push({
-              styleId,
+              styleId: styleKey,
               assetId: asset.id,
               type: asset.type,
               migrated: true,
@@ -977,7 +992,7 @@ export function registerAdminRoutes(app: Express) {
           } catch (error) {
             failCount++;
             results.push({
-              styleId,
+              styleId: styleKey,
               assetId: asset.id,
               type: asset.type,
               migrated: false,
