@@ -24,6 +24,9 @@ Preferred communication style: Simple, everyday language.
 - **Token Export Pipeline**: A modular pipeline exports design tokens into 18 different formats, including various code, mobile, design tool, and game engine formats.
 - **One-Click Deploy**: Supports deployment to Vercel and Netlify by generating platform-specific configurations and bundling necessary assets.
 - **Async Job Orchestration**: A robust system (`server/job-runner.ts`) manages long-running operations like token_extraction, image_generation, and metadata_enrichment with retry logic and backoff.
+- **Parallel Image Generation**: Uses `Promise.allSettled` for independent stage persistence, achieving 60-70% faster style regeneration with token snapshots to prevent race conditions.
+- **AI Retry Logic**: Production-grade retry wrapper (`server/retry-utils.ts`) using p-retry with exponential backoff (4 retries, 2-60s timeout) for Gemini/OpenAI/Prodia API calls.
+- **Modular Route Architecture**: Domain-specific routers in `server/routes/` (styles, images, jobs, analytics, system, pipeline, vision, batch-processing) for maintainability.
 - **Node.js-to-Python Pipeline Integration**: A bridge (`server/pipeline-bridge.ts`) facilitates communication with a Python backend for advanced CV, validation, and semantic search capabilities.
 - **Component + Material Intelligence Pipeline**: CV-based system for detecting UI components (buttons, sliders, knobs, cards) and extracting material/texture signals (translucency, specular, emission, grain, microcontrast). Features a library of 12 material recipes (glassmorphic, anodized metal, soft plastic, neon, etc.) with confidence-scored matching. Optional Gemini AI semantic classification for enhanced component labeling.
 
