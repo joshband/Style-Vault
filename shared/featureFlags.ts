@@ -138,10 +138,10 @@ export const defaultFeatureFlags: FeatureFlags = {
   'refresh.enabled': false,
   
   // Inspect page features - DISABLED
-  'inspect.summary': false,
+  'inspect.summary': true,
   'inspect.previews': false,
-  'inspect.tokens': false,
-  'inspect.palette': false,
+  'inspect.tokens': true,
+  'inspect.palette': true,
   'moodboard.enabled': false,
   'uiconcepts.enabled': false,
   'materials.enabled': false,

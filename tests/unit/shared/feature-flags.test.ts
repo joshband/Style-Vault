@@ -87,8 +87,8 @@ describe('Feature Flags System', () => {
       });
     });
 
-    it('should have exactly the Stage 1 flags enabled', () => {
-      const stage1EnabledFlags: (keyof FeatureFlags)[] = [
+    it('should have exactly the Stage 2 flags enabled', () => {
+      const stage2EnabledFlags: (keyof FeatureFlags)[] = [
         'vault.enabled',
         'auth.enabled',
         'nav.basic',
@@ -96,15 +96,18 @@ describe('Feature Flags System', () => {
         'api.styles.list',
         'inspect.enabled',
         'api.styles.detail',
+        'inspect.summary',
+        'inspect.tokens',
+        'inspect.palette',
       ];
 
-      stage1EnabledFlags.forEach(key => {
+      stage2EnabledFlags.forEach(key => {
         expect(defaultFeatureFlags[key]).toBe(true);
       });
     });
 
-    it('should have all non-Stage 1 features disabled', () => {
-      const stage1EnabledFlags = new Set([
+    it('should have all non-Stage 2 features disabled', () => {
+      const stage2EnabledFlags = new Set([
         'vault.enabled',
         'auth.enabled',
         'nav.basic',
@@ -112,10 +115,13 @@ describe('Feature Flags System', () => {
         'api.styles.list',
         'inspect.enabled',
         'api.styles.detail',
+        'inspect.summary',
+        'inspect.tokens',
+        'inspect.palette',
       ]);
 
       Object.entries(defaultFeatureFlags).forEach(([key, value]) => {
-        if (!stage1EnabledFlags.has(key)) {
+        if (!stage2EnabledFlags.has(key)) {
           expect(value).toBe(false);
         }
       });
@@ -170,7 +176,7 @@ describe('Feature Flags System', () => {
   });
 
   describe('getEnabledFeatures', () => {
-    it('should return all Stage 1 enabled features', () => {
+    it('should return all Stage 2 enabled features', () => {
       const enabled = getEnabledFeatures();
       expect(enabled).toContain('vault.enabled');
       expect(enabled).toContain('auth.enabled');
@@ -179,7 +185,10 @@ describe('Feature Flags System', () => {
       expect(enabled).toContain('api.styles.list');
       expect(enabled).toContain('inspect.enabled');
       expect(enabled).toContain('api.styles.detail');
-      expect(enabled.length).toBe(7);
+      expect(enabled).toContain('inspect.summary');
+      expect(enabled).toContain('inspect.tokens');
+      expect(enabled).toContain('inspect.palette');
+      expect(enabled.length).toBe(10);
     });
 
     it('should not include any disabled features', () => {

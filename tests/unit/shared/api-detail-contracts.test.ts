@@ -91,13 +91,25 @@ describe('API Contract Tests - Style Detail', () => {
     });
   });
 
-  describe('Feature Flag Behavior (Stage 1)', () => {
-    it('api.styles.detail flag should be true after Stage 1', () => {
+  describe('Feature Flag Behavior (Stage 2)', () => {
+    it('api.styles.detail flag should be true', () => {
       expect(defaultFeatureFlags['api.styles.detail']).toBe(true);
     });
 
-    it('inspect.enabled flag should be true after Stage 1', () => {
+    it('inspect.enabled flag should be true', () => {
       expect(defaultFeatureFlags['inspect.enabled']).toBe(true);
+    });
+
+    it('inspect.tokens flag should be true', () => {
+      expect(defaultFeatureFlags['inspect.tokens']).toBe(true);
+    });
+
+    it('inspect.palette flag should be true', () => {
+      expect(defaultFeatureFlags['inspect.palette']).toBe(true);
+    });
+
+    it('inspect.summary flag should be true', () => {
+      expect(defaultFeatureFlags['inspect.summary']).toBe(true);
     });
   });
 });
