@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { ActiveJobsIndicator } from "./active-jobs-indicator";
 import { useAuth } from "@/hooks/use-auth";
+import { useFeatureFlag } from "@/lib/feature-flags";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,6 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import type { FeatureFlags } from "@shared/featureFlags";
 
 type AppMode = "explore" | "inspect" | "author" | "generate" | "remix" | "tools";
 
@@ -43,19 +45,46 @@ const modeDescriptions: Record<AppMode, string> = {
   tools: "Design utilities",
 };
 
+interface NavItem {
+  href: string;
+  label: string;
+  icon: typeof Compass;
+  mode: AppMode;
+  featureFlag: keyof FeatureFlags;
+}
+
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user, isLoading: authLoading, isAuthenticated } = useAuth();
   
   const currentMode = getCurrentMode(location);
+  
+  const navExploreEnabled = useFeatureFlag('nav.explore');
+  const navCreateEnabled = useFeatureFlag('nav.create');
+  const navRemixEnabled = useFeatureFlag('nav.remix');
+  const navToolsEnabled = useFeatureFlag('nav.tools');
+  const navLibraryEnabled = useFeatureFlag('nav.library');
+  const navAnalyticsEnabled = useFeatureFlag('nav.analytics');
+  const searchEnabled = useFeatureFlag('search.enabled');
+  const jobsEnabled = useFeatureFlag('jobs.enabled');
 
-  const navItems = [
-    { href: "/", label: "Explore", icon: Compass, mode: "explore" as AppMode },
-    { href: "/create", label: "Create", icon: PenTool, mode: "author" as AppMode },
-    { href: "/remix", label: "Remix", icon: Sparkles, mode: "remix" as AppMode },
-    { href: "/tools", label: "Tools", icon: Paintbrush, mode: "tools" as AppMode },
+  const navItems: NavItem[] = [
+    { href: "/", label: "Explore", icon: Compass, mode: "explore", featureFlag: 'nav.explore' },
+    { href: "/create", label: "Create", icon: PenTool, mode: "author", featureFlag: 'nav.create' },
+    { href: "/remix", label: "Remix", icon: Sparkles, mode: "remix", featureFlag: 'nav.remix' },
+    { href: "/tools", label: "Tools", icon: Paintbrush, mode: "tools", featureFlag: 'nav.tools' },
   ];
+  
+  const enabledNavItems = navItems.filter(item => {
+    switch (item.featureFlag) {
+      case 'nav.explore': return navExploreEnabled;
+      case 'nav.create': return navCreateEnabled;
+      case 'nav.remix': return navRemixEnabled;
+      case 'nav.tools': return navToolsEnabled;
+      default: return false;
+    }
+  });
 
   return (
     <div className="flex h-screen w-full bg-background text-foreground font-sans overflow-hidden flex-col md:flex-row">
@@ -86,7 +115,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </div>
 
           <nav className="space-y-1">
-            {navItems.map((item) => {
+            {enabledNavItems.map((item) => {
               const Icon = item.icon;
               const isActive = currentMode === item.mode;
               
@@ -109,7 +138,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               );
             })}
             
-            {/* Contextual mode indicators for Inspect and Generate */}
+            {/* Contextual mode indicators for Inspect and Generate - only show if those features are enabled */}
             {(currentMode === "inspect" || currentMode === "generate") && (
               <div className="mt-4 pt-4 border-t border-sidebar-border">
                 <div className="px-3 py-2 text-xs font-mono text-muted-foreground uppercase tracking-wider mb-2">
@@ -126,7 +155,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
         <div className="pt-4 border-t border-sidebar-border hidden sm:block">
           <div className="px-3 py-2 text-xs text-muted-foreground/60 font-mono">
-            v1.0.0-alpha
+            v1.0.0-alpha (minimal)
           </div>
         </div>
       </aside>
@@ -142,17 +171,23 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <Menu size={20} />
             </button>
             
-            <div className="flex items-center gap-2 md:gap-4 w-full max-w-md">
-              <Search className="text-muted-foreground flex-shrink-0" size={16} />
-              <input 
-                type="text" 
-                placeholder="Search..." 
-                className="bg-transparent border-none outline-none text-xs sm:text-sm w-full placeholder:text-muted-foreground/60"
-              />
-            </div>
+            {/* Search bar - only shown when search is enabled */}
+            {searchEnabled ? (
+              <div className="flex items-center gap-2 md:gap-4 w-full max-w-md">
+                <Search className="text-muted-foreground flex-shrink-0" size={16} />
+                <input 
+                  type="text" 
+                  placeholder="Search..." 
+                  className="bg-transparent border-none outline-none text-xs sm:text-sm w-full placeholder:text-muted-foreground/60"
+                />
+              </div>
+            ) : (
+              <div className="flex-1" />
+            )}
             
             <div className="flex items-center gap-3 ml-auto">
-              <ActiveJobsIndicator />
+              {/* Jobs indicator - only shown when jobs are enabled */}
+              {jobsEnabled && <ActiveJobsIndicator />}
               
               {authLoading ? (
                 <div className="w-8 h-8 rounded-full bg-muted animate-pulse" />
@@ -178,19 +213,23 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       <p className="text-xs text-muted-foreground">{user.email}</p>
                     </div>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild>
-                      <Link href="/saved" className="flex items-center gap-2 cursor-pointer" data-testid="library-link">
-                        <Bookmark size={14} />
-                        My Library
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href="/analytics" className="flex items-center gap-2 cursor-pointer" data-testid="analytics-link">
-                        <BarChart3 size={14} />
-                        Analytics
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
+                    {navLibraryEnabled && (
+                      <DropdownMenuItem asChild>
+                        <Link href="/saved" className="flex items-center gap-2 cursor-pointer" data-testid="library-link">
+                          <Bookmark size={14} />
+                          My Library
+                        </Link>
+                      </DropdownMenuItem>
+                    )}
+                    {navAnalyticsEnabled && (
+                      <DropdownMenuItem asChild>
+                        <Link href="/analytics" className="flex items-center gap-2 cursor-pointer" data-testid="analytics-link">
+                          <BarChart3 size={14} />
+                          Analytics
+                        </Link>
+                      </DropdownMenuItem>
+                    )}
+                    {(navLibraryEnabled || navAnalyticsEnabled) && <DropdownMenuSeparator />}
                     <DropdownMenuItem asChild>
                       <a href="/api/logout" className="flex items-center gap-2 cursor-pointer" data-testid="logout-button">
                         <LogOut size={14} />
