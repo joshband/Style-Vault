@@ -197,26 +197,47 @@ const StyleCardComponent = memo(function StyleCard({ style, className, onDelete 
               )}
             </div>
 
-            {/* Content - Editorial minimalism: image, name, description, date */}
-            <div className="p-4 flex flex-col gap-1.5">
+            {/* Content - Editorial minimalism: image, name, metadata tags, author */}
+            <div className="p-4 flex flex-col gap-2">
               <h3 className="font-serif font-medium text-base leading-tight text-foreground">
                 {style.name}
               </h3>
               
-              <p className="text-sm text-muted-foreground line-clamp-1 leading-relaxed">
-                {style.description}
-              </p>
+              {/* Metadata Tags as chips */}
+              {style.metadataTags && (
+                <div className="flex flex-wrap gap-1">
+                  {[
+                    ...(style.metadataTags.mood || []).slice(0, 2),
+                    ...(style.metadataTags.colorFamily || []).slice(0, 2),
+                    ...(style.metadataTags.era || []).slice(0, 1),
+                  ].slice(0, 4).map((tag: string, i: number) => (
+                    <span 
+                      key={`${tag}-${i}`}
+                      className="inline-flex px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground"
+                      data-testid={`tag-${tag}`}
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
 
-              <time 
-                dateTime={style.createdAt}
-                className="text-xs text-muted-foreground/60 mt-1"
-              >
-                {new Date(style.createdAt).toLocaleDateString(undefined, { 
-                  month: 'short', 
-                  day: 'numeric',
-                  year: 'numeric'
-                })}
-              </time>
+              {/* Author and date row */}
+              <div className="flex items-center justify-between text-xs text-muted-foreground/60 mt-0.5">
+                {style.creatorName ? (
+                  <span className="truncate max-w-[60%]" data-testid="text-author">
+                    by {style.creatorName}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground/40">Community</span>
+                )}
+                <time dateTime={style.createdAt}>
+                  {new Date(style.createdAt).toLocaleDateString(undefined, { 
+                    month: 'short', 
+                    day: 'numeric'
+                  })}
+                </time>
+              </div>
             </div>
           </motion.div>
         </Link>
