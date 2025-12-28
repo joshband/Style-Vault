@@ -1,55 +1,97 @@
 {
-  "generatedAt": "2025-12-28T01:11:21.217Z",
+  "generatedAt": "2025-12-28T01:16:44.990Z",
   "baseUrl": "http://localhost:5000",
   "summary": {
-    "total": 18,
-    "passed": 18,
+    "total": 24,
+    "passed": 24,
     "failed": 0,
     "skipped": 0,
     "passRate": 100,
-    "totalDuration": 4264
+    "totalDuration": 6601
   },
   "results": [
     {
       "name": "GET /api/styles returns styles list",
       "category": "API Endpoints",
       "status": "pass",
-      "duration": 1574,
+      "duration": 1603,
       "details": "Found 18 styles"
     },
     {
       "name": "GET /api/styles includes imageIds",
       "category": "API Endpoints",
       "status": "pass",
-      "duration": 24,
+      "duration": 40,
       "details": "18/18 styles have images"
     },
     {
       "name": "GET /api/styles/:id returns style details",
       "category": "API Endpoints",
       "status": "pass",
-      "duration": 347,
+      "duration": 243,
       "details": "Retrieved style: Wired Nostalgia Art"
     },
     {
       "name": "GET /api/images/:id returns image",
       "category": "API Endpoints",
       "status": "pass",
-      "duration": 414,
+      "duration": 426,
       "details": "Image 2cc9ccef-5497-4dc2-8ee4-ae34026e49bd loaded"
     },
     {
       "name": "Image compression variants available",
       "category": "API Endpoints",
       "status": "pass",
-      "duration": 35,
+      "duration": 25,
       "details": "Thumb and medium variants available"
+    },
+    {
+      "name": "GET /api/health returns status",
+      "category": "API Endpoints",
+      "status": "pass",
+      "duration": 1577,
+      "details": "Health check status: 200"
+    },
+    {
+      "name": "GET /api/diagnostics returns system info",
+      "category": "API Endpoints",
+      "status": "pass",
+      "duration": 1620,
+      "details": "Diagnostics status: 200"
+    },
+    {
+      "name": "Paginated styles API works",
+      "category": "API Endpoints",
+      "status": "pass",
+      "duration": 287,
+      "details": "Paginated: 5 items, 18 total"
+    },
+    {
+      "name": "GET /api/styles/:id handles 404",
+      "category": "Error Handling",
+      "status": "pass",
+      "duration": 10,
+      "details": "Returns 404 for non-existent style"
+    },
+    {
+      "name": "GET /api/images/:id handles 404",
+      "category": "Error Handling",
+      "status": "pass",
+      "duration": 10,
+      "details": "Returns 404 for non-existent image"
+    },
+    {
+      "name": "SPA fallback handles client routes",
+      "category": "Error Handling",
+      "status": "pass",
+      "duration": 13,
+      "details": "SPA fallback returns 200 for client routing"
     },
     {
       "name": "Home/Explore page accessible",
       "category": "Page Accessibility",
       "status": "pass",
-      "duration": 32,
+      "duration": 35,
       "details": "Status: 200"
     },
     {
@@ -63,49 +105,49 @@
       "name": "Compare Styles page accessible",
       "category": "Page Accessibility",
       "status": "pass",
-      "duration": 11,
+      "duration": 14,
       "details": "Status: 200"
     },
     {
       "name": "Saved Styles page accessible",
       "category": "Page Accessibility",
       "status": "pass",
-      "duration": 320,
+      "duration": 22,
       "details": "Status: 200"
     },
     {
       "name": "Tools page accessible",
       "category": "Page Accessibility",
       "status": "pass",
-      "duration": 359,
+      "duration": 13,
       "details": "Status: 200"
     },
     {
       "name": "Features page accessible",
       "category": "Page Accessibility",
       "status": "pass",
-      "duration": 230,
+      "duration": 11,
       "details": "Status: 200"
     },
     {
       "name": "Analytics page accessible",
       "category": "Page Accessibility",
       "status": "pass",
-      "duration": 116,
+      "duration": 11,
       "details": "Status: 200"
     },
     {
       "name": "Admin Dashboard page accessible",
       "category": "Page Accessibility",
       "status": "pass",
-      "duration": 14,
+      "duration": 13,
       "details": "Status: 200"
     },
     {
       "name": "Remix page accessible",
       "category": "Page Accessibility",
       "status": "pass",
-      "duration": 9,
+      "duration": 8,
       "details": "Status: 200"
     },
     {
@@ -119,64 +161,113 @@
       "name": "Styles have valid structure",
       "category": "Data Integrity",
       "status": "pass",
-      "duration": 11,
+      "duration": 12,
       "details": "18/18 styles have valid structure"
     },
     {
       "name": "Styles have design tokens",
       "category": "Data Integrity",
       "status": "pass",
-      "duration": 204,
+      "duration": 196,
       "details": "Tokens present"
     },
     {
       "name": "Image IDs reference valid images",
       "category": "Data Integrity",
       "status": "pass",
-      "duration": 539,
+      "duration": 387,
       "details": "8/8 images valid"
     }
   ],
   "categories": [
     {
       "name": "API Endpoints",
-      "passed": 5,
+      "passed": 8,
       "failed": 0,
       "tests": [
         {
           "name": "GET /api/styles returns styles list",
           "category": "API Endpoints",
           "status": "pass",
-          "duration": 1574,
+          "duration": 1603,
           "details": "Found 18 styles"
         },
         {
           "name": "GET /api/styles includes imageIds",
           "category": "API Endpoints",
           "status": "pass",
-          "duration": 24,
+          "duration": 40,
           "details": "18/18 styles have images"
         },
         {
           "name": "GET /api/styles/:id returns style details",
           "category": "API Endpoints",
           "status": "pass",
-          "duration": 347,
+          "duration": 243,
           "details": "Retrieved style: Wired Nostalgia Art"
         },
         {
           "name": "GET /api/images/:id returns image",
           "category": "API Endpoints",
           "status": "pass",
-          "duration": 414,
+          "duration": 426,
           "details": "Image 2cc9ccef-5497-4dc2-8ee4-ae34026e49bd loaded"
         },
         {
           "name": "Image compression variants available",
           "category": "API Endpoints",
           "status": "pass",
-          "duration": 35,
+          "duration": 25,
           "details": "Thumb and medium variants available"
+        },
+        {
+          "name": "GET /api/health returns status",
+          "category": "API Endpoints",
+          "status": "pass",
+          "duration": 1577,
+          "details": "Health check status: 200"
+        },
+        {
+          "name": "GET /api/diagnostics returns system info",
+          "category": "API Endpoints",
+          "status": "pass",
+          "duration": 1620,
+          "details": "Diagnostics status: 200"
+        },
+        {
+          "name": "Paginated styles API works",
+          "category": "API Endpoints",
+          "status": "pass",
+          "duration": 287,
+          "details": "Paginated: 5 items, 18 total"
+        }
+      ]
+    },
+    {
+      "name": "Error Handling",
+      "passed": 3,
+      "failed": 0,
+      "tests": [
+        {
+          "name": "GET /api/styles/:id handles 404",
+          "category": "Error Handling",
+          "status": "pass",
+          "duration": 10,
+          "details": "Returns 404 for non-existent style"
+        },
+        {
+          "name": "GET /api/images/:id handles 404",
+          "category": "Error Handling",
+          "status": "pass",
+          "duration": 10,
+          "details": "Returns 404 for non-existent image"
+        },
+        {
+          "name": "SPA fallback handles client routes",
+          "category": "Error Handling",
+          "status": "pass",
+          "duration": 13,
+          "details": "SPA fallback returns 200 for client routing"
         }
       ]
     },
@@ -189,7 +280,7 @@
           "name": "Home/Explore page accessible",
           "category": "Page Accessibility",
           "status": "pass",
-          "duration": 32,
+          "duration": 35,
           "details": "Status: 200"
         },
         {
@@ -203,49 +294,49 @@
           "name": "Compare Styles page accessible",
           "category": "Page Accessibility",
           "status": "pass",
-          "duration": 11,
+          "duration": 14,
           "details": "Status: 200"
         },
         {
           "name": "Saved Styles page accessible",
           "category": "Page Accessibility",
           "status": "pass",
-          "duration": 320,
+          "duration": 22,
           "details": "Status: 200"
         },
         {
           "name": "Tools page accessible",
           "category": "Page Accessibility",
           "status": "pass",
-          "duration": 359,
+          "duration": 13,
           "details": "Status: 200"
         },
         {
           "name": "Features page accessible",
           "category": "Page Accessibility",
           "status": "pass",
-          "duration": 230,
+          "duration": 11,
           "details": "Status: 200"
         },
         {
           "name": "Analytics page accessible",
           "category": "Page Accessibility",
           "status": "pass",
-          "duration": 116,
+          "duration": 11,
           "details": "Status: 200"
         },
         {
           "name": "Admin Dashboard page accessible",
           "category": "Page Accessibility",
           "status": "pass",
-          "duration": 14,
+          "duration": 13,
           "details": "Status: 200"
         },
         {
           "name": "Remix page accessible",
           "category": "Page Accessibility",
           "status": "pass",
-          "duration": 9,
+          "duration": 8,
           "details": "Status: 200"
         },
         {
@@ -266,21 +357,21 @@
           "name": "Styles have valid structure",
           "category": "Data Integrity",
           "status": "pass",
-          "duration": 11,
+          "duration": 12,
           "details": "18/18 styles have valid structure"
         },
         {
           "name": "Styles have design tokens",
           "category": "Data Integrity",
           "status": "pass",
-          "duration": 204,
+          "duration": 196,
           "details": "Tokens present"
         },
         {
           "name": "Image IDs reference valid images",
           "category": "Data Integrity",
           "status": "pass",
-          "duration": 539,
+          "duration": 387,
           "details": "8/8 images valid"
         }
       ]
@@ -295,7 +386,7 @@
     },
     {
       "metric": "Image Load Time (thumbnail)",
-      "value": 7,
+      "value": 14,
       "target": 200,
       "status": "good"
     }

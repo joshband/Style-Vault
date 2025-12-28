@@ -136,6 +136,54 @@ async function runAPITests(): Promise<void> {
       details: 'Thumb and medium variants available'
     };
   });
+
+  await runTest('GET /api/health returns status', 'API Endpoints', async () => {
+    const response = await fetch(`${BASE_URL}/api/health`);
+    return { 
+      success: response.ok,
+      details: `Health check status: ${response.status}`
+    };
+  });
+
+  await runTest('GET /api/diagnostics returns system info', 'API Endpoints', async () => {
+    const response = await fetch(`${BASE_URL}/api/diagnostics`);
+    return { 
+      success: response.ok,
+      details: `Diagnostics status: ${response.status}`
+    };
+  });
+
+  await runTest('Paginated styles API works', 'API Endpoints', async () => {
+    const data = await fetchJson('/api/styles?limit=5&offset=0');
+    return { 
+      success: data.items && Array.isArray(data.items) && data.total !== undefined,
+      details: `Paginated: ${data.items?.length || 0} items, ${data.total} total`
+    };
+  });
+
+  await runTest('GET /api/styles/:id handles 404', 'Error Handling', async () => {
+    const response = await fetch(`${BASE_URL}/api/styles/non-existent-id-12345`);
+    return { 
+      success: response.status === 404,
+      details: `Returns ${response.status} for non-existent style`
+    };
+  });
+
+  await runTest('GET /api/images/:id handles 404', 'Error Handling', async () => {
+    const response = await fetch(`${BASE_URL}/api/images/non-existent-image-id`);
+    return { 
+      success: response.status === 404,
+      details: `Returns ${response.status} for non-existent image`
+    };
+  });
+
+  await runTest('SPA fallback handles client routes', 'Error Handling', async () => {
+    const response = await fetch(`${BASE_URL}/nonexistent-page`);
+    return { 
+      success: response.ok,
+      details: `SPA fallback returns ${response.status} for client routing`
+    };
+  });
 }
 
 async function runPageTests(): Promise<void> {
