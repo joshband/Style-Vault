@@ -80,19 +80,19 @@
 
   --foreground: red; /*replace with H S L */
 
-  --border: 0 0% 88%; /* light grey border */
+  --border: 0 0% 100%; /* transparent/invisible border */
 
   --card: red; /*replace with H S L */
 
   --card-foreground: red; /*replace with H S L */
 
-  --card-border: 0 0% 88%; /* light grey card border */
+  --card-border: 0 0% 100%; /* transparent/invisible card border */
 
   --sidebar: red; /*replace with H S L */
 
   --sidebar-foreground: red; /*replace with H S L */
 
-  --sidebar-border: 0 0% 88%; /* light grey sidebar border */
+  --sidebar-border: 0 0% 100%; /* transparent/invisible sidebar border */
 
   --sidebar-primary: red; /*replace with H S L */
 
@@ -198,19 +198,19 @@
 
   --foreground: red; /*replace with H S L */
 
-  --border: 0 0% 25%; /* light grey border for dark mode */
+  --border: 0 0% 0%; /* transparent/invisible border for dark mode */
 
   --card: red; /*replace with H S L */
 
   --card-foreground: red; /*replace with H S L */
 
-  --card-border: 0 0% 25%; /* light grey card border for dark mode */
+  --card-border: 0 0% 0%; /* transparent/invisible card border for dark mode */
 
   --sidebar: red; /*replace with H S L */
 
   --sidebar-foreground: red; /*replace with H S L */
 
-  --sidebar-border: 0 0% 25%; /* light grey sidebar border for dark mode */
+  --sidebar-border: 0 0% 0%; /* transparent/invisible sidebar border for dark mode */
 
   --sidebar-primary: red; /*replace with H S L */
 
