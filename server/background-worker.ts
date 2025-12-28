@@ -5,6 +5,7 @@ import { analyzeImageForStyle } from "./analysis";
 import type { Style, MoodBoardAssets, UiConceptAssets, MetadataTags, JobType } from "@shared/schema";
 import { cache, CACHE_KEYS } from "./cache";
 import { getPLimit } from "./utils/esm-interop";
+import { logger } from "./logger";
 
 const SCHEDULER_INTERVAL_MS = 60000;
 const MAX_CONCURRENT_BACKGROUND_JOBS = 2;
@@ -26,12 +27,12 @@ export async function repairStyleName(styleId: string): Promise<string | null> {
   const referenceImages = style.referenceImages as string[] | null;
   const referenceImage = referenceImages?.[0];
   if (!referenceImage) {
-    console.log(`[BackgroundWorker] Style ${styleId} has no reference image for name repair`);
+    logger.info(`Style ${styleId} has no reference image for name repair`, { module: 'BackgroundWorker', styleId });
     return null;
   }
 
   try {
-    console.log(`[BackgroundWorker] Repairing name for style ${styleId}`);
+    logger.info(`Repairing name for style ${styleId}`, { module: 'BackgroundWorker', styleId });
     
     const base64Data = referenceImage.split(",")[1] || referenceImage;
     const analysis = await analyzeImageForStyle(base64Data);
@@ -39,13 +40,13 @@ export async function repairStyleName(styleId: string): Promise<string | null> {
     if (analysis.styleName && analysis.styleName !== style.name) {
       await storage.updateStyleName(styleId, analysis.styleName);
       cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
-      console.log(`[BackgroundWorker] Repaired name for style ${styleId}: "${style.name}" -> "${analysis.styleName}"`);
+      logger.info(`Repaired name for style ${styleId}: "${style.name}" -> "${analysis.styleName}"`, { module: 'BackgroundWorker', styleId });
       return analysis.styleName;
     }
     
     return style.name;
   } catch (error) {
-    console.error(`[BackgroundWorker] Failed to repair name for style ${styleId}:`, error);
+    logger.error(`Failed to repair name for style ${styleId}`, error, { module: 'BackgroundWorker', styleId });
     return null;
   }
 }
@@ -66,11 +67,11 @@ export async function generateMissingAssets(styleId: string): Promise<boolean> {
   const needsUiConcepts = !uiConcepts || uiConcepts.status !== "complete" || uiConceptCount < 2;
 
   if (!needsMoodBoard && !needsUiConcepts) {
-    console.log(`[BackgroundWorker] Style ${styleId} already has all assets`);
+    logger.info(`Style ${styleId} already has all assets`, { module: 'BackgroundWorker', styleId });
     return true;
   }
 
-  console.log(`[BackgroundWorker] Generating missing assets for style ${styleId} (moodBoard: ${needsMoodBoard}, uiConcepts: ${needsUiConcepts})`);
+  logger.info(`Generating missing assets for style ${styleId} (moodBoard: ${needsMoodBoard}, uiConcepts: ${needsUiConcepts})`, { module: 'BackgroundWorker', styleId });
 
   try {
     const metadataTags = (style.metadataTags || {
@@ -143,23 +144,23 @@ export async function generateMissingAssets(styleId: string): Promise<boolean> {
       await storage.updateStyleMoodBoard(styleId, updatedMoodBoard, updatedUiConcepts);
       cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
       
-      console.log(`[BackgroundWorker] Generated assets for style ${styleId}`);
+      logger.info(`Generated assets for style ${styleId}`, { module: 'BackgroundWorker', styleId });
       return true;
     }
 
     return false;
   } catch (error) {
-    console.error(`[BackgroundWorker] Failed to generate assets for style ${styleId}:`, error);
+    logger.error(`Failed to generate assets for style ${styleId}`, error, { module: 'BackgroundWorker', styleId });
     return false;
   }
 }
 
 async function runSchedulerCycle(): Promise<void> {
-  console.log("[BackgroundWorker] Running scheduler cycle...");
+  logger.info("Running scheduler cycle...", { module: 'BackgroundWorker' });
 
   try {
     const stylesWithBadNames = await storage.getStylesWithUuidNames();
-    console.log(`[BackgroundWorker] Found ${stylesWithBadNames.length} styles with UUID-like names`);
+    logger.info(`Found ${stylesWithBadNames.length} styles with UUID-like names`, { module: 'BackgroundWorker' });
 
     for (const style of stylesWithBadNames) {
       const hasActiveJob = await storage.hasActiveJobForStyle(style.id, ["style_name_repair"]);
@@ -181,7 +182,7 @@ async function runSchedulerCycle(): Promise<void> {
     }
 
     const stylesNeedingAssets = await storage.getStylesNeedingAssets();
-    console.log(`[BackgroundWorker] Found ${stylesNeedingAssets.length} styles needing asset generation`);
+    logger.info(`Found ${stylesNeedingAssets.length} styles needing asset generation`, { module: 'BackgroundWorker' });
 
     for (const style of stylesNeedingAssets) {
       const hasActiveJob = await storage.hasActiveJobForStyle(style.id, [
@@ -207,20 +208,20 @@ async function runSchedulerCycle(): Promise<void> {
       }
     }
 
-    console.log("[BackgroundWorker] Scheduler cycle complete");
+    logger.info("Scheduler cycle complete", { module: 'BackgroundWorker' });
   } catch (error) {
-    console.error("[BackgroundWorker] Scheduler cycle error:", error);
+    logger.error("Scheduler cycle error", error, { module: 'BackgroundWorker' });
   }
 }
 
 export function startBackgroundScheduler(): void {
   if (schedulerRunning) {
-    console.log("[BackgroundWorker] Scheduler already running");
+    logger.info("Scheduler already running", { module: 'BackgroundWorker' });
     return;
   }
 
   schedulerRunning = true;
-  console.log("[BackgroundWorker] Starting background scheduler");
+  logger.info("Starting background scheduler", { module: 'BackgroundWorker' });
 
   setTimeout(() => {
     runSchedulerCycle();
@@ -233,5 +234,5 @@ export function startBackgroundScheduler(): void {
 
 export function stopBackgroundScheduler(): void {
   schedulerRunning = false;
-  console.log("[BackgroundWorker] Background scheduler stopped");
+  logger.info("Background scheduler stopped", { module: 'BackgroundWorker' });
 }

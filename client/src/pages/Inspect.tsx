@@ -4,15 +4,22 @@ import { Layout } from "@/components/layout";
 import { TokenViewer } from "@/components/token-viewer";
 import { ColorPaletteSwatches } from "@/components/color-palette-swatches";
 import { StyleSpecEditor } from "@/components/style-spec-editor";
-import { ArrowLeft, ArrowRight, Download, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Share2, Check, Copy, Bookmark, Star, User, FolderPlus, Folder, Plus, FileCode, FileJson, Paintbrush, History, RotateCcw, Save, Sparkles, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { MaterialIntelligencePanel } from "@/components/material-intelligence-panel";
+import { ArrowLeft, ArrowRight, Download, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Share2, Check, Copy, Bookmark, Star, User, FolderPlus, Folder, Plus, FileCode, FileJson, Paintbrush, History, RotateCcw, Save, Sparkles, X, ChevronLeft, ChevronRight, Palette, FileText } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { AiMoodBoard } from "@/components/ai-mood-board";
 import { ExportDialog } from "@/components/export-dialog";
+import { TokenVisualization } from "@/components/token-visualization";
 import { DeployDialog } from "@/components/deploy-dialog";
+import { StyleAudit } from "@/components/style-audit";
+import { DesignToolSync } from "@/components/DesignToolSync";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/use-auth";
+import { generateBrandKitPDF } from "@/lib/pdf-export";
+import { toast } from "sonner";
 
 interface StyleSummary {
   id: string;
@@ -65,6 +72,23 @@ function SectionHeader({ title, description }: { title: string; description?: st
       {description && <p className="text-sm text-muted-foreground mt-0.5">{description}</p>}
     </div>
   );
+}
+
+const MAX_SAFE_BASE64_LENGTH = 100000;
+
+function isSafeBase64(src: string | undefined): boolean {
+  if (!src) return false;
+  if (src.startsWith('/api/')) return true;
+  if (src.startsWith('data:') || src.length > 100) {
+    return src.length < MAX_SAFE_BASE64_LENGTH;
+  }
+  return true;
+}
+
+function getSafeImageSrc(imageIdSrc: string | undefined, base64Fallback: string | undefined): string | null {
+  if (imageIdSrc) return imageIdSrc;
+  if (base64Fallback && isSafeBase64(base64Fallback)) return base64Fallback;
+  return null;
 }
 
 function PreviewSkeleton({ aspect }: { aspect: string }) {
@@ -123,6 +147,9 @@ export default function Inspect() {
   const [versionsLoading, setVersionsLoading] = useState(false);
   const [revertingVersion, setRevertingVersion] = useState<string | null>(null);
   const [savingVersion, setSavingVersion] = useState(false);
+  
+  // PDF Export
+  const [pdfExporting, setPdfExporting] = useState(false);
   
   // Try It Now - Image Generation
   const [tryItOpen, setTryItOpen] = useState(false);
@@ -214,12 +241,9 @@ export default function Inspect() {
         body: JSON.stringify({ rating, review: userReview }),
       });
       if (res.ok) {
-        setUserRating(rating);
-        const ratingsRes = await fetch(`/api/styles/${id}/ratings`);
-        if (ratingsRes.ok) {
-          const data = await ratingsRes.json();
-          setAvgRating({ average: data.average, count: data.count });
-        }
+        const data = await res.json();
+        setUserRating(data.userRating);
+        setAvgRating({ average: data.averageRating, count: data.totalRatings });
       }
     } catch (error) {
       console.error("Failed to submit rating:", error);
@@ -320,7 +344,7 @@ export default function Inspect() {
       try {
         const [bookmarkRes, ratingRes, collectionsRes, styleCollectionsRes] = await Promise.all([
           fetch(`/api/styles/${id}/bookmark`),
-          fetch(`/api/styles/${id}/my-rating`),
+          fetch(`/api/styles/${id}/rating`),
           fetch(`/api/collections`),
           fetch(`/api/styles/${id}/collections`),
         ]);
@@ -333,8 +357,10 @@ export default function Inspect() {
         if (ratingRes.ok) {
           const data = await ratingRes.json();
           if (data) {
-            setUserRating(data.rating);
-            setUserReview(data.review || "");
+            setUserRating(data.userRating);
+            if (data.averageRating !== undefined) {
+              setAvgRating({ average: data.averageRating, count: data.totalRatings });
+            }
           }
         }
         
@@ -495,7 +521,7 @@ export default function Inspect() {
     const categoryLabels: Record<string, string> = {
       color: 'Colors',
       spacing: 'Spacing', 
-      borderRadius: 'Border Radius',
+      radius: 'Border Radius',
       typography: 'Typography',
       shadow: 'Shadows',
       elevation: 'Elevation',
@@ -579,7 +605,7 @@ export default function Inspect() {
     
     if (tokens.color) config.theme.extend.colors = flattenTokens(tokens.color);
     if (tokens.spacing) config.theme.extend.spacing = flattenTokens(tokens.spacing);
-    if (tokens.borderRadius) config.theme.extend.borderRadius = flattenTokens(tokens.borderRadius);
+    if (tokens.radius) config.theme.extend.borderRadius = flattenTokens(tokens.radius);
     if (tokens.shadow) config.theme.extend.boxShadow = flattenTokens(tokens.shadow);
     if (tokens.typography) config.theme.extend.fontSize = flattenTokens(tokens.typography);
     if (tokens.fontWeight) config.theme.extend.fontWeight = flattenTokens(tokens.fontWeight);
@@ -779,7 +805,7 @@ export default ${safeName};`;
       if (type === 'color' || (typeof value === 'string' && /^#|^rgb/.test(value))) {
         resolvedType = 'COLOR';
         resolvedValue = hexToFigmaColor(String(value));
-      } else if (type === 'dimension' || type === 'spacing' || type === 'borderRadius') {
+      } else if (type === 'dimension' || type === 'spacing' || type === 'radius') {
         resolvedType = 'FLOAT';
         resolvedValue = parseFloat(String(value).replace(/[^\d.-]/g, '')) || 0;
       } else if (typeof value === 'number') {
@@ -1127,50 +1153,97 @@ export default ${safeName};`;
         {/* === SECTION 2: VISUAL TRUST STRIP === */}
         <section className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Source Image - Trust Signal */}
-          <div className="relative aspect-square rounded-lg overflow-hidden border border-border bg-muted">
-            {(summary.imageIds?.reference || (summary.referenceImages && summary.referenceImages.length > 0)) ? (
-              <>
-                <img 
-                  src={summary.imageIds?.reference 
-                    ? `/api/images/${summary.imageIds.reference}?size=medium`
-                    : summary.referenceImages[0]
-                  } 
-                  alt="Source reference"
-                  className="absolute inset-0 w-full h-full object-cover"
-                  loading="eager"
-                  data-testid="img-source-reference"
-                />
-                <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/70 text-white text-[10px] font-mono rounded">
-                  Source
-                </div>
-              </>
-            ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
-                No source image
-              </div>
-            )}
+          <div className="relative aspect-square rounded-lg overflow-hidden border border-border bg-neutral-100 dark:bg-neutral-900">
+            {(() => {
+              const refImageIdSrc = summary.imageIds?.reference 
+                ? `/api/images/${summary.imageIds.reference}?size=medium`
+                : undefined;
+              const refBase64Fallback = summary.referenceImages?.[0];
+              const refSrc = getSafeImageSrc(refImageIdSrc, refBase64Fallback);
+              
+              if (refSrc) {
+                return (
+                  <>
+                    <div className="absolute inset-0 p-3 flex items-center justify-center">
+                      <img 
+                        src={refSrc} 
+                        alt="Source reference"
+                        className="max-w-full max-h-full object-contain rounded"
+                        loading="eager"
+                        data-testid="img-source-reference"
+                      />
+                    </div>
+                    <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/70 text-white text-[10px] font-mono rounded">
+                      Source
+                    </div>
+                  </>
+                );
+              } else if (refBase64Fallback && !isSafeBase64(refBase64Fallback)) {
+                return (
+                  <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
+                    Image too large to display
+                  </div>
+                );
+              } else if (summary.tokens) {
+                return (
+                  <TokenVisualization 
+                    tokens={summary.tokens} 
+                    compact={true}
+                    className="absolute inset-0"
+                  />
+                );
+              } else {
+                return (
+                  <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
+                    No source image
+                  </div>
+                );
+              }
+            })()}
           </div>
           
           {/* Software App UI - Style Output */}
-          <div className="relative aspect-square rounded-lg overflow-hidden border border-border bg-muted">
-            {summary.imageIds?.ui_software_app ? (
-              <>
-                <img 
-                  src={`/api/images/${summary.imageIds.ui_software_app}?size=medium`}
-                  alt="Applied UI"
-                  className="absolute inset-0 w-full h-full object-cover"
-                  loading="eager"
-                  data-testid="img-applied-ui"
-                />
-                <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/70 text-white text-[10px] font-mono rounded">
-                  Applied
-                </div>
-              </>
-            ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
-                Generating...
-              </div>
-            )}
+          <div className="relative aspect-square rounded-lg overflow-hidden border border-border bg-neutral-100 dark:bg-neutral-900">
+            {(() => {
+              const uiImageIdSrc = summary.imageIds?.ui_software_app 
+                ? `/api/images/${summary.imageIds.ui_software_app}?size=medium`
+                : undefined;
+              const uiBase64Fallback = assets?.uiConcepts?.softwareApp;
+              const uiSrc = getSafeImageSrc(uiImageIdSrc, uiBase64Fallback);
+              
+              if (uiSrc) {
+                return (
+                  <>
+                    <div className="absolute inset-0 p-3 flex items-center justify-center">
+                      <img 
+                        src={uiSrc}
+                        alt="Applied UI"
+                        className="max-w-full max-h-full object-contain rounded"
+                        loading="eager"
+                        data-testid="img-applied-ui"
+                      />
+                    </div>
+                    <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/70 text-white text-[10px] font-mono rounded">
+                      Applied
+                    </div>
+                  </>
+                );
+              } else if (assets?.uiConcepts?.status === "generating" || summary.uiConceptsStatus === "generating") {
+                return (
+                  <div className="flex items-center justify-center h-full text-muted-foreground text-xs gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Generating...
+                  </div>
+                );
+              } else {
+                return (
+                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-xs gap-2">
+                    <span>Not Generated</span>
+                    <span className="text-[10px] opacity-70">UI preview coming soon</span>
+                  </div>
+                );
+              }
+            })()}
           </div>
         </section>
 
@@ -1238,6 +1311,33 @@ export default ${safeName};`;
             }
           />
           
+          {/* PDF Brand Kit */}
+          <button 
+            onClick={async () => {
+              setPdfExporting(true);
+              try {
+                await generateBrandKitPDF({
+                  name: summary.name,
+                  description: summary.description,
+                  tokens: summary.tokens,
+                  metadataTags: summary.metadataTags,
+                });
+                toast.success("Brand Kit PDF downloaded!");
+              } catch (error) {
+                console.error("PDF export error:", error);
+                toast.error("Failed to generate PDF. Please try again.");
+              } finally {
+                setPdfExporting(false);
+              }
+            }}
+            disabled={pdfExporting}
+            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 border border-border bg-muted/50 hover:bg-muted rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+            data-testid="button-pdf-export"
+          >
+            {pdfExporting ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
+            Brand Kit
+          </button>
+          
           {/* Deploy */}
           <DeployDialog 
             tokens={summary.tokens} 
@@ -1255,6 +1355,44 @@ export default ${safeName};`;
               </button>
             }
           />
+
+          {/* Style Audit */}
+          <StyleAudit
+            styleId={summary.id}
+            styleName={summary.name}
+            tokens={summary.tokens}
+            trigger={
+              <button 
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 border border-border bg-muted/50 hover:bg-muted rounded-lg text-sm font-medium transition-colors"
+                data-testid="button-audit-primary"
+              >
+                <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth="1.5">
+                  <circle cx="6" cy="6" r="4.5" />
+                  <path d="M9 9L14 14" strokeLinecap="round" />
+                </svg>
+                Audit
+              </button>
+            }
+          />
+          
+          {/* Design Tools */}
+          <Dialog>
+            <DialogTrigger asChild>
+              <button 
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 border border-border bg-muted/50 hover:bg-muted rounded-lg text-sm font-medium transition-colors"
+                data-testid="button-design-tools"
+              >
+                <Palette size={16} />
+                Figma/XD
+              </button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl p-0 overflow-hidden">
+              <DesignToolSync 
+                styleName={summary.name}
+                tokens={summary.tokens}
+              />
+            </DialogContent>
+          </Dialog>
           
           {/* Remix / Apply */}
           <Button
@@ -1286,15 +1424,41 @@ export default ${safeName};`;
               <div className="grid grid-cols-3 gap-2">
                 {['landscape', 'portrait', 'stillLife'].map((type) => {
                   const key = type === 'stillLife' ? 'preview_still_life' : `preview_${type}`;
-                  const imgSrc = summary.imageIds?.[key] 
+                  const imageIdSrc = summary.imageIds?.[key] 
                     ? `/api/images/${summary.imageIds[key]}?size=medium`
-                    : (previews as any)[type];
+                    : undefined;
+                  const base64Fallback = (previews as any)[type];
+                  const imgSrc = getSafeImageSrc(imageIdSrc, base64Fallback);
+                  // Use ?size=full for downloads - high quality original
+                  const fullSrc = summary.imageIds?.[key]
+                    ? `/api/images/${summary.imageIds[key]}?size=full`
+                    : (isSafeBase64(base64Fallback) ? base64Fallback : null);
                   return (
-                    <div key={type} className="aspect-square bg-muted rounded-lg overflow-hidden border border-border relative">
+                    <div key={type} className="aspect-square bg-muted rounded-lg overflow-hidden border border-border relative group/preview">
                       {imgSrc ? (
-                        <img src={imgSrc} alt={type} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+                        <>
+                          <img src={imgSrc} alt={type} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+                          <button
+                            onClick={() => {
+                              if (!fullSrc) return;
+                              const link = document.createElement("a");
+                              link.href = fullSrc;
+                              link.download = `${summary.name}-${type}.png`;
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                            }}
+                            className="absolute top-1 right-1 p-1.5 rounded-md bg-black/50 text-white opacity-0 group-hover/preview:opacity-100 transition-opacity hover:bg-black/70"
+                            title={`Download ${type}`}
+                            data-testid={`button-download-preview-${type}`}
+                          >
+                            <Download size={12} />
+                          </button>
+                        </>
                       ) : (
-                        <div className="flex items-center justify-center h-full text-muted-foreground text-xs capitalize">{type}</div>
+                        <div className="flex items-center justify-center h-full text-muted-foreground text-xs capitalize">
+                          {base64Fallback && !isSafeBase64(base64Fallback) ? 'Preview too large' : type}
+                        </div>
                       )}
                     </div>
                   );
@@ -1504,7 +1668,7 @@ export default ${safeName};`;
             </div>
           </details>
 
-          {/* Design DNA - Tokens section, collapsed by default */}
+          {/* Design DNA - Tokens & Material Intelligence section, collapsed by default */}
           <details className="group" onToggle={(e) => { if ((e.target as HTMLDetailsElement).open) setTokensExpanded(true); }}>
             <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
               <span className="text-sm font-medium text-foreground">Design DNA</span>
@@ -1520,6 +1684,20 @@ export default ${safeName};`;
                   <div>
                     <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">All Tokens</h4>
                     <TokenViewer tokens={summary.tokens} />
+                  </div>
+                  
+                  {/* Material Intelligence - inside Design DNA */}
+                  <div>
+                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Material Intelligence</h4>
+                    <MaterialIntelligencePanel
+                      styleId={summary.id}
+                      referenceImage={getSafeImageSrc(
+                        summary.imageIds?.reference
+                          ? `/api/images/${summary.imageIds.reference}?size=large`
+                          : undefined,
+                        isSafeBase64(summary.referenceImages?.[0]) ? summary.referenceImages?.[0] : undefined
+                      ) || undefined}
+                    />
                   </div>
                 </>
               )}

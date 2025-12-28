@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { storage } from "./storage";
+import { logger } from "./logger";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
@@ -168,7 +169,7 @@ Return ONLY valid JSON (no markdown, no code blocks) with this structure:
   try {
     parsed = JSON.parse(cleanedText);
   } catch (parseError) {
-    console.error("Failed to parse AI response:", cleanedText.slice(0, 500));
+    logger.error("Failed to parse AI response", parseError, { module: 'Remix', responsePreview: cleanedText.slice(0, 200) });
     throw new Error("AI generated an invalid response. Please try again.");
   }
 

@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import type { MetadataTags, MoodBoardAssets, UiConceptAssets } from "@shared/schema";
+import { logger } from "./logger";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
@@ -342,7 +343,7 @@ export async function generateMoodBoardCollage(
 
     return { collage: "", status: "failed", history: [] };
   } catch (error) {
-    console.error("Mood board generation failed:", error);
+    logger.error("Mood board generation failed", error, { module: 'MoodBoardGeneration' });
     return { collage: "", status: "failed", history: [] };
   }
 }
@@ -355,11 +356,49 @@ export async function generateSingleUiConcept(
   const prompt = buildUiConceptPrompt(request, summary, conceptType);
   
   // Define aspect ratios for each concept type
+  // softwareApp uses 1:1 square for optimal display as detail view squares and vault thumbnails
   const aspectRatios: Record<string, string> = {
-    softwareApp: "16:9",   // Landscape for gallery thumbnails (matches 16:10 display)
-    audioPlugin: "16:9",   // Landscape format
-    dashboard: "16:9",     // Landscape format
+    softwareApp: "1:1",    // Square for detail view and vault thumbnail cropping
+    audioPlugin: "16:9",   // Landscape format for audio plugin UI
+    dashboard: "1:1",      // Square for consistent gallery display
   };
+  
+  // Build parts array - include reference image for style transfer if available
+  const parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> = [];
+  
+  // Add reference image FIRST so Gemini can analyze the artistic style
+  if (request.referenceImageBase64) {
+    const mimeMatch = request.referenceImageBase64.match(/^data:(image\/[a-z]+);base64,/);
+    const mimeType = mimeMatch?.[1] || "image/jpeg";
+    const base64Data = request.referenceImageBase64.replace(/^data:image\/[a-z]+;base64,/, "");
+    
+    parts.push({
+      inlineData: {
+        mimeType,
+        data: base64Data,
+      },
+    });
+  }
+  
+  // Build enhanced prompt with style transfer instructions when reference image is present
+  let enhancedPrompt = prompt;
+  if (request.referenceImageBase64) {
+    enhancedPrompt = `STYLE TRANSFER INSTRUCTIONS:
+Study the artistic style, rendering technique, color treatment, and visual aesthetic of the reference image above.
+Apply this EXACT same artistic style to the UI mockup described below.
+
+Key requirements:
+- Match the color palette, saturation, and contrast from the reference
+- Preserve the artistic rendering style (if illustrated, keep it illustrated; if painterly, keep it painterly)
+- Apply similar lighting, texture, and mood
+- DO NOT render as generic dark UI or photorealistic if the reference is artistic/stylized
+
+================================================================================
+
+${prompt}`;
+  }
+  
+  parts.push({ text: enhancedPrompt });
   
   try {
     const response = await ai.models.generateContent({
@@ -367,7 +406,7 @@ export async function generateSingleUiConcept(
       contents: [
         {
           role: "user",
-          parts: [{ text: prompt }],
+          parts,
         },
       ],
       config: {
@@ -381,7 +420,7 @@ export async function generateSingleUiConcept(
 
     return extractImageFromResponse(response);
   } catch (error) {
-    console.error(`UI concept ${conceptType} generation failed:`, error);
+    logger.error("UI concept generation failed", error, { module: 'MoodBoardGeneration', conceptType });
     return null;
   }
 }

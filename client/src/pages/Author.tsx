@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Upload, Wand2, ArrowRight, ArrowLeft, Loader2, X, Layers, Check, Sparkles, AlertCircle, RefreshCw, FileJson, ChevronDown } from "lucide-react";
+import { Upload, Wand2, ArrowRight, ArrowLeft, Loader2, X, Layers, Check, Sparkles, AlertCircle, RefreshCw, FileJson, ChevronDown, Shuffle, FileText, Lightbulb } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { createStyle, SAMPLE_TOKENS } from "@/lib/store";
 import { useToast } from "@/hooks/use-toast";
@@ -10,8 +10,72 @@ import { Progress } from "@/components/ui/progress";
 import { detectFormat, importTokens, SUPPORTED_FORMATS, ImportResult, countTokens, TokenStats } from "@/lib/token-importers";
 
 type WizardStep = 1 | 2;
-type InputMode = "image" | "prompt" | "file" | null;
+type InputMode = "image" | "prompt" | "file" | "random" | "consultant" | null;
 type ErrorType = "ai_unavailable" | "cv_disabled" | "network" | "unknown" | null;
+
+interface ConsultantAnalysis {
+  domain: string;
+  subDomain?: string;
+  targetAudience: string;
+  mood: string[];
+  keywords: string[];
+  uiDensity: string;
+  colorTemperature: string;
+  formality: string;
+  aestheticStyle: string;
+  platformType: string;
+  summary: string;
+}
+
+interface TokenSuggestionsFromConsultant {
+  colors: {
+    primary: string;
+    secondary: string;
+    accent: string;
+    background: string;
+    surface: string;
+    text: string;
+  };
+  typography: {
+    headingFont: string;
+    bodyFont: string;
+    scale: number;
+    weight: string;
+  };
+  spacing: {
+    baseUnit: number;
+    density: string;
+  };
+  effects: {
+    borderRadius: string;
+    shadowStyle: string;
+    materialHint: string;
+  };
+  motion: {
+    speed: string;
+    style: string;
+  };
+}
+
+interface StyleMatchFromConsultant {
+  styleId: string;
+  styleName: string;
+  relevanceScore: number;
+  matchReasons: string[];
+  thumbnailUrl?: string;
+}
+
+interface ConsultantRecommendation {
+  analysis: ConsultantAnalysis;
+  tokenSuggestions: TokenSuggestionsFromConsultant;
+  matchingStyles: StyleMatchFromConsultant[];
+  promptScaffolding: {
+    base: string;
+    modifiers: string[];
+    negative: string;
+  };
+  rationale: string;
+}
 
 interface AuthorError {
   type: ErrorType;
@@ -131,6 +195,12 @@ export default function Author() {
   const [importError, setImportError] = useState<string | null>(null);
   const [importStats, setImportStats] = useState<TokenStats | null>(null);
 
+  // Consultant state
+  const [projectDescription, setProjectDescription] = useState("");
+  const [consultantRecommendation, setConsultantRecommendation] = useState<ConsultantRecommendation | null>(null);
+  const [isConsulting, setIsConsulting] = useState(false);
+  const [consultError, setConsultError] = useState<AuthorError | null>(null);
+
   // Generated data
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -144,6 +214,7 @@ export default function Author() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isGeneratingRandom, setIsGeneratingRandom] = useState(false);
   
   // Error state - preserved across retries
   const [analyzeError, setAnalyzeError] = useState<AuthorError | null>(null);
@@ -207,12 +278,13 @@ export default function Author() {
   });
 
   // Submission guard - any operation in progress blocks others
-  const isProcessing = isAnalyzing || isGenerating || isSaving;
+  const isProcessing = isAnalyzing || isGenerating || isSaving || isConsulting;
 
   const hasValidInput = inputMode === "image" ? !!referenceImage : 
     (inputMode === "prompt" && textPrompt.trim().length >= 10) ||
-    (inputMode === "file" && !!importedTokens);
-  const canProceedToStep2 = hasValidInput && !isAnalyzing;
+    (inputMode === "file" && !!importedTokens) ||
+    (inputMode === "consultant" && !!consultantRecommendation);
+  const canProceedToStep2 = hasValidInput && !isAnalyzing && !isConsulting;
 
   const handleFileSelect = async (file: File) => {
     if (!file.type.startsWith("image/")) return;
@@ -296,8 +368,8 @@ export default function Author() {
   const proceedToStep2 = async () => {
     if (!canProceedToStep2 || isProcessing) return; // Prevent duplicate submissions
 
-    // For file imports, skip preview generation and go straight to step 2
-    if (inputMode === "file" && importedTokens) {
+    // For file imports and consultant mode, skip preview generation and go straight to step 2
+    if ((inputMode === "file" || inputMode === "consultant") && importedTokens) {
       setGeneratedPreviews({ stillLife: "", landscape: "", portrait: "" });
       setStep(2);
       return;
@@ -406,8 +478,101 @@ export default function Author() {
     setImportFileName("");
     setImportError(null);
     setImportStats(null);
+    setProjectDescription("");
+    setConsultantRecommendation(null);
+    setConsultError(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (tokenFileInputRef.current) tokenFileInputRef.current.value = "";
+  };
+
+  const handleConsultant = async () => {
+    if (isProcessing) return;
+    if (projectDescription.trim().length < 20) {
+      setConsultError({
+        type: "unknown",
+        message: "Please provide a more detailed project description (at least 20 characters).",
+        canRetry: false,
+      });
+      return;
+    }
+
+    setIsConsulting(true);
+    setConsultError(null);
+
+    try {
+      const response = await fetch("/api/styles/consultant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: projectDescription.trim() }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to analyze project description");
+      }
+
+      const { recommendation, generatedTokens } = await response.json();
+      setConsultantRecommendation(recommendation);
+      setImportedTokens(generatedTokens);
+      setName(recommendation.analysis.aestheticStyle || `${recommendation.analysis.domain} Style`);
+      setDescription(recommendation.analysis.summary || `A style designed for ${recommendation.analysis.domain} applications.`);
+    } catch (error) {
+      const classified = classifyError(error, "project analysis");
+      setConsultError(classified);
+    } finally {
+      setIsConsulting(false);
+    }
+  };
+
+  const handleUseConsultantStyle = () => {
+    if (!consultantRecommendation) return;
+    setStep(2);
+    setGeneratedPreviews({ stillLife: "", landscape: "", portrait: "" });
+  };
+  
+  const handleSurpriseMe = async () => {
+    if (isProcessing) return;
+    
+    setIsGeneratingRandom(true);
+    setAnalyzeError(null);
+    
+    try {
+      const response = await fetch("/api/styles/random", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to generate random style");
+      }
+      
+      const data = await response.json();
+      
+      if (data.success && data.style) {
+        setInputMode("random");
+        setName(data.style.name);
+        setDescription(data.style.description);
+        setImportedTokens(data.style.tokens);
+        
+        toast({
+          title: "Random style generated!",
+          description: `Created "${data.style.name}" - a unique style just for you`,
+        });
+        
+        // Move to step 2
+        setStep(2);
+      }
+    } catch (error) {
+      const classified = classifyError(error, "random style generation");
+      setAnalyzeError(classified);
+      toast({
+        title: "Generation failed",
+        description: classified.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingRandom(false);
+    }
   };
   
   const handleTokenFileSelect = async (file: File) => {
@@ -596,41 +761,75 @@ export default function Author() {
               {/* Input Options */}
               {!inputMode && (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {/* Upload Image Option */}
                     <div
                       onDragOver={handleDragOver}
                       onDrop={handleDrop}
                       onClick={() => fileInputRef.current?.click()}
-                      className="aspect-square border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center text-muted-foreground hover:bg-muted/50 hover:border-primary/50 transition-all cursor-pointer p-6"
+                      className="aspect-square border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center text-muted-foreground hover:bg-muted/50 hover:border-primary/50 transition-all cursor-pointer p-4"
                       data-testid="dropzone-image"
                     >
-                      <Upload size={40} className="mb-4 opacity-50" />
-                      <span className="text-sm font-medium text-center">Upload Image</span>
-                      <span className="text-xs mt-2 opacity-60 text-center">Extract from photo</span>
+                      <Upload size={32} className="mb-3 opacity-50" />
+                      <span className="text-xs font-medium text-center">Upload Image</span>
+                      <span className="text-[10px] mt-1 opacity-60 text-center">Extract from photo</span>
                     </div>
 
                     {/* Text Prompt Option */}
                     <div
                       onClick={() => setInputMode("prompt")}
-                      className="aspect-square border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center text-muted-foreground hover:bg-muted/50 hover:border-primary/50 transition-all cursor-pointer p-6"
+                      className="aspect-square border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center text-muted-foreground hover:bg-muted/50 hover:border-primary/50 transition-all cursor-pointer p-4"
                       data-testid="option-prompt"
                     >
-                      <Sparkles size={40} className="mb-4 opacity-50" />
-                      <span className="text-sm font-medium text-center">Describe Style</span>
-                      <span className="text-xs mt-2 opacity-60 text-center">Text description</span>
+                      <Sparkles size={32} className="mb-3 opacity-50" />
+                      <span className="text-xs font-medium text-center">Describe Style</span>
+                      <span className="text-[10px] mt-1 opacity-60 text-center">Text description</span>
                     </div>
                     
                     {/* Import File Option */}
                     <div
                       onClick={() => tokenFileInputRef.current?.click()}
-                      className="aspect-square border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center text-muted-foreground hover:bg-muted/50 hover:border-primary/50 transition-all cursor-pointer p-6"
+                      className="aspect-square border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center text-muted-foreground hover:bg-muted/50 hover:border-primary/50 transition-all cursor-pointer p-4"
                       data-testid="option-import"
                     >
-                      <FileJson size={40} className="mb-4 opacity-50" />
-                      <span className="text-sm font-medium text-center">Import Tokens</span>
-                      <span className="text-xs mt-2 opacity-60 text-center">Figma, CSS, DTCG</span>
+                      <FileJson size={32} className="mb-3 opacity-50" />
+                      <span className="text-xs font-medium text-center">Import Tokens</span>
+                      <span className="text-[10px] mt-1 opacity-60 text-center">Figma, CSS, DTCG</span>
                     </div>
+
+                    {/* Style Consultant Option */}
+                    <div
+                      onClick={() => setInputMode("consultant")}
+                      className="aspect-square border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center text-muted-foreground hover:bg-muted/50 hover:border-primary/50 transition-all cursor-pointer p-4 relative overflow-hidden"
+                      data-testid="option-consultant"
+                    >
+                      <div className="absolute top-1 right-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-[8px] px-1.5 py-0.5 rounded-full font-medium">NEW</div>
+                      <Lightbulb size={32} className="mb-3 opacity-50" />
+                      <span className="text-xs font-medium text-center">Style Consultant</span>
+                      <span className="text-[10px] mt-1 opacity-60 text-center">From PRD/spec</span>
+                    </div>
+                  </div>
+                  
+                  {/* Surprise Me Button */}
+                  <div className="flex justify-center">
+                    <button
+                      onClick={handleSurpriseMe}
+                      disabled={isGeneratingRandom}
+                      className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+                      data-testid="button-surprise-me"
+                    >
+                      {isGeneratingRandom ? (
+                        <>
+                          <Loader2 size={18} className="animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Shuffle size={18} />
+                          Surprise Me
+                        </>
+                      )}
+                    </button>
                   </div>
                   
                   {/* Batch upload link */}
@@ -844,6 +1043,182 @@ export default function Author() {
                   <div className="text-center text-sm text-muted-foreground">
                     Supported formats: W3C DTCG, Figma Variables, Tokens Studio, CSS, Tailwind
                   </div>
+                </div>
+              )}
+
+              {/* Style Consultant Panel */}
+              {inputMode === "consultant" && (
+                <div className="space-y-4">
+                  <div className="p-4 bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-xl">
+                    <div className="flex items-start gap-3 mb-4">
+                      <Lightbulb className="w-5 h-5 text-purple-500 shrink-0 mt-0.5" />
+                      <div>
+                        <h3 className="font-medium text-sm">Style Consultant</h3>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Paste your project description, PRD, or spec. Our AI will analyze it and recommend design tokens.
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <textarea
+                      value={projectDescription}
+                      onChange={(e) => setProjectDescription(e.target.value)}
+                      placeholder="Example: A stereo AU/VST3 plugin using JUCE. The plugin is a memory-based delay instrument. UI should be dark, restrained, cinematic, minimal. Limited to 6-8 knobs max. Abstract, non-literal visuals. No hardware cosplay..."
+                      className="w-full h-48 bg-background border border-border rounded-lg px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                      data-testid="input-project-description"
+                    />
+                    
+                    <div className="flex items-center justify-between mt-3">
+                      <span className="text-xs text-muted-foreground">{projectDescription.length} characters (20 min)</span>
+                      <button
+                        onClick={handleConsultant}
+                        disabled={isConsulting || projectDescription.trim().length < 20}
+                        className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-lg text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        data-testid="button-analyze-project"
+                      >
+                        {isConsulting ? (
+                          <>
+                            <Loader2 size={16} className="animate-spin" />
+                            Analyzing...
+                          </>
+                        ) : (
+                          <>
+                            <Wand2 size={16} />
+                            Analyze & Recommend
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Error Alert */}
+                  {consultError && (
+                    <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm text-amber-800 dark:text-amber-200">{consultError.message}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Recommendation Results */}
+                  {consultantRecommendation && (
+                    <div className="space-y-4">
+                      <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-xl">
+                        <div className="flex items-center gap-2 text-green-600 mb-3">
+                          <Check size={16} />
+                          <span className="font-medium text-sm">Analysis Complete</span>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-3 text-xs">
+                          <div>
+                            <span className="text-muted-foreground">Domain:</span>
+                            <span className="ml-1 font-medium">{consultantRecommendation.analysis.domain}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Platform:</span>
+                            <span className="ml-1 font-medium">{consultantRecommendation.analysis.platformType}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">UI Density:</span>
+                            <span className="ml-1 font-medium">{consultantRecommendation.analysis.uiDensity}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Formality:</span>
+                            <span className="ml-1 font-medium">{consultantRecommendation.analysis.formality}</span>
+                          </div>
+                        </div>
+                        
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {consultantRecommendation.analysis.mood.map((m, i) => (
+                            <span key={i} className="px-2 py-0.5 bg-purple-500/10 text-purple-600 rounded text-xs font-medium">
+                              {m}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      {/* Color Preview */}
+                      <div className="p-4 border border-border rounded-xl">
+                        <h4 className="text-sm font-medium mb-3">Suggested Colors</h4>
+                        <div className="flex gap-2">
+                          {Object.entries(consultantRecommendation.tokenSuggestions.colors).map(([name, color]) => (
+                            <div key={name} className="text-center">
+                              <div
+                                className="w-10 h-10 rounded-lg border border-border shadow-sm"
+                                style={{ backgroundColor: color }}
+                                title={`${name}: ${color}`}
+                              />
+                              <span className="text-[10px] text-muted-foreground mt-1 block">{name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      {/* Typography & Effects */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="p-3 border border-border rounded-xl">
+                          <h4 className="text-xs font-medium mb-2">Typography</h4>
+                          <p className="text-xs text-muted-foreground">
+                            {consultantRecommendation.tokenSuggestions.typography.headingFont} / {consultantRecommendation.tokenSuggestions.typography.bodyFont}
+                          </p>
+                        </div>
+                        <div className="p-3 border border-border rounded-xl">
+                          <h4 className="text-xs font-medium mb-2">Material</h4>
+                          <p className="text-xs text-muted-foreground">
+                            {consultantRecommendation.tokenSuggestions.effects.materialHint}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {/* Matching Styles */}
+                      {consultantRecommendation.matchingStyles.length > 0 && (
+                        <div className="p-4 border border-border rounded-xl">
+                          <h4 className="text-sm font-medium mb-3">Similar Community Styles</h4>
+                          <div className="space-y-2">
+                            {consultantRecommendation.matchingStyles.slice(0, 3).map((match) => (
+                              <Link
+                                key={match.styleId}
+                                href={`/style/${match.styleId}`}
+                                className="flex items-center justify-between p-2 bg-muted/50 rounded-lg hover:bg-muted transition-colors"
+                              >
+                                <div className="flex items-center gap-3">
+                                  {match.thumbnailUrl && (
+                                    <img src={match.thumbnailUrl} alt="" className="w-8 h-8 rounded object-cover" />
+                                  )}
+                                  <span className="text-sm font-medium">{match.styleName}</span>
+                                </div>
+                                <span className="text-xs text-muted-foreground">{match.relevanceScore}% match</span>
+                              </Link>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Rationale */}
+                      <div className="p-4 bg-muted/30 rounded-xl">
+                        <p className="text-sm text-muted-foreground italic">"{consultantRecommendation.rationale}"</p>
+                      </div>
+                      
+                      <button
+                        onClick={handleUseConsultantStyle}
+                        className="w-full h-12 bg-primary text-primary-foreground rounded-xl flex items-center justify-center gap-2 text-sm font-medium hover:opacity-90 transition-all"
+                        data-testid="button-use-recommendations"
+                      >
+                        <Check size={18} />
+                        Use These Recommendations
+                      </button>
+                    </div>
+                  )}
+                  
+                  <button
+                    onClick={resetWizard}
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    ← Back to options
+                  </button>
                 </div>
               )}
 

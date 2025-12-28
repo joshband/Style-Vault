@@ -126,7 +126,7 @@ export function importTokens(content: string, format: ImportFormat, filename?: s
 function importDTCG(content: string, filename?: string): ImportResult {
   const parsed = JSON.parse(content);
   
-  if (parsed.color || parsed.spacing || parsed.typography || parsed.shadow || parsed.borderRadius) {
+  if (parsed.color || parsed.spacing || parsed.typography || parsed.shadow || parsed.radius) {
     return {
       success: true,
       tokens: parsed,
@@ -219,7 +219,7 @@ function figmaColorToHex(color: any): string {
 
 function importTokensStudio(content: string, filename?: string): ImportResult {
   const parsed = JSON.parse(content);
-  const tokens: any = { color: {}, spacing: {}, typography: {}, borderRadius: {} };
+  const tokens: any = { color: {}, spacing: {}, typography: {}, radius: {} };
   
   const tokenSets = parsed.$themes ? 
     Object.keys(parsed).filter(k => !k.startsWith('$')) :
@@ -273,7 +273,7 @@ function processTokensStudioSet(set: any, tokens: any, path: string) {
         if (isColor) {
           tokens.color[currentPath] = { $type: 'color', $value: tokenValue };
         } else if (isBorderRadius) {
-          tokens.borderRadius[currentPath] = { $type: 'dimension', $value: normalizeValue(tokenValue) };
+          tokens.radius[currentPath] = { $type: 'dimension', $value: normalizeValue(tokenValue) };
         } else if (isSpacing) {
           tokens.spacing[currentPath] = { $type: 'dimension', $value: normalizeValue(tokenValue) };
         } else if (isTypography) {

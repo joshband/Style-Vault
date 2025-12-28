@@ -1,5 +1,6 @@
 import { Layout } from "@/components/layout";
 import { StyleCard } from "@/components/style-card";
+import { StyleCardSkeleton } from "@/components/style-card-skeleton";
 import { useAuth } from "@/hooks/use-auth";
 import { ArrowLeft, Bookmark, Loader2, Palette, FolderPlus, Folder, Plus, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { Link, useLocation } from "wouter";
@@ -11,6 +12,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { NoBookmarksEmpty, NoCreationsEmpty, NoCollectionsEmpty, EmptyCollectionState } from "@/components/empty-state";
+import { PageTransition } from "@/components/page-transition";
+import { notify } from "@/lib/notifications";
 
 interface StyleSummary {
   id: string;
@@ -34,20 +38,12 @@ interface Collection {
   styles?: StyleSummary[];
 }
 
-function StyleGrid({ styles, emptyMessage, emptyIcon: EmptyIcon, emptyAction }: { 
+function StyleGrid({ styles, emptyComponent }: { 
   styles: StyleSummary[]; 
-  emptyMessage: string; 
-  emptyIcon: any;
-  emptyAction?: React.ReactNode;
+  emptyComponent: React.ReactNode;
 }) {
   if (styles.length === 0) {
-    return (
-      <div className="text-center py-16 space-y-4">
-        <EmptyIcon className="w-12 h-12 mx-auto text-muted-foreground/30" />
-        <h2 className="text-xl font-medium text-muted-foreground">{emptyMessage}</h2>
-        {emptyAction}
-      </div>
-    );
+    return <>{emptyComponent}</>;
   }
 
   return (
@@ -141,10 +137,15 @@ function CreateCollectionDialog({ open, onOpenChange, onCreated }: {
       if (res.ok) {
         const created = await res.json();
         onCreated(created);
+        notify.collectionCreated(name);
         setName("");
         setDescription("");
         onOpenChange(false);
+      } else {
+        notify.error("Failed to create collection");
       }
+    } catch {
+      notify.error("Failed to create collection");
     } finally {
       setLoading(false);
     }
@@ -220,8 +221,13 @@ function EditCollectionDialog({ collection, open, onOpenChange, onUpdated }: {
       if (res.ok) {
         const updated = await res.json();
         onUpdated(updated);
+        notify.success("Collection updated");
         onOpenChange(false);
+      } else {
+        notify.error("Failed to update collection");
       }
+    } catch {
+      notify.error("Failed to update collection");
     } finally {
       setLoading(false);
     }
@@ -322,9 +328,12 @@ export default function SavedStyles() {
         if (selectedCollection?.id === collectionId) {
           setSelectedCollection(null);
         }
+        notify.collectionDeleted();
+      } else {
+        notify.error("Failed to delete collection");
       }
     } catch (error) {
-      console.error("Failed to delete collection:", error);
+      notify.error("Failed to delete collection");
     }
   };
 
@@ -401,16 +410,7 @@ export default function SavedStyles() {
           ) : (
             <StyleGrid 
               styles={selectedCollection.styles || []} 
-              emptyMessage="This collection is empty"
-              emptyIcon={Folder}
-              emptyAction={
-                <Link
-                  href="/"
-                  className="inline-flex items-center gap-2 px-4 py-2 text-sm border border-border rounded-md hover:bg-muted transition-colors"
-                >
-                  Browse Styles to Add
-                </Link>
-              }
+              emptyComponent={<EmptyCollectionState />}
             />
           )}
         </div>
@@ -461,29 +461,14 @@ export default function SavedStyles() {
               <TabsContent value="bookmarks">
                 <StyleGrid 
                   styles={bookmarkedStyles} 
-                  emptyMessage="No saved styles yet"
-                  emptyIcon={Bookmark}
-                  emptyAction={
-                    <p className="text-sm text-muted-foreground/70">
-                      When you find a style you love, click the Save button to add it here.
-                    </p>
-                  }
+                  emptyComponent={<NoBookmarksEmpty />}
                 />
               </TabsContent>
 
               <TabsContent value="created">
                 <StyleGrid 
                   styles={createdStyles} 
-                  emptyMessage="No styles created yet"
-                  emptyIcon={Palette}
-                  emptyAction={
-                    <Link
-                      href="/create"
-                      className="inline-flex items-center gap-2 px-4 py-2 text-sm border border-border rounded-md hover:bg-muted transition-colors"
-                    >
-                      <Plus className="w-4 h-4" /> Create Your First Style
-                    </Link>
-                  }
+                  emptyComponent={<NoCreationsEmpty />}
                 />
               </TabsContent>
 
@@ -498,13 +483,7 @@ export default function SavedStyles() {
                   </Button>
 
                   {collections.length === 0 ? (
-                    <div className="text-center py-16 space-y-4">
-                      <Folder className="w-12 h-12 mx-auto text-muted-foreground/30" />
-                      <h2 className="text-xl font-medium text-muted-foreground">No collections yet</h2>
-                      <p className="text-sm text-muted-foreground/70">
-                        Create collections to organize your favorite styles into groups.
-                      </p>
-                    </div>
+                    <NoCollectionsEmpty onCreateCollection={() => setCreateDialogOpen(true)} />
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       {collections.map((collection) => (

@@ -1,0 +1,70 @@
+~/workspace$ rm -f .git/index.lock
+~/workspace$ git status
+On branch feat/personalization-data-store
+Your branch is ahead of 'origin/feat/personalization-data-store' by 1 commit.
+  (use "git push" to publish your local commits)
+
+You have unmerged paths.
+  (fix conflicts and run "git commit")
+  (use "git merge --abort" to abort the merge)
+
+Changes to be committed:
+    modified:   .replit
+
+Unmerged paths:
+  (use "git add <file>..." to mark resolution)
+    both modified:   client/public/opengraph.jpg
+    both modified:   client/src/App.tsx
+    both added:      client/src/components/color-palette-swatches.tsx
+    both added:      client/src/components/deploy-dialog.tsx
+    both added:      client/src/components/export-dialog.tsx
+    both modified:   client/src/components/layout.tsx
+    both added:      client/src/components/lazy-image.tsx
+    both added:      client/src/components/style-card-skeleton.tsx
+    both modified:   client/src/components/style-card.tsx
+    both added:      client/src/components/style-filters.tsx
+    both modified:   client/src/components/token-viewer.tsx
+    both added:      client/src/lib/exporters/figma-variables.ts
+    both added:      client/src/lib/exporters/index.ts
+    both added:      client/src/lib/token-exporters.ts
+    both added:      client/src/lib/token-importers.ts
+    both added:      client/src/pages/Author.tsx
+    both added:      client/src/pages/Explore.tsx
+    both added:      client/src/pages/Inspect.tsx
+    both added:      client/src/pages/SavedStyles.tsx
+    both modified:   package-lock.json
+    both modified:   package.json
+    both added:      pyproject.toml
+    both modified:   replit.md
+    both added:      server/background-worker.ts
+    both added:      server/cv-bridge.ts
+    both added:      server/image-service.ts
+    both added:      server/job-runner.ts
+    both added:      server/metadata-enrichment.ts
+    both added:      server/mood-board-generation.ts
+    both added:      server/object-image-service.ts
+    both modified:   server/preview-generation.ts
+    both added:      server/remix.ts
+    both modified:   server/routes.ts
+    both modified:   server/storage.ts
+    both added:      server/token-cache.ts
+    both modified:   shared/schema.ts
+    both added:      uv.lock
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+    modified:   .gitignore
+    modified:   .replit
+    modified:   client/index.html
+    modified:   client/src/components/ui/skeleton.tsx
+    modified:   client/src/index.css
+    modified:   client/src/lib/queryClient.ts
+    modified:   script/build.ts
+    modified:   server/index.ts
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+    attached_assets/Pasted--workspace-git-fetch-origin-main-From-https-github-com-_1766955476120.txt
+
+~/workspace$ 

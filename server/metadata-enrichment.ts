@@ -2,6 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import { storage } from "./storage";
 import type { Style, MetadataTags, MetadataEnrichmentStatus } from "@shared/schema";
 import { getPLimit } from "./utils/esm-interop";
+import { logger } from "./logger";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
@@ -17,6 +18,13 @@ interface EnrichmentResult {
   colorFamily: string[];
   lighting: string[];
   texture: string[];
+  
+  // Extended visual characteristics
+  depth: string[];
+  shadow: string[];
+  material: string[];
+  atmosphere: string[];
+  environment: string[];
   
   // Art historical context
   era: string[];
@@ -69,6 +77,11 @@ Respond with ONLY valid JSON in this exact format:
   "colorFamily": ["tag1", "tag2"],
   "lighting": ["tag1", "tag2"],
   "texture": ["tag1", "tag2"],
+  "depth": ["tag1", "tag2"],
+  "shadow": ["tag1", "tag2"],
+  "material": ["tag1", "tag2"],
+  "atmosphere": ["tag1", "tag2"],
+  "environment": ["tag1", "tag2"],
   "era": ["tag1", "tag2"],
   "artPeriod": ["tag1", "tag2"],
   "historicalInfluences": ["influence1", "influence2"],
@@ -91,8 +104,13 @@ Respond with ONLY valid JSON in this exact format:
 == OBJECTIVE CHARACTERISTICS ==
 - mood: emotional qualities (e.g., "serene", "melancholic", "energetic", "nostalgic", "whimsical")
 - colorFamily: color palettes (e.g., "earth-tones", "pastels", "monochrome", "jewel-tones")
-- lighting: lighting characteristics (e.g., "soft-diffused", "dramatic-chiaroscuro", "golden-hour")
-- texture: surface qualities (e.g., "smooth", "grainy", "impasto", "organic")
+- lighting: lighting characteristics (e.g., "soft-diffused", "dramatic-chiaroscuro", "golden-hour", "rim-lighting", "volumetric")
+- texture: surface qualities (e.g., "smooth", "grainy", "impasto", "organic", "brushed-metal", "velvet")
+- depth: spatial depth perception (e.g., "shallow-flat", "deep-layered", "infinite-perspective", "intimate-close", "aerial-view")
+- shadow: shadow characteristics (e.g., "soft-ambient", "hard-cast", "dramatic-noir", "minimal-shadowless", "colored-shadows")
+- material: surface materials present (e.g., "glass", "metal", "fabric", "stone", "plastic", "wood", "ceramic")
+- atmosphere: atmospheric quality (e.g., "misty-hazy", "clear-crisp", "dusty", "humid", "smoky", "ethereal")
+- environment: environmental context (e.g., "indoor-studio", "outdoor-natural", "urban", "industrial", "domestic", "fantastical")
 - era: time period (e.g., "1920s", "1970s", "contemporary", "renaissance")
 - artPeriod: art movements (e.g., "art-deco", "impressionism", "bauhaus", "minimalism")
 - historicalInfluences: design schools/movements (e.g., "japanese-woodblock", "swiss-style", "memphis-design")
@@ -151,6 +169,13 @@ function parseEnrichmentResponse(text: string): EnrichmentResult | null {
       lighting: normalizeArray(parsed.lighting || []),
       texture: normalizeArray(parsed.texture || []),
       
+      // Extended visual characteristics
+      depth: normalizeArray(parsed.depth || []),
+      shadow: normalizeArray(parsed.shadow || []),
+      material: normalizeArray(parsed.material || []),
+      atmosphere: normalizeArray(parsed.atmosphere || []),
+      environment: normalizeArray(parsed.environment || []),
+      
       // Art historical context
       era: normalizeArray(parsed.era || []),
       artPeriod: normalizeArray(parsed.artPeriod || []),
@@ -183,18 +208,19 @@ function parseEnrichmentResponse(text: string): EnrichmentResult | null {
       keywords: normalizeArray(parsed.keywords || []),
     };
   } catch (error) {
-    console.error("Failed to parse enrichment response:", error);
+    logger.error("Failed to parse enrichment response", error, { module: 'MetadataEnrichment' });
     return null;
   }
 }
 
 export async function enrichStyleMetadata(styleId: string): Promise<boolean> {
+  const startTime = Date.now();
   try {
     await storage.updateStyleEnrichmentStatus(styleId, "processing");
     
     const style = await storage.getStyleById(styleId);
     if (!style) {
-      console.error(`Style ${styleId} not found for enrichment`);
+      logger.error("Style not found for enrichment", undefined, { module: 'MetadataEnrichment', styleId });
       await storage.updateStyleEnrichmentStatus(styleId, "failed");
       return false;
     }
@@ -210,8 +236,15 @@ export async function enrichStyleMetadata(styleId: string): Promise<boolean> {
     const enrichmentResult = parseEnrichmentResponse(responseText);
     
     if (!enrichmentResult) {
-      console.error(`Failed to parse enrichment for style ${styleId}`);
+      logger.error("Failed to parse enrichment for style", undefined, { module: 'MetadataEnrichment', styleId });
       await storage.updateStyleEnrichmentStatus(styleId, "failed");
+      storage.recordMetric({
+        type: "metadata_enrichment",
+        styleId,
+        durationMs: Date.now() - startTime,
+        success: false,
+        metadata: { error: "parse_failure" },
+      }).catch(() => {});
       return false;
     }
     
@@ -222,11 +255,27 @@ export async function enrichStyleMetadata(styleId: string): Promise<boolean> {
     };
     
     await storage.updateStyleMetadata(styleId, updatedTags, "complete");
-    console.log(`Successfully enriched metadata for style ${styleId}`);
+    logger.info("Successfully enriched metadata for style", { module: 'MetadataEnrichment', styleId });
+    
+    storage.recordMetric({
+      type: "metadata_enrichment",
+      styleId,
+      durationMs: Date.now() - startTime,
+      success: true,
+      metadata: { tagCount: Object.keys(enrichmentResult).length },
+    }).catch(() => {});
+    
     return true;
   } catch (error) {
-    console.error(`Error enriching style ${styleId}:`, error);
+    logger.error("Error enriching style", error, { module: 'MetadataEnrichment', styleId });
     await storage.updateStyleEnrichmentStatus(styleId, "failed");
+    storage.recordMetric({
+      type: "metadata_enrichment",
+      styleId,
+      durationMs: Date.now() - startTime,
+      success: false,
+      metadata: { error: error instanceof Error ? error.message : "unknown" },
+    }).catch(() => {});
     return false;
   }
 }
@@ -234,8 +283,17 @@ export async function enrichStyleMetadata(styleId: string): Promise<boolean> {
 export async function queueStyleForEnrichment(styleId: string): Promise<void> {
   await storage.updateStyleEnrichmentStatus(styleId, "queued");
   
-  setTimeout(() => {
-    enrichStyleMetadata(styleId).catch(console.error);
+  setTimeout(async () => {
+    try {
+      const metadataSuccess = await enrichStyleMetadata(styleId);
+      
+      if (metadataSuccess) {
+        await enrichStyleSpec(styleId);
+        logger.info("Completed full enrichment (metadata + spec)", { module: 'MetadataEnrichment', styleId });
+      }
+    } catch (err) {
+      logger.error("Async enrichment failed", err, { module: 'MetadataEnrichment', styleId });
+    }
   }, 100);
 }
 
@@ -318,7 +376,7 @@ Respond with ONLY valid JSON:
 export async function generateStyleSpecContent(styleId: string): Promise<StyleSpecContent | null> {
   const style = await storage.getStyleById(styleId);
   if (!style) {
-    console.log(`Style ${styleId} not found for spec generation`);
+    logger.info("Style not found for spec generation", { module: 'MetadataEnrichment', styleId });
     return null;
   }
 
@@ -327,7 +385,7 @@ export async function generateStyleSpecContent(styleId: string): Promise<StyleSp
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: prompt,
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
       config: {
         temperature: 0.7,
         topP: 0.9,
@@ -346,7 +404,7 @@ export async function generateStyleSpecContent(styleId: string): Promise<StyleSp
       try {
         parsed = JSON.parse(jsonMatch[0]) as StyleSpecContent;
       } catch {
-        console.error("Failed to parse JSON from style spec response");
+        logger.error("Failed to parse JSON from style spec response", undefined, { module: 'MetadataEnrichment', styleId });
       }
     }
     
@@ -362,12 +420,12 @@ export async function generateStyleSpecContent(styleId: string): Promise<StyleSp
           usageGuidelines: extractedGuidelines,
           designNotes: extractedNotes,
         };
-        console.log(`Fallback parsing extracted: guidelines=${extractedGuidelines.length} chars, notes=${extractedNotes.length} chars`);
+        logger.info("Fallback parsing extracted", { module: 'MetadataEnrichment', styleId, guidelinesLength: extractedGuidelines.length, notesLength: extractedNotes.length });
       }
     }
     
     if (!parsed) {
-      console.error("Failed to extract JSON from style spec response");
+      logger.error("Failed to extract JSON from style spec response", undefined, { module: 'MetadataEnrichment', styleId });
       return null;
     }
     
@@ -377,13 +435,13 @@ export async function generateStyleSpecContent(styleId: string): Promise<StyleSp
     };
     
     if (validSpec.usageGuidelines.length < 20 && validSpec.designNotes.length < 20) {
-      console.error("Style spec content too short, treating as failure");
+      logger.error("Style spec content too short, treating as failure", undefined, { module: 'MetadataEnrichment', styleId });
       return null;
     }
 
     return validSpec;
   } catch (error) {
-    console.error(`Error generating style spec for ${styleId}:`, error);
+    logger.error("Error generating style spec", error, { module: 'MetadataEnrichment', styleId });
     return null;
   }
 }
@@ -402,7 +460,7 @@ export async function enrichStyleSpec(styleId: string): Promise<boolean> {
   };
 
   await storage.updateStyleSpec(styleId, updatedSpec);
-  console.log(`Generated style spec for: ${style.name}`);
+  logger.info("Generated style spec", { module: 'MetadataEnrichment', styleId, styleName: style.name });
   return true;
 }
 
@@ -414,7 +472,7 @@ export async function enrichAllStyleSpecs(): Promise<{ processed: number; succes
     return !spec?.usageGuidelines || !spec?.designNotes;
   });
 
-  console.log(`Found ${stylesWithoutSpec.length} styles needing spec generation`);
+  logger.info("Found styles needing spec generation", { module: 'MetadataEnrichment', count: stylesWithoutSpec.length });
   
   const limit = await getPLimit(2);
   const errors: string[] = [];

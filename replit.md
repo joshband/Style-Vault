@@ -1,114 +1,74 @@
 # Visual DNA
 
 ## Overview
-Visual DNA is a style intelligence application that manages visual styles as first-class, standards-based artifacts. It treats styles as reusable, inspectable, and comparable objects composed of reference images, canonical preview images, W3C DTCG design tokens, and AI prompt scaffolding. The core philosophy is that design tokens are the source of truth, and image generation is a consumer of these styles, not their definition. The application supports browsing and comparing saved styles (Style Explorer), creating new styles from images or prompts (Style Authoring), and generating new images using saved styles (Image Generation).
+Visual DNA is a style intelligence application designed to manage visual styles as first-class, standards-based artifacts. It treats styles as reusable, inspectable, and comparable objects comprising reference images, canonical preview images, W3C DTCG design tokens, and AI prompt scaffolding. The core principle is that design tokens are the definitive source of truth, with image generation consuming these styles rather than defining them. The application facilitates browsing and comparing saved styles, creating new styles from various inputs, and generating new images using established styles. The business vision is to standardize and streamline visual asset management, offering market potential in design, marketing, and content creation industries by providing a robust, AI-powered platform for consistent visual branding and rapid prototyping.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
 ## System Architecture
 
-### Frontend
-- **Framework**: React 18 with TypeScript
-- **Routing**: Wouter
-- **State Management**: TanStack React Query
-- **Styling**: Tailwind CSS v4 with shadcn/ui (New York style)
-- **Animations**: Framer Motion
-- **Build Tool**: Vite
+### UI/UX Decisions
+- **Framework**: React 18 with TypeScript.
+- **Styling**: Tailwind CSS v4 with shadcn/ui (New York style) for a modern, consistent look.
+- **Animations**: Framer Motion for smooth page transitions, hover effects, and micro-interactions.
+- **Loading States**: Skeleton loaders with shimmer animations for cards and lists, blur-up lazy image loading with IntersectionObserver.
+- **Empty States**: Illustrated empty state components (NoStylesEmpty, NoBookmarksEmpty, NoSearchResultsEmpty, NoCollectionsEmpty, etc.) with animated icons and helpful CTAs.
+- **Notifications**: Sonner toast system with specialized notifications for styles, collections, exports, and errors.
+- **Onboarding**: First-time user welcome modal with feature highlights (stored in localStorage).
+- **Mobile Responsive**: Responsive grids (260px min-width cards), collapsible sidebar, touch-friendly interactions.
 
-### Backend
-- **Runtime**: Node.js with Express
-- **Language**: TypeScript (ESM modules)
-- **API Pattern**: RESTful JSON endpoints
-- **Build Process**: esbuild for server, Vite for client
+### Technical Implementations
+- **Frontend**: Utilizes Wouter for routing, TanStack React Query for state management, and Vite for building.
+- **Backend**: Node.js with Express and TypeScript (ESM modules) providing RESTful JSON endpoints. esbuild is used for server bundling.
+- **Authentication**: Replit Auth (OpenID Connect) handles user sign-ins, session management via PostgreSQL, and user profiles.
+- **Data Storage**: PostgreSQL with Drizzle ORM manages all persistent data, including `styles`, `users`, `sessions`, `bookmarks`, `ratings`, and `generatedImages`.
+- **AI Integration**: Leverages Google Gemini via Replit AI Integrations for image analysis, canonical preview generation, styled image generation, and metadata enrichment. AI image generation prioritizes Design Tokens.
+- **UI Concept Style Transfer**: The `generateSingleUiConcept` function in `server/mood-board-generation.ts` now passes the reference image directly to Gemini for proper style transfer, ensuring UI mockups (softwareApp, audioPlugin, dashboard) match the artistic rendering style of the source reference image. UI concepts use optimized aspect ratios: softwareApp and dashboard use 1:1 square, audioPlugin uses 16:9 landscape.
+- **Comprehensive DTCG Generator**: Combines CV, Vision API, and AI to produce full W3C DTCG 2025.10 token structures, encompassing 12 categories (color, spacing, typography, etc.) with confidence tracking and source attribution.
+- **Token Export Pipeline**: A modular pipeline exports design tokens into 18 different formats, including various code, mobile, design tool, and game engine formats.
+- **One-Click Deploy**: Supports deployment to Vercel and Netlify by generating platform-specific configurations and bundling necessary assets.
+- **Async Job Orchestration**: A robust system (`server/job-runner.ts`) manages long-running operations like token_extraction, image_generation, and metadata_enrichment with retry logic and backoff.
+- **Parallel Image Generation**: Uses `Promise.allSettled` for independent stage persistence, achieving 60-70% faster style regeneration with token snapshots to prevent race conditions.
+- **Optimized Image Storage**: All generated images (previews, mood boards, UI concepts) flow through `server/object-image-service.ts` via `storeImageToObjectStorage()` which creates WebP-optimized variants: thumb (300px), medium (800px), and full (original quality). The UI loads appropriate sizes: vault thumbnails use ?size=thumb, detail views use ?size=medium, and downloads use ?size=full. Images are stored in Replit Object Storage, NOT as base64 in the database.
+- **Automatic Usage Notes Generation**: The metadata enrichment pipeline (`queueStyleForEnrichment()`) now calls both `enrichStyleMetadata()` for tags AND `enrichStyleSpec()` for usage guidelines and design notes, ensuring complete style documentation on style creation/regeneration.
+- **AI Retry Logic**: Production-grade retry wrapper (`server/retry-utils.ts`) using p-retry with exponential backoff (4 retries, 2-60s timeout) for Gemini/OpenAI/Prodia API calls.
+- **Modular Route Architecture**: Domain-specific routers in `server/routes/` (styles, images, jobs, analytics, system, pipeline, vision, batch-processing) for maintainability.
+- **Node.js-to-Python Pipeline Integration**: A bridge (`server/pipeline-bridge.ts`) facilitates communication with a Python backend for advanced CV, validation, and semantic search capabilities.
+- **Component + Material Intelligence Pipeline**: CV-based system for detecting UI components (buttons, sliders, knobs, cards) and extracting material/texture signals (translucency, specular, emission, grain, microcontrast). Features a library of 12 material recipes (glassmorphic, anodized metal, soft plastic, neon, etc.) with confidence-scored matching. Optional Gemini AI semantic classification for enhanced component labeling.
 
-### Authentication
-- **Provider**: Replit Auth (OpenID Connect)
-- **Features**: Sign in with various providers, session management via PostgreSQL, user profiles.
-- **Client Hook**: `useAuth()` for UI integration.
+### Feature Specifications
+- **User Features**: Bookmarking, 1-5 star ratings and reviews, creator-linked style galleries, public/private style visibility, and protected routes requiring authentication.
+- **Background Worker System**: Autonomous system for style name repair, mood board generation, task deduplication, and cache invalidation.
+- **Style Sharing**: Styles can be shared via 6-character alphanumeric codes.
+- **Style Versioning**: Tracks style changes in a `style_versions` table, allowing for manual snapshots and reverts.
 
-### Data Storage
-- **Database**: PostgreSQL via Drizzle ORM
-- **Key Tables**: `users`, `sessions`, `styles` (with tokens, previews, metadata, creatorId), `bookmarks`, `ratings`, `generatedImages`, `conversations`, `messages`.
-
-### User Features
-- **Bookmarking**: Save and manage favorite styles.
-- **Ratings & Reviews**: Provide 1-5 star ratings and reviews for styles.
-- **Creator Tracking**: Styles are linked to their creators, allowing for creator-specific style galleries.
-- **Public/Private Visibility**: Styles can be toggled between public and private visibility by their creators.
-- **Protected Routes**: User-specific endpoints require authentication.
-
-### AI Integration
-- **Provider**: Google Gemini via Replit AI Integrations (`gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-2.5-flash-image`).
-- **Features**: Image analysis for style extraction, canonical preview generation, styled image generation, and metadata enrichment.
-- **Token-Weighted Prompts**: AI image generation prioritizes Design Tokens as primary visual directives, with semantic context as secondary guidance.
-
-### CV-Based Token Extraction (Optional)
-- **Technology**: Python script using `opencv-python-headless`, `numpy`, `scipy`, `coloraide` for deterministic, explainable token extraction.
-- **Capabilities**: Extracts colors (OKLCH), spacing, border radius, grid, elevation, stroke width. Includes advanced color analysis (harmony, WCAG contrast, temperature) and multi-cue depth estimation.
-- **Algorithm Walkthrough**: Opt-in feature to visualize intermediate CV processing steps for educational purposes.
-
-### Design Token System
-- **Standard**: W3C DTCG 2025.10 format.
-- **Structure**: Hierarchical JSON with `$type`, `$value`, and `$description`.
-- **Usage**: Defines visual characteristics for consistent application across generated images.
-
-### Token Export Pipeline
-- **Architecture**: Modular pipeline with normalization → alias resolution → transformation stages.
-- **Core File**: `client/src/lib/token-pipeline.ts` - Pipeline types, normalization, alias resolution, shared utilities.
-- **Exporter Registry**: Plugin-style registration pattern in `client/src/lib/exporters/`.
-- **Exporters** (18 formats):
-  - **Code**: W3C DTCG JSON (.tokens.json), CSS Variables, SCSS Variables, React/TypeScript, Tailwind Config, Next.js Theme
-  - **Mobile**: Flutter/Dart, React Native, Swift/iOS (SwiftUI + UIKit), Android XML (colors.xml/dimens.xml)
-  - **Design Tools**: Figma Variables JSON, Adobe ASE Swatches (binary), Sketch Palette
-  - **Frameworks**: Material UI theme, Web Components
-  - **Game/Audio**: Unity C# ScriptableObject, JUCE C++ header, Unreal Engine DataAsset
-- **Features**: Alias resolution ({} syntax), type inference, color format conversion, dimension parsing.
-- **UI**: Multi-target export dialog with category grouping, sub-options per format, toast notifications.
-
-### One-Click Deploy
-- **Platforms**: Vercel and Netlify support via DeployDialog component.
-- **Bundle Contents**: Single ZIP archive containing tokens.css, tokens.json, theme.ts, platform config (vercel.json or netlify.toml), package.json, and README.md.
-- **Features**: Platform-specific configuration generation, copy-to-clipboard commands, quick start instructions, and single-file download.
-
-### Async Job Orchestration
-- **Engine**: `server/job-runner.ts` manages all long-running operations.
-- **Features**: Persistent job tracking, configurable timeouts, max retries, exponential backoff, and polling.
-- **Job Types**: token_extraction, preview_generation, image_generation, mood_board, metadata_enrichment, style_name_repair, background_asset_generation.
-
-### Background Worker System
-- **Purpose**: Autonomous asset generation and maintenance.
-- **Tasks**: Style name repair, automatic generation of mood boards and UI concepts, deduplication of tasks, and cache invalidation.
-
-### Style Sharing
-- **Mechanism**: 6-character alphanumeric share codes.
-- **Functionality**: Generate share codes for styles and access styles via these codes for public viewing.
-
-### Style Versioning
-- **Database**: `style_versions` table for snapshots of style states.
-- **Features**: Tracks versions with change types, allows manual snapshots, and enables reverting to previous versions (owner only).
-
-### Key Design Decisions
-- **Tokens as Source of Truth**: All styles must have complete token definitions for portability and consistency.
-- **Canonical Preview System**: Standardized preview images for cross-style comparison.
-- **Prompt Scaffolding**: Structured prompt templates derived from tokens for consistent style application.
-- **Job-Based Async Operations**: Robust system for long-running tasks with retry and progress tracking.
-- **Background Metadata Enrichment**: AI-powered enrichment of styles with objective and subjective "Visual DNA" descriptors for advanced search and discovery.
+### System Design Choices
+- **Tokens as Source of Truth**: Design tokens are central to ensuring style portability and consistency.
+- **Canonical Preview System**: Standardized previews enable consistent cross-style comparison.
+- **Prompt Scaffolding**: Structured prompts derived from tokens ensure consistent application of styles in AI generation.
+- **Job-Based Async Operations**: Guarantees reliability for long-running and resource-intensive tasks.
+- **Pluggable Storage**: Utilizes in-memory storage for development and production-ready interfaces for cloud services.
+- **Python Pipeline Backend**: Modular Python services for advanced functionalities like DTCG validation, canonical assembly, semantic search, safety hardening, and material intelligence.
+- **Material Intelligence Panel**: Interactive UI component in the Style Inspector for analyzing material properties, viewing detected components, and exploring matched recipes with layer topology and interaction bindings.
+- **Image Service Migration**: `server/image-service.ts` functions (storeImage, getImage, migrateStyleImages) are deprecated in favor of `server/object-image-service.ts`. Admin endpoints `/api/admin/migrate-to-object-storage` and `/api/admin/migration-status` facilitate migrating existing `imageAssets` table data to `objectAssets` table with Object Storage backing.
 
 ## External Dependencies
 
 ### AI Services
-- **Replit AI Integrations**: Provides Google Gemini API access.
+- **Replit AI Integrations**: For Google Gemini API access.
+- **Google Cloud Vision API**: For production-grade image analysis (labels, colors, objects, text, safe search).
+- **Prodia AI**: For fast image generation (Flux Fast Schnell model).
 
 ### Database
-- **PostgreSQL**: Primary data store.
+- **PostgreSQL**: The primary relational database.
 
 ### UI Components
-- **shadcn/ui**: Component library based on Radix UI.
+- **shadcn/ui**: Component library.
 - **Radix UI**: Accessible UI primitives.
 - **Lucide React**: Icon library.
 
 ### Development Tools
-- **Vite**: Frontend build and dev server.
+- **Vite**: Frontend build tool.
 - **Drizzle Kit**: Database schema management.
 - **esbuild**: Server bundling.

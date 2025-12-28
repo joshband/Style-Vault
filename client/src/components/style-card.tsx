@@ -48,10 +48,13 @@ const StyleCardComponent = memo(function StyleCard({ style, className, onDelete 
         entries.forEach((entry) => {
           if (entry.isIntersecting && !hasPreloaded.current) {
             hasPreloaded.current = true;
-            const fullImageUrl = style.imageIds?.ui_software_app
-              ? `/api/images/${style.imageIds.ui_software_app}`
+            // Prioritize preview images that match the source style aesthetic
+            const fullImageUrl = style.imageIds?.preview_portrait
+              ? `/api/images/${style.imageIds.preview_portrait}`
               : style.imageIds?.preview_landscape 
               ? `/api/images/${style.imageIds.preview_landscape}`
+              : style.imageIds?.preview_still_life
+              ? `/api/images/${style.imageIds.preview_still_life}`
               : style.imageIds?.reference
               ? `/api/images/${style.imageIds.reference}`
               : null;
@@ -163,17 +166,22 @@ const StyleCardComponent = memo(function StyleCard({ style, className, onDelete 
             }}
             transition={{ duration: 0.2, ease: "easeOut" }}
           >
-            {/* Preview Image - prioritize ui_software_app as primary thumbnail */}
+            {/* Preview Image - prioritize UI software app (core purpose of tool) then fallback to other previews */}
+            {/* Use ?size=thumb for vault view (optimized 300px WebP) to reduce bandwidth */}
             <div className="relative aspect-[16/10] bg-muted overflow-hidden">
-              {(style.imageIds?.ui_software_app || style.imageIds?.preview_landscape || style.imageIds?.reference || style.thumbnailPreview) ? (
+              {(style.imageIds?.ui_software_app || style.imageIds?.preview_portrait || style.imageIds?.preview_landscape || style.imageIds?.preview_still_life || style.imageIds?.reference || style.thumbnailPreview) ? (
                 <img 
                   src={
                     style.imageIds?.ui_software_app
-                      ? `/api/images/${style.imageIds.ui_software_app}?size=medium`
+                      ? `/api/images/${style.imageIds.ui_software_app}?size=thumb`
+                      : style.imageIds?.preview_portrait
+                      ? `/api/images/${style.imageIds.preview_portrait}?size=thumb`
                       : style.imageIds?.preview_landscape 
-                      ? `/api/images/${style.imageIds.preview_landscape}?size=medium`
+                      ? `/api/images/${style.imageIds.preview_landscape}?size=thumb`
+                      : style.imageIds?.preview_still_life
+                      ? `/api/images/${style.imageIds.preview_still_life}?size=thumb`
                       : style.imageIds?.reference
-                      ? `/api/images/${style.imageIds.reference}?size=medium`
+                      ? `/api/images/${style.imageIds.reference}?size=thumb`
                       : style.thumbnailPreview!
                   } 
                   alt={style.name}
@@ -181,67 +189,34 @@ const StyleCardComponent = memo(function StyleCard({ style, className, onDelete 
                   draggable={false}
                   loading="lazy"
                   decoding="async"
-                  width={640}
-                  height={400}
+                  width={300}
+                  height={188}
                 />
               ) : (
                 <div className="flex-1 h-full bg-muted" />
               )}
             </div>
 
-            {/* Content */}
-            <div className="p-4 flex flex-col gap-2">
+            {/* Content - Editorial minimalism: image, name, description, date */}
+            <div className="p-4 flex flex-col gap-1.5">
               <h3 className="font-serif font-medium text-base leading-tight text-foreground">
                 {style.name}
               </h3>
               
-              <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
+              <p className="text-sm text-muted-foreground line-clamp-1 leading-relaxed">
                 {style.description}
               </p>
 
-              {style.keywords && style.keywords.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-1" data-testid={`tags-style-${style.id}`}>
-                  {style.keywords.slice(0, 4).map((keyword, idx) => (
-                    <span 
-                      key={idx}
-                      className="px-1.5 py-0.5 text-[10px] bg-muted text-muted-foreground rounded-md"
-                    >
-                      {keyword}
-                    </span>
-                  ))}
-                  {style.keywords.length > 4 && (
-                    <span className="px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                      +{style.keywords.length - 4}
-                    </span>
-                  )}
-                </div>
-              )}
-
-              <div className="flex items-center justify-between mt-1">
-                <time 
-                  dateTime={style.createdAt}
-                  className="text-xs text-muted-foreground/70"
-                >
-                  {new Date(style.createdAt).toLocaleDateString(undefined, { 
-                    month: 'long', 
-                    day: 'numeric',
-                    year: 'numeric'
-                  })}
-                </time>
-                {style.creatorName && style.creatorId && (
-                  <span
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      navigate(`/creator/${style.creatorId}`);
-                    }}
-                    className="text-xs text-primary hover:underline cursor-pointer"
-                    data-testid={`link-creator-${style.creatorId}`}
-                  >
-                    by {style.creatorName}
-                  </span>
-                )}
-              </div>
+              <time 
+                dateTime={style.createdAt}
+                className="text-xs text-muted-foreground/60 mt-1"
+              >
+                {new Date(style.createdAt).toLocaleDateString(undefined, { 
+                  month: 'short', 
+                  day: 'numeric',
+                  year: 'numeric'
+                })}
+              </time>
             </div>
           </motion.div>
         </Link>

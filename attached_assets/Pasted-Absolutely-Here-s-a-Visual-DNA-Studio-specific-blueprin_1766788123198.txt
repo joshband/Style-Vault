@@ -1,0 +1,211 @@
+Absolutely. Here’s a **Visual DNA Studio–specific blueprint** that’s opinionated, pragmatic, and aligned with where your repo already is—without turning it into a science project or bloating it into Copy-That-Lite.
+
+---
+
+## Visual DNA Studio: Purpose-Built Token Intelligence (Not a Monolith)
+
+**Hard truth:** Visual DNA Studio should *not* try to compete with Copy-That on depth. Its value is speed, clarity, and trust. It should feel like a precision instrument, not a lab bench.
+
+Think of it as **“Token First Contact.”**
+
+---
+
+## What Visual DNA Studio *Is* (and Should Stay)
+
+A lightweight system that:
+
+* Accepts **one reference image**
+* Extracts a **complete, standards-compliant DTCG 2025.10 token set**
+* Treats that token JSON as the **canonical artifact**
+* Uses images only as *evidence*, never as state
+
+This makes it:
+
+* Fast enough for Replit
+* Legible to designers
+* Trustworthy to engineers
+
+---
+
+## Architecture Tailored to Your Repo
+
+### 1. Make Tokens the Only Source of Truth (No Exceptions)
+
+**Rule:**
+If it’s not in `style.tokens.json`, it doesn’t exist.
+
+**Concrete changes:**
+
+* Every style has exactly one immutable token file:
+
+  ```
+  /styles/{styleId}/tokens.dtcg.json
+  ```
+* Images are *linked*, not embedded.
+* All UI views read from tokens—not derived state.
+
+**Why this matters:**
+It prevents “UI drift” and keeps Visual DNA Studio honest.
+
+---
+
+### 2. Token Completeness > Token Accuracy (At This Stage)
+
+Your app should always emit a **full DTCG surface area**, even when confidence is low.
+
+That means:
+
+* Colors, spacing, typography, radii, shadows, opacity, depth, motion
+* Composite types populated with inferred defaults
+* Confidence metadata stored in `$extensions.visualDNA.confidence`
+
+Example:
+
+```json
+{
+  "spacing": {
+    "md": {
+      "value": "12px",
+      "$extensions": {
+        "visualDNA": { "confidence": 0.63 }
+      }
+    }
+  }
+}
+```
+
+This allows:
+
+* Honest UI messaging
+* Future reprocessing
+* Downstream automation
+
+---
+
+### 3. Treat CV as a *Resolver*, Not an Oracle
+
+In Visual DNA Studio:
+
+* CV **suggests**
+* Heuristics **stabilize**
+* Tokens **decide**
+
+Your current lightweight OpenCV approach is correct. Do *not* introduce ML-heavy models here.
+
+Recommended breakdown:
+
+* **Color:** k-means + perceptual clustering (ColorAide)
+* **Spacing:** bounding box deltas → histogram → mode collapse
+* **Typography:** size clustering + contrast heuristics
+* **Shadows:** edge halos + luminance gradients
+* **Depth:** simple monocular heuristic (blur + occlusion)
+
+If a signal is weak—emit it anyway, tagged with low confidence.
+
+---
+
+### 4. Storage: Hybrid, But Opinionated
+
+You already outlined this—and it’s the right call.
+
+**Canonical store:**
+
+* Object storage for images
+* Postgres for metadata + token JSON
+
+**Never store:**
+
+* Base64 images
+* Derived previews
+* Token subsets
+
+**Always serve:**
+
+* Thumb URLs only for grids
+* Medium URLs for inspection
+* Originals only for reprocessing
+
+---
+
+### 5. UI Should Feel Editorial, Not Analytical
+
+Your Explorer view instinct is right.
+
+Cards should show:
+
+* Image
+* Name
+* One-line aesthetic description
+* Date
+
+**No chips. No tags. No metrics.**
+
+Token inspection belongs in a **secondary, deliberate view**—not the browsing surface.
+
+This reinforces the core idea:
+
+> *Styles are visual artifacts, not datasets.*
+
+---
+
+### 6. Confidence Is a First-Class Concept
+
+This is where Visual DNA Studio can outshine everything else.
+
+Expose:
+
+* Overall extraction confidence
+* Token-category confidence
+* Clear messaging when something is inferred vs observed
+
+This builds trust faster than “AI magic.”
+
+---
+
+## What You Should Explicitly *Not* Add (Yet)
+
+Be ruthless here:
+
+* ❌ Component inference
+* ❌ Token-to-code exporters
+* ❌ ML segmentation models
+* ❌ Live editing of tokens
+* ❌ Prompt-based style creation
+
+Those belong in Copy-That.
+
+Visual DNA Studio is the *gate*, not the factory.
+
+---
+
+## The Strategic Positioning (Why This Works)
+
+Visual DNA Studio becomes:
+
+* A **design intelligence intake layer**
+* A **style vault**
+* A **token provenance system**
+
+Copy-That becomes:
+
+* The heavy transformer
+* The generative engine
+* The research platform
+
+This separation is not a compromise. It’s leverage.
+
+---
+
+## Next High-Impact Move (1–2 days of work)
+
+If you do nothing else:
+
+1. Enforce **full DTCG emission** every time
+2. Add confidence metadata everywhere
+3. Strip Explorer UI down to editorial minimalism
+
+That alone will make the app feel *intentional*, not experimental.
+
+---
+
+This repo is already pointed in the right direction. The win now is restraint—clarity beats cleverness at this stage.

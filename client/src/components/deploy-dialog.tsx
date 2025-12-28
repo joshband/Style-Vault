@@ -1,11 +1,11 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
-import { Rocket, Copy, Download, Check, ExternalLink, FileCode, Terminal, Globe } from "lucide-react";
+import { Rocket, Copy, Download, Check, ExternalLink, FileCode, Terminal, Globe, Zap, Github, Cloud, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { exportTokens } from "@/lib/token-pipeline";
 import { initializeExporters } from "@/lib/exporters";
@@ -25,6 +25,10 @@ interface PlatformConfig {
   color: string;
   description: string;
   docsUrl: string;
+  oneClickUrl?: string;
+  cliInstall: string;
+  loginCmd: string;
+  deployCmd: string;
 }
 
 const PLATFORMS: PlatformConfig[] = [
@@ -35,6 +39,10 @@ const PLATFORMS: PlatformConfig[] = [
     color: 'bg-black text-white',
     description: 'Zero-config deployments for Next.js, React, and more',
     docsUrl: 'https://vercel.com/docs',
+    oneClickUrl: 'https://vercel.com/new',
+    cliInstall: 'npm i -g vercel',
+    loginCmd: 'vercel login',
+    deployCmd: 'vercel --prod',
   },
   {
     id: 'netlify',
@@ -43,6 +51,82 @@ const PLATFORMS: PlatformConfig[] = [
     color: 'bg-[#00AD9F] text-white',
     description: 'Build, deploy, and scale modern web projects',
     docsUrl: 'https://docs.netlify.com/',
+    oneClickUrl: 'https://app.netlify.com/drop',
+    cliInstall: 'npm i -g netlify-cli',
+    loginCmd: 'netlify login',
+    deployCmd: 'netlify deploy --prod',
+  },
+  {
+    id: 'cloudflare',
+    name: 'Cloudflare Pages',
+    logo: '☁',
+    color: 'bg-[#F6821F] text-white',
+    description: 'Fast, secure sites with unlimited bandwidth',
+    docsUrl: 'https://developers.cloudflare.com/pages/',
+    oneClickUrl: 'https://dash.cloudflare.com/?to=/:account/pages/new',
+    cliInstall: 'npm i -g wrangler',
+    loginCmd: 'wrangler login',
+    deployCmd: 'wrangler pages deploy dist',
+  },
+  {
+    id: 'railway',
+    name: 'Railway',
+    logo: '🚂',
+    color: 'bg-[#0B0D0E] text-white',
+    description: 'Deploy from GitHub or CLI in seconds',
+    docsUrl: 'https://docs.railway.app/',
+    oneClickUrl: 'https://railway.app/new',
+    cliInstall: 'npm i -g @railway/cli',
+    loginCmd: 'railway login',
+    deployCmd: 'railway up',
+  },
+  {
+    id: 'render',
+    name: 'Render',
+    logo: '◉',
+    color: 'bg-[#46E3B7] text-black',
+    description: 'Cloud application hosting with free SSL',
+    docsUrl: 'https://render.com/docs',
+    oneClickUrl: 'https://dashboard.render.com/select-repo?type=static',
+    cliInstall: 'npm i -g render-cli',
+    loginCmd: 'render login',
+    deployCmd: 'render deploy',
+  },
+  {
+    id: 'github-pages',
+    name: 'GitHub Pages',
+    logo: '🐙',
+    color: 'bg-[#24292e] text-white',
+    description: 'Free static hosting directly from your GitHub repo',
+    docsUrl: 'https://docs.github.com/en/pages',
+    oneClickUrl: 'https://github.com/new',
+    cliInstall: 'npm i -g gh-pages',
+    loginCmd: 'gh auth login',
+    deployCmd: 'gh-pages -d dist',
+  },
+  {
+    id: 'surge',
+    name: 'Surge',
+    logo: '⚡',
+    color: 'bg-[#FF5A5F] text-white',
+    description: 'Simple, single-command static web publishing',
+    docsUrl: 'https://surge.sh/help/',
+    oneClickUrl: 'https://surge.sh/',
+    cliInstall: 'npm i -g surge',
+    loginCmd: 'surge login',
+    deployCmd: 'surge dist',
+  },
+  {
+    id: 'firebase',
+    name: 'Firebase Hosting',
+    logo: '🔥',
+    color: 'bg-[#FFCA28] text-black',
+    description: 'Fast and secure hosting with global CDN by Google',
+    docsUrl: 'https://firebase.google.com/docs/hosting',
+    oneClickUrl: 'https://console.firebase.google.com/',
+    cliInstall: 'npm i -g firebase-tools',
+    loginCmd: 'firebase login',
+    deployCmd: 'firebase deploy --only hosting',
   },
 ];
 
@@ -110,8 +194,10 @@ function generatePackageJson(styleName: string, tokens: Record<string, any>): st
 }
 
 function generateReadme(styleName: string, platform: string): string {
-  const platformName = platform === 'vercel' ? 'Vercel' : 'Netlify';
-  const deployCommand = platform === 'vercel' ? 'vercel' : 'netlify deploy --prod';
+  const platformConfig = PLATFORMS.find(p => p.id === platform);
+  const platformName = platformConfig?.name || platform;
+  const deployCommand = platformConfig?.deployCmd || `${platform} deploy`;
+  const cliInstall = platformConfig?.cliInstall || `npm i -g ${platform}`;
   
   return `# ${styleName} Design Tokens
 
@@ -121,29 +207,41 @@ Generated by Visual DNA Studio
 
 ### Prerequisites
 - Node.js 18+ installed
-- ${platformName} CLI installed (\`npm i -g ${platform}\`)
+- ${platformName} CLI installed (\`${cliInstall}\`)
 - ${platformName} account
 
 ### Steps
 
-1. **Initialize the project:**
+1. **Extract the bundle:**
+   \`\`\`bash
+   unzip ${styleName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${platform}-bundle.zip -d ${styleName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-theme
+   cd ${styleName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-theme
+   \`\`\`
+
+2. **Install dependencies:**
    \`\`\`bash
    npm install
    \`\`\`
 
-2. **Deploy:**
+3. **Deploy:**
    \`\`\`bash
    ${deployCommand}
    \`\`\`
 
-3. **Follow the CLI prompts** to link your ${platformName} account
+4. **Follow the CLI prompts** to link your ${platformName} account
+
+## One-Click Deploy Option
+
+You can also drag and drop the \`dist\` folder directly to:
+${platformConfig?.oneClickUrl ? `- ${platformConfig.oneClickUrl}` : '- Your platform dashboard'}
 
 ## Files Included
 
 - \`tokens.css\` - CSS custom properties
 - \`tokens.json\` - W3C DTCG format tokens
 - \`theme.ts\` - TypeScript theme object
-- \`${platform === 'vercel' ? 'vercel.json' : 'netlify.toml'}\` - Platform configuration
+- \`index.html\` - Preview page with your tokens
+- Platform configuration file
 
 ## Usage
 
@@ -159,10 +257,185 @@ Or use the TypeScript theme:
 import { theme } from './theme';
 \`\`\`
 
+## Token Categories
+
+This bundle includes design tokens for:
+- Colors (primary, secondary, accent, neutrals)
+- Typography (font families, sizes, weights)
+- Spacing (consistent spacing scale)
+- Border radius (rounded corners)
+- Shadows (elevation levels)
+- Motion (animations and transitions)
+
 ---
 
 Created with [Visual DNA Studio](https://visualdna.studio)
 `;
+}
+
+function generateIndexHtml(styleName: string, tokens: Record<string, any>): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${styleName} - Design Tokens</title>
+  <link rel="stylesheet" href="tokens.css">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { 
+      font-family: var(--typography-font-family-sans, system-ui, sans-serif);
+      background: var(--color-background, #fafafa);
+      color: var(--color-text, #1a1a1a);
+      padding: 2rem;
+      min-height: 100vh;
+    }
+    .container { max-width: 1200px; margin: 0 auto; }
+    h1 { 
+      font-size: 2.5rem; 
+      margin-bottom: 0.5rem;
+      color: var(--color-primary, #3b82f6);
+    }
+    .subtitle { 
+      color: var(--color-text-muted, #666); 
+      margin-bottom: 2rem;
+    }
+    .section { 
+      background: var(--color-surface, white);
+      border-radius: var(--border-radius-lg, 12px);
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: var(--shadow-md, 0 4px 6px rgba(0,0,0,0.1));
+    }
+    .section-title { 
+      font-size: 1.25rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .color-grid { 
+      display: grid; 
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); 
+      gap: 1rem; 
+    }
+    .color-swatch {
+      aspect-ratio: 1;
+      border-radius: var(--border-radius-md, 8px);
+      display: flex;
+      align-items: flex-end;
+      padding: 0.5rem;
+      font-size: 0.75rem;
+      color: white;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    }
+    .typography-sample { margin: 0.5rem 0; }
+    .spacing-row { 
+      display: flex; 
+      align-items: center; 
+      gap: 1rem; 
+      margin: 0.5rem 0;
+    }
+    .spacing-bar { 
+      height: 1.5rem; 
+      background: var(--color-primary, #3b82f6);
+      border-radius: 4px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.25rem 0.75rem;
+      background: var(--color-primary, #3b82f6);
+      color: white;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+    footer { 
+      text-align: center; 
+      margin-top: 3rem; 
+      color: var(--color-text-muted, #666);
+      font-size: 0.875rem;
+    }
+    footer a { color: var(--color-primary, #3b82f6); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>${styleName}</h1>
+      <p class="subtitle">Design Tokens Preview</p>
+    </header>
+
+    <div class="section">
+      <h2 class="section-title">🎨 Colors</h2>
+      <div class="color-grid" id="colors"></div>
+    </div>
+
+    <div class="section">
+      <h2 class="section-title">📝 Typography</h2>
+      <div id="typography"></div>
+    </div>
+
+    <div class="section">
+      <h2 class="section-title">📏 Spacing</h2>
+      <div id="spacing"></div>
+    </div>
+
+    <div class="section">
+      <h2 class="section-title">⬛ Border Radius</h2>
+      <div id="radius" style="display: flex; gap: 1rem; flex-wrap: wrap;"></div>
+    </div>
+
+    <footer>
+      <p>Generated by <a href="https://visualdna.studio" target="_blank">Visual DNA Studio</a></p>
+    </footer>
+  </div>
+
+  <script>
+    const style = getComputedStyle(document.documentElement);
+    
+    const colorVars = ['primary', 'secondary', 'tertiary', 'accent', 'background', 'surface'];
+    const colorsEl = document.getElementById('colors');
+    colorVars.forEach(name => {
+      const value = style.getPropertyValue('--color-' + name).trim();
+      if (value) {
+        const div = document.createElement('div');
+        div.className = 'color-swatch';
+        div.style.backgroundColor = value;
+        div.textContent = name;
+        colorsEl.appendChild(div);
+      }
+    });
+
+    const typographyEl = document.getElementById('typography');
+    const sizes = ['sm', 'base', 'lg', 'xl', '2xl', '3xl'];
+    sizes.forEach(size => {
+      const p = document.createElement('p');
+      p.className = 'typography-sample';
+      p.style.fontSize = 'var(--typography-font-size-' + size + ', 1rem)';
+      p.textContent = size.toUpperCase() + ' - The quick brown fox jumps over the lazy dog';
+      typographyEl.appendChild(p);
+    });
+
+    const spacingEl = document.getElementById('spacing');
+    ['1', '2', '3', '4', '6', '8'].forEach(size => {
+      const row = document.createElement('div');
+      row.className = 'spacing-row';
+      row.innerHTML = '<span style="width: 2rem;">' + size + '</span><div class="spacing-bar" style="width: var(--spacing-' + size + ', ' + (parseInt(size) * 4) + 'px);"></div>';
+      spacingEl.appendChild(row);
+    });
+
+    const radiusEl = document.getElementById('radius');
+    ['sm', 'md', 'lg', 'xl', 'full'].forEach(size => {
+      const div = document.createElement('div');
+      div.style.cssText = 'width: 80px; height: 80px; background: var(--color-primary, #3b82f6); border-radius: var(--border-radius-' + size + ', 8px); display: flex; align-items: center; justify-content: center; color: white; font-size: 0.75rem;';
+      div.textContent = size;
+      radiusEl.appendChild(div);
+    });
+  </script>
+</body>
+</html>`;
 }
 
 export function DeployDialog({ tokens, styleName, trigger }: DeployDialogProps) {
@@ -259,6 +532,106 @@ export function DeployDialog({ tokens, styleName, trigger }: DeployDialogProps) 
     return new Blob(parts, { type: 'application/zip' });
   }, []);
 
+  const generatePlatformConfig = useCallback((platformId: string): { content: string; filename: string } => {
+    switch (platformId) {
+      case 'vercel':
+        return { content: generateVercelConfig(styleName), filename: 'vercel.json' };
+      case 'netlify':
+        return { content: generateNetlifyConfig(styleName), filename: 'netlify.toml' };
+      case 'cloudflare':
+        return {
+          content: `name = "${styleName.toLowerCase().replace(/[^a-z0-9-]/g, '-')}"
+compatibility_date = "${new Date().toISOString().split('T')[0]}"
+
+[site]
+bucket = "./dist"`,
+          filename: 'wrangler.toml',
+        };
+      case 'railway':
+        return {
+          content: JSON.stringify({
+            $schema: 'https://railway.app/railway.schema.json',
+            build: { builder: 'NIXPACKS' },
+            deploy: { restartPolicyType: 'ON_FAILURE' },
+          }, null, 2),
+          filename: 'railway.json',
+        };
+      case 'render':
+        return {
+          content: `services:
+  - type: web
+    name: ${styleName.toLowerCase().replace(/[^a-z0-9-]/g, '-')}-tokens
+    env: static
+    buildCommand: npm run build
+    staticPublishPath: ./dist`,
+          filename: 'render.yaml',
+        };
+      case 'github-pages':
+        return {
+          content: `# GitHub Pages workflow for ${styleName}
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: \${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v4
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: './dist'
+      - uses: actions/deploy-pages@v4
+        id: deployment`,
+          filename: '.github/workflows/deploy.yml',
+        };
+      case 'surge':
+        return {
+          content: `# Surge configuration for ${styleName}
+# Domain will be assigned automatically or specify your own
+# surge dist your-custom-name.surge.sh
+
+project: ${styleName.toLowerCase().replace(/[^a-z0-9-]/g, '-')}-tokens
+domain: ${styleName.toLowerCase().replace(/[^a-z0-9-]/g, '-')}.surge.sh`,
+          filename: 'CNAME',
+        };
+      case 'firebase':
+        return {
+          content: JSON.stringify({
+            hosting: {
+              public: 'dist',
+              ignore: ['firebase.json', '**/.*', '**/node_modules/**'],
+              rewrites: [{ source: '**', destination: '/index.html' }],
+              headers: [
+                {
+                  source: '**',
+                  headers: [
+                    { key: 'X-Content-Type-Options', value: 'nosniff' },
+                    { key: 'X-Frame-Options', value: 'DENY' },
+                  ],
+                },
+              ],
+            },
+          }, null, 2),
+          filename: 'firebase.json',
+        };
+      default:
+        return { content: generateVercelConfig(styleName), filename: 'vercel.json' };
+    }
+  }, [styleName]);
+
   const handleDownloadBundle = useCallback(async () => {
     setDeploying(true);
     
@@ -280,15 +653,14 @@ export function DeployDialog({ tokens, styleName, trigger }: DeployDialogProps) 
         themeContent = `// Theme for ${styleName}\nexport const theme = {};\n`;
       }
       
-      const configContent = platform === 'vercel' 
-        ? generateVercelConfig(styleName)
-        : generateNetlifyConfig(styleName);
-      const configFilename = platform === 'vercel' ? 'vercel.json' : 'netlify.toml';
-      
+      const { content: configContent, filename: configFilename } = generatePlatformConfig(platform);
       const packageJson = generatePackageJson(styleName, tokens);
       const readme = generateReadme(styleName, platform);
+      const indexHtml = generateIndexHtml(styleName, tokens);
       
       const files = [
+        { name: 'dist/index.html', content: indexHtml },
+        { name: 'dist/tokens.css', content: cssContent },
         { name: 'tokens.css', content: cssContent },
         { name: 'tokens.json', content: dtcgContent },
         { name: 'theme.ts', content: themeContent },
@@ -307,20 +679,28 @@ export function DeployDialog({ tokens, styleName, trigger }: DeployDialogProps) 
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       
-      toast.success(`Downloaded ${platform === 'vercel' ? 'Vercel' : 'Netlify'} deployment bundle`);
+      const platformName = PLATFORMS.find(p => p.id === platform)?.name || platform;
+      toast.success(`Downloaded ${platformName} deployment bundle`);
     } catch (error) {
       console.error('Failed to generate bundle:', error);
       toast.error('Failed to generate deployment bundle');
     } finally {
       setDeploying(false);
     }
-  }, [selectedPlatform, styleName, tokens, createZipBundle]);
+  }, [selectedPlatform, styleName, tokens, createZipBundle, generatePlatformConfig]);
+
+  const handleOneClickDeploy = useCallback((platform: PlatformConfig) => {
+    if (platform.oneClickUrl) {
+      window.open(platform.oneClickUrl, '_blank', 'noopener,noreferrer');
+      toast.info(`Opening ${platform.name}. Download the bundle first, then upload it there.`);
+    }
+  }, []);
 
   const platform = PLATFORMS.find(p => p.id === selectedPlatform)!;
-  const configContent = selectedPlatform === 'vercel' 
-    ? generateVercelConfig(styleName)
-    : generateNetlifyConfig(styleName);
-  const configFilename = selectedPlatform === 'vercel' ? 'vercel.json' : 'netlify.toml';
+  const { content: configContent, filename: configFilename } = useMemo(
+    () => generatePlatformConfig(selectedPlatform),
+    [generatePlatformConfig, selectedPlatform]
+  );
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -343,14 +723,20 @@ export function DeployDialog({ tokens, styleName, trigger }: DeployDialogProps) 
           </DialogDescription>
         </DialogHeader>
 
+        <ScrollArea className="flex-1 min-h-0">
         <Tabs value={selectedPlatform} onValueChange={setSelectedPlatform} className="flex-1">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-4 md:grid-cols-8 h-auto gap-1 p-1">
             {PLATFORMS.map(p => (
-              <TabsTrigger key={p.id} value={p.id} className="flex items-center gap-2" data-testid={`tab-${p.id}`}>
-                <span className={`w-5 h-5 rounded flex items-center justify-center text-xs font-bold ${p.color}`}>
+              <TabsTrigger 
+                key={p.id} 
+                value={p.id} 
+                className="flex flex-col items-center gap-1 py-2 px-2 text-xs" 
+                data-testid={`tab-${p.id}`}
+              >
+                <span className={`w-6 h-6 rounded flex items-center justify-center text-sm font-bold ${p.color}`}>
                   {p.logo}
                 </span>
-                {p.name}
+                <span className="truncate max-w-full">{p.name.split(' ')[0]}</span>
               </TabsTrigger>
             ))}
           </TabsList>
@@ -419,16 +805,16 @@ export function DeployDialog({ tokens, styleName, trigger }: DeployDialogProps) 
                 
                 <div className="space-y-2">
                   {[
-                    { step: 1, cmd: `npm i -g ${p.id}`, desc: `Install ${p.name} CLI` },
-                    { step: 2, cmd: p.id === 'vercel' ? 'vercel login' : 'netlify login', desc: 'Authenticate' },
-                    { step: 3, cmd: p.id === 'vercel' ? 'vercel' : 'netlify deploy --prod', desc: 'Deploy' },
+                    { step: 1, cmd: p.cliInstall, desc: `Install CLI` },
+                    { step: 2, cmd: p.loginCmd, desc: 'Authenticate' },
+                    { step: 3, cmd: p.deployCmd, desc: 'Deploy' },
                   ].map(({ step, cmd, desc }) => (
                     <div key={step} className="flex items-center gap-3 p-2 rounded border border-border/50 bg-muted/10">
                       <Badge variant="secondary" className="w-6 h-6 rounded-full p-0 flex items-center justify-center text-xs">
                         {step}
                       </Badge>
-                      <code className="flex-1 text-xs font-mono bg-muted/50 px-2 py-1 rounded">{cmd}</code>
-                      <span className="text-xs text-muted-foreground">{desc}</span>
+                      <code className="flex-1 text-xs font-mono bg-muted/50 px-2 py-1 rounded truncate">{cmd}</code>
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">{desc}</span>
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -453,16 +839,44 @@ export function DeployDialog({ tokens, styleName, trigger }: DeployDialogProps) 
                   ))}
                 </div>
               </div>
+
+              {p.oneClickUrl && (
+                <div className="p-4 rounded-lg border border-dashed border-primary/50 bg-primary/5">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-full bg-primary/10">
+                        <Zap className="w-5 h-5 text-primary" />
+                      </div>
+                      <div>
+                        <h4 className="font-medium text-sm">One-Click Deploy</h4>
+                        <p className="text-xs text-muted-foreground">
+                          Drag & drop the dist folder directly to {p.name}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOneClickDeploy(p)}
+                      data-testid={`button-one-click-${p.id}`}
+                    >
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Open {p.name}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </TabsContent>
           ))}
         </Tabs>
+        </ScrollArea>
 
-        <div className="flex items-center justify-between pt-4 border-t border-border mt-4">
+        <div className="flex flex-col gap-3 pt-4 border-t border-border mt-4">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Globe className="w-4 h-4" />
-            <span>Includes tokens, config, and README</span>
+            <Cloud className="w-4 h-4" />
+            <span>Bundle includes: tokens.css, tokens.json, theme.ts, index.html, config, README</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between">
             <Button
               variant="outline"
               size="sm"
@@ -471,21 +885,34 @@ export function DeployDialog({ tokens, styleName, trigger }: DeployDialogProps) 
             >
               Cancel
             </Button>
-            <Button
-              size="sm"
-              onClick={handleDownloadBundle}
-              disabled={deploying}
-              data-testid="button-download-bundle"
-            >
-              {deploying ? (
-                "Preparing..."
-              ) : (
-                <>
-                  <Download className="w-4 h-4 mr-2" />
-                  Download {platform.name} Bundle
-                </>
+            <div className="flex items-center gap-2">
+              {platform.oneClickUrl && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleOneClickDeploy(platform)}
+                  data-testid="button-open-platform"
+                >
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Open {platform.name}
+                </Button>
               )}
-            </Button>
+              <Button
+                size="sm"
+                onClick={handleDownloadBundle}
+                disabled={deploying}
+                data-testid="button-download-bundle"
+              >
+                {deploying ? (
+                  "Preparing..."
+                ) : (
+                  <>
+                    <Download className="w-4 h-4 mr-2" />
+                    Download Bundle
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>

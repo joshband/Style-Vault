@@ -362,7 +362,7 @@ export function exportToFigma(tokens: Record<string, any>, styleName: string): s
     if (type === 'color' || (typeof value === 'string' && /^#|^rgb|^oklch/.test(value))) {
       resolvedType = 'COLOR';
       resolvedValue = hexToFigmaColor(value);
-    } else if (type === 'dimension' || type === 'spacing' || type === 'borderRadius') {
+    } else if (type === 'dimension' || type === 'spacing' || type === 'radius') {
       resolvedType = 'FLOAT';
       resolvedValue = parseFloat(String(value).replace(/[^\d.-]/g, '')) || 0;
     } else if (typeof value === 'number') {

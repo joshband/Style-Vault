@@ -44,8 +44,7 @@ async function buildAll() {
     ...Object.keys(pkg.dependencies || {}),
     ...Object.keys(pkg.devDependencies || {}),
   ];
-  const esmOnlyPackages = ["p-limit", "p-retry", "nanoid"];
-  const externals = allDeps.filter((dep) => !allowlist.includes(dep) || esmOnlyPackages.includes(dep));
+  const externals = allDeps.filter((dep) => !allowlist.includes(dep));
 
   await esbuild({
     entryPoints: ["server/index.ts"],

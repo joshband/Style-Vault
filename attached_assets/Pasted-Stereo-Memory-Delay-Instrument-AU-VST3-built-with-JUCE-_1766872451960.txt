@@ -1,0 +1,183 @@
+Stereo Memory Delay Instrument (AU / VST3) built with JUCE + Visual DNA Studio
+
+⸻
+
+ROLE & INTENT
+
+You are a senior audio software engineer building a stereo AU/VST3 plugin using JUCE.
+The plugin is a memory-based delay instrument inspired by Chase Bliss Habit, but not a clone.
+It treats time and memory as musical material, not just signal processing.
+
+This plugin is designed first as an instrument, second as an effect.
+
+The UI is generated using Visual DNA Studio, which provides W3C DTCG 2025.10 design tokens extracted from reference imagery and mood boards. Those tokens must drive the JUCE LookAndFeel system.
+
+⸻
+
+PRODUCT GOAL
+
+Build a stereo memory delay plugin that:
+	•	Continuously records incoming audio into a long-form circular memory buffer
+	•	Allows manual and automatic scanning backward through time
+	•	Can play multiple moments from memory simultaneously
+	•	Supports deterministic randomness for DAW-safe offline rendering
+	•	Feels exploratory, restrained, and musical—not technical or clinical
+
+This is not a traditional looper, granular delay, or tape echo.
+It is a time-based collaborator.
+
+⸻
+
+CORE AUDIO ARCHITECTURE REQUIREMENTS
+
+Audio Engine
+	•	JUCE AudioProcessor–based architecture
+	•	Stereo input → stereo output
+	•	Circular memory buffer (minutes long, configurable)
+	•	Dual playhead system:
+	•	Primary playhead: near-present delay
+	•	Secondary playhead: offset deeper into memory (“Spread”)
+
+Time Interaction
+	•	Scan: selects how far back into memory to read
+	•	Manual scan mode
+	•	Automatic scan mode (periodic, seeded randomness)
+	•	Spread: temporal distance between playheads
+	•	Feedback: supports near-infinite feedback without instability
+	•	Mix: dry/wet with dry-kill option
+
+Determinism (Critical)
+	•	All random behaviors must be seeded
+	•	Same seed + same transport state = identical offline render
+	•	No non-deterministic calls inside audio thread
+	•	Explicit reset rules on:
+	•	Transport restart
+	•	Preset load (configurable)
+	•	Manual memory clear only
+
+⸻
+
+FEATURE SCOPE (MVP)
+
+Must Have
+	•	Stereo memory buffer (moderate length)
+	•	Manual + auto scan
+	•	Dual playheads
+	•	Feedback, Mix, Time
+	•	One Character macro controlling modifier intensity
+	•	Full DAW automation support
+	•	Render-safe deterministic behavior
+
+Explicitly Excluded (for MVP)
+	•	Waveform display
+	•	Audio scrubbing
+	•	Snapshot system
+	•	Multi-instance memory sharing
+	•	AI features
+
+⸻
+
+UI / UX PHILOSOPHY (NON-NEGOTIABLE)
+
+Core Principles
+	•	Two-layer UI:
+	•	Play Mode (default): minimal, tactile, performance-first
+	•	Inspect Mode (opt-in): observational, never edits sound
+	•	No waveform editors
+	•	No parameter grids
+	•	No engineering dashboards
+
+Visible Controls (Play Mode)
+
+Limit to 6–8 knobs max:
+	•	Mix
+	•	Time
+	•	Scan
+	•	Spread
+	•	Feedback
+	•	Character
+
+Everything else is contextual or hidden.
+
+⸻
+
+VISUAL DNA STUDIO INTEGRATION (CRITICAL)
+
+Design System Source of Truth
+	•	All UI styling must be driven by Visual DNA Studio
+	•	Use a Visual DNA style JSON conforming to W3C DTCG 2025.10
+	•	Tokens include:
+	•	Color
+	•	Typography
+	•	Spacing
+	•	Radius
+	•	Motion hints
+	•	Material / surface intent
+
+Workflow
+	1.	Select or generate a Visual DNA Studio style:
+	•	Mood: dark, restrained, cinematic, minimal
+	•	Keywords: memory, drift, erosion, time
+	2.	Export full design-token JSON
+	3.	Convert tokens into JUCE LookAndFeel mappings:
+	•	Colors → LookAndFeel colour IDs
+	•	Typography → JUCE Font definitions
+	•	Spacing → layout constants
+	•	Motion → animation timing values
+
+UI Expectations
+	•	Abstract, non-literal visuals
+	•	Subtle motion only, but meaningful and helpful
+	•	No hardware cosplay
+	•	UI should suggest behavior, not explain it
+
+⸻
+
+JUCE UI IMPLEMENTATION REQUIREMENTS
+	•	Custom LookAndFeel class driven by token JSON
+	•	Token loader at plugin initialization
+	•	All spacing, color, font values read from token system
+	•	No hard-coded UI constants
+	•	Parameter attachments via AudioProcessorValueTreeState
+	•	Smooth parameter animations (no jumps)
+
+⸻
+
+TECHNICAL CONSTRAINTS
+	•	Zero or near-zero latency
+	•	No heap allocation in audio thread
+	•	Memory buffers pre-allocated
+	•	Sample-rate independent behavior
+	•	Offline render safe
+	•	macOS + Windows compatible
+
+⸻
+
+OUTPUT EXPECTATIONS FROM YOU (THE AGENT)
+
+Produce:
+	1.	JUCE project structure
+	•	Audio engine
+	•	Memory system
+	•	Determinism layer
+	•	UI layer
+	2.	Clear class responsibilities
+	3.	Token-to-LookAndFeel mapping strategy
+	4.	Parameter list + automation strategy
+	5.	Notes on future expansion paths (maximal version)
+
+Do not:
+	•	Add features not explicitly requested
+	•	Over-engineer UI
+	•	Introduce DAW-style editing metaphors
+
+⸻
+
+DESIGN NORTH STAR
+
+This plugin should feel like:
+
+“I don’t fully understand what it’s doing…
+but it keeps giving me music worth following.”
+
+Build toward that outcome.

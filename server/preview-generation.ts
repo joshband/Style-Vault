@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { logger } from "./logger";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
@@ -192,7 +193,7 @@ Render this subject using${hasTokenColors ? " the Design Token colors above and"
 
     return extractImageFromResponse(response);
   } catch (error) {
-    console.warn(`${type} generation failed:`, error instanceof Error ? error.message : String(error));
+    logger.warn(`${type} preview generation failed`, { module: 'PreviewGeneration', error: error instanceof Error ? error.message : String(error) });
     return null;
   }
 }
@@ -210,7 +211,7 @@ export async function generateCanonicalPreviews(
   // Extract color palette from tokens for inclusion in prompts
   const colorPalette = extractColorPalette(tokens);
   if (colorPalette.length > 0) {
-    console.log(`Preview generation for "${styleName}" using ${colorPalette.length} colors:`, colorPalette.join(", "));
+    logger.info("Preview generation using colors", { module: 'PreviewGeneration', styleName, colorCount: colorPalette.length });
   }
 
   const result: PreviewGenerationResult = {
@@ -270,7 +271,7 @@ export async function generateCanonicalPreviews(
       }
     }
   } catch (error) {
-    console.error("Error in preview generation:", error instanceof Error ? error.message : String(error));
+    logger.error("Error in preview generation", error, { module: 'PreviewGeneration', styleName });
   }
 
   result.successCount = successCount;
@@ -278,9 +279,9 @@ export async function generateCanonicalPreviews(
   
   // Log the result
   if (result.allFailed) {
-    console.warn(`All preview generations failed for style "${styleName}"`);
+    logger.warn("All preview generations failed for style", { module: 'PreviewGeneration', styleName });
   } else if (successCount < 3) {
-    console.log(`Preview generation partial success for "${styleName}": ${successCount}/3 images generated`);
+    logger.info("Preview generation partial success", { module: 'PreviewGeneration', styleName, successCount });
   }
 
   return result;
@@ -307,7 +308,7 @@ function extractImageFromResponse(response: any): string | null {
       }
     }
   } catch (error) {
-    console.warn("Error extracting image from response:", error instanceof Error ? error.message : String(error));
+    logger.warn("Error extracting image from response", { module: 'PreviewGeneration', error: error instanceof Error ? error.message : String(error) });
   }
 
   return null;

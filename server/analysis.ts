@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { logger } from "./logger";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
@@ -149,7 +150,7 @@ Consider: Color palette, lighting, atmosphere, texture, surface qualities, compo
       metadataTags: result.metadataTags || defaultTags,
     };
   } catch (error) {
-    console.error("Error analyzing image:", error);
+    logger.error("Error analyzing image", error, { module: 'Analysis' });
     throw error;
   }
 }

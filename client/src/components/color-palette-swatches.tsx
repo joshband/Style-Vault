@@ -80,7 +80,7 @@ function ColorSwatch({ name, hex, usage }: ColorSwatchProps) {
 }
 
 interface ColorPaletteSwatchesProps {
-  tokens: DTCGTokenGroup;
+  tokens: DTCGTokenGroup | null | undefined;
   className?: string;
 }
 
@@ -101,8 +101,49 @@ const COLOR_USAGE_MAP: Record<string, string> = {
   info: "Info",
 };
 
-function extractColors(tokens: DTCGTokenGroup): { name: string; hex: string; usage: string }[] {
+function oklchToHex(oklchStr: string): string | null {
+  const match = oklchStr.match(/oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\)/);
+  if (!match) return null;
+  
+  const L = parseFloat(match[1]);
+  const C = parseFloat(match[2]);
+  const H = parseFloat(match[3]);
+  
+  const hRad = (H * Math.PI) / 180;
+  const a = C * Math.cos(hRad);
+  const b = C * Math.sin(hRad);
+  
+  const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
+  const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
+  const s_ = L - 0.0894841775 * a - 1.2914855480 * b;
+  
+  const l = l_ ** 3;
+  const m = m_ ** 3;
+  const s = s_ ** 3;
+  
+  let r = +4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s;
+  let g = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s;
+  let bl = -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s;
+  
+  const toSRGB = (x: number) => {
+    const clamped = Math.max(0, Math.min(1, x));
+    const linear = clamped <= 0.0031308 
+      ? 12.92 * clamped 
+      : 1.055 * Math.pow(clamped, 1/2.4) - 0.055;
+    return Math.round(Math.max(0, Math.min(255, linear * 255)));
+  };
+  
+  const rHex = toSRGB(r).toString(16).padStart(2, '0');
+  const gHex = toSRGB(g).toString(16).padStart(2, '0');
+  const bHex = toSRGB(bl).toString(16).padStart(2, '0');
+  
+  return `#${rHex}${gHex}${bHex}`;
+}
+
+function extractColors(tokens: DTCGTokenGroup | null | undefined): { name: string; hex: string; usage: string }[] {
   const colors: { name: string; hex: string; usage: string }[] = [];
+  if (!tokens || typeof tokens !== "object") return colors;
+  
   const seenKeys = new Set<string>();
   
   const colorGroup = tokens.color;
@@ -116,8 +157,18 @@ function extractColors(tokens: DTCGTokenGroup): { name: string; hex: string; usa
     const fullName = prefix ? `${prefix}.${key}` : key;
     
     if (isToken(value) && value.$type === "color") {
-      const hexValue = String(value.$value);
-      if (hexValue.startsWith("#") || hexValue.startsWith("rgb")) {
+      const colorValue = String(value.$value);
+      let hexValue: string | null = null;
+      
+      if (colorValue.startsWith("#")) {
+        hexValue = colorValue;
+      } else if (colorValue.startsWith("rgb")) {
+        hexValue = colorValue;
+      } else if (colorValue.startsWith("oklch")) {
+        hexValue = oklchToHex(colorValue);
+      }
+      
+      if (hexValue) {
         const uniqueKey = fullName;
         if (!seenKeys.has(uniqueKey)) {
           seenKeys.add(uniqueKey);

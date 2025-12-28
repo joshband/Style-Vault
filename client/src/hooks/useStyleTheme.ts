@@ -91,7 +91,7 @@ export function extractThemeFromTokens(tokens: DTCGTokenGroup): StyleTheme {
   const color = tokens.color as DTCGTokenGroup || {};
   const typography = tokens.typography as DTCGTokenGroup || {};
   const spacing = tokens.spacing as DTCGTokenGroup || {};
-  const borderRadius = tokens.borderRadius as DTCGTokenGroup || {};
+  const radius = tokens.radius as DTCGTokenGroup || {};
   const shadow = tokens.shadow as DTCGTokenGroup || {};
   const texture = tokens.texture as DTCGTokenGroup || {};
   const lighting = tokens.lighting as DTCGTokenGroup || {};
@@ -147,11 +147,11 @@ export function extractThemeFromTokens(tokens: DTCGTokenGroup): StyleTheme {
       "3xl": getTokenValue(spacing["3xl"] as DTCGToken, "64px"),
     },
     borderRadius: {
-      none: getTokenValue(borderRadius.none as DTCGToken, "0px"),
-      sm: getTokenValue(borderRadius.sm as DTCGToken, "2px"),
-      md: getTokenValue(borderRadius.md as DTCGToken, "4px"),
-      lg: getTokenValue(borderRadius.lg as DTCGToken, "8px"),
-      full: getTokenValue(borderRadius.full as DTCGToken, "9999px"),
+      none: getTokenValue(radius.none as DTCGToken, "0px"),
+      sm: getTokenValue(radius.sm as DTCGToken, "2px"),
+      md: getTokenValue(radius.md as DTCGToken, "4px"),
+      lg: getTokenValue(radius.lg as DTCGToken, "8px"),
+      full: getTokenValue(radius.full as DTCGToken, "9999px"),
     },
     shadows: {
       xs: parseShadowToken(shadow.xs as DTCGToken, "0 1px 2px rgba(0,0,0,0.05)"),

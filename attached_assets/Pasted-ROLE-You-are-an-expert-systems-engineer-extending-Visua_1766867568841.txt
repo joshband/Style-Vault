@@ -1,0 +1,416 @@
+ROLE
+You are an expert systems engineer extending Visual DNA Studio with a fast, practical
+“Component + Material Intelligence” pipeline.
+
+Goals:
+1) Detect likely UI components (button/knob/slider/card/panel/etc.) and their bounding boxes.
+2) Infer material + layer topology (glass, metal, plastic, emissive, etc.) including texture + opacity cues.
+3) Emit reusable representations as:
+   - W3C DTCG 2025.10 tokens (canonical)
+   - Namespaced extensions for material, texture, and interaction bindings (optional/ignorable)
+4) Integrate into the existing pipeline architecture (add stages + endpoints; do not break existing flows).
+
+Timing:
+- Should be fast. Near-realtime is ideal, but “fast enough for iterative use” is acceptable.
+- Must degrade gracefully when AI calls are slow or fail.
+
+---
+
+NON-NEGOTIABLES
+
+- Must integrate with existing Python CV pipeline + Node/TS API.
+- Must output W3C DTCG-compliant JSON for standard token types.
+- Add extensions under a clear namespace (e.g. material.*, texture.*, components.*, interaction.*).
+- Must be explainable and debuggable (store intermediate artifacts + metrics).
+- Prefer deterministic CV and lightweight heuristics; AI is for semantic compression, not magic.
+
+---
+
+HIGH-LEVEL PIPELINE (NEW OPTIONAL STAGES)
+
+Image Upload
+ → Stage 0: Existing CV token extraction (colors/spacing/radius/grid/elevation/strokes/etc.)
+ → Stage 1: Component Detection (NEW, CV-first + optional AI)
+ → Stage 2: Material Signals (NEW, deterministic)
+ → Stage 3: Texture Signals (NEW, deterministic)
+ → Stage 4: Recipe Match + Synthesis (NEW, deterministic)
+ → Stage 5: AI Semantic Compression (optional, fast model)
+ → Stage 6: Canonical Token Assembly (existing, extend with namespaced fields)
+ → Persist lineage + intermediate artifacts (existing provenance concept)
+
+---
+
+STEP 1 — COMPONENT DETECTION (FAST, PRACTICAL)
+
+Create:
+  python/components/detect.py
+
+Implement a two-tier approach:
+
+A) Deterministic CV proposals (default path)
+- Preprocess: resize to max 1024 px on longest edge
+- Edge map (Canny), morphology close/open
+- Find contours + rectangles
+- Filter by area, aspect ratio, solidity
+- Cluster rectangles into likely component candidates
+- Derive component “shape features”:
+  - roundness, corner radius estimate
+  - symmetry
+  - gradient presence
+  - icon/text presence (optional quick OCR later)
+
+Output candidates:
+[
+  {
+    "id": "c1",
+    "bbox": [x, y, w, h],
+    "shape": {"roundness": 0.78, "radiusHint": 12, "rectangularity": 0.92},
+    "visual": {"hasText": false, "hasIcon": true, "dominantGradient": true}
+  },
+  ...
+]
+
+B) Optional AI classification (only if enabled / budget allows)
+- Send downsampled image + candidate bboxes + shape features
+- Model returns labels from a constrained ontology:
+  ["button", "knob", "slider", "toggle", "card", "panel", "tab", "input", "badge", "unknown"]
+- No prose, no new categories
+
+If AI fails:
+- Keep candidates as "unknown" but still usable.
+
+---
+
+STEP 2 — MATERIAL SIGNAL EXTRACTION (DETERMINISTIC)
+
+Create:
+  python/material/signals.py
+
+Compute global + per-component material cues:
+- translucency_score (0..1)
+  - edge softness (Laplacian variance, edge falloff)
+  - local contrast attenuation (compare inside bbox vs immediate outside ring)
+- specular_density (0..1)
+  - count of high-luma pixels with strong gradients
+  - directionality of highlights (Hough line hints / oriented gradients)
+- emission_score (0..1)
+  - halo detection: bright pixels bleeding beyond shape boundary
+  - saturation spikes near edges / internal cores
+- depth_shadow_complexity
+  - estimate shadow layers using shadow-like regions below/around components
+
+Return:
+{
+  "global": {...},
+  "perComponent": {"c1": {...}, ...}
+}
+
+---
+
+STEP 3 — TEXTURE SIGNAL EXTRACTION (DETERMINISTIC)
+
+Create:
+  python/texture/signals.py
+
+Extract texture cues (global + per-component) using light classic features:
+- texture_grain (0..1)
+  - high-frequency energy ratio (FFT band energy or Laplacian energy)
+- microcontrast (0..1)
+  - local contrast statistics (CLAHE delta proxy)
+- anisotropy (0..1)
+  - oriented gradient histogram concentration (brushed metal / fabric hints)
+- noise_type_hint (categorical)
+  - ["none", "film_grain", "dither", "speckle", "patterned"]
+- pattern_period_hint (optional)
+  - detect repeating patterns (autocorrelation peak)
+
+Return compact values; keep it cheap.
+
+---
+
+STEP 4 — MATERIAL RECIPE LIBRARY (CORE FEATURE)
+
+Create:
+  python/material/recipes.py
+
+Define a recipe library that includes:
+- expected signal ranges for material + texture + opacity
+- default layer topology
+- default interaction binding hypotheses
+- default token suggestions
+
+Schema:
+
+MATERIAL_RECIPES = [
+  {
+    "id": "glassmorphic_emissive",
+    "label": "Glassmorphic (Emissive)",
+    "signal_profile": {
+      "translucency": [0.55, 1.0],
+      "specular": [0.55, 1.0],
+      "emission": [0.25, 1.0],
+      "texture_grain": [0.0, 0.35],
+      "anisotropy": [0.0, 0.35]
+    },
+    "layer_topology": [
+      "shadow_ambient",
+      "shadow_contact",
+      "glass_body",
+      "frost_noise",
+      "reflection_ramp",
+      "specular_highlight",
+      "internal_glow",
+      "bezel_optional"
+    ],
+    "material_tokens": {
+      "material.type": "glass",
+      "material.finish": "frosted",
+      "material.translucency": 0.7,
+      "material.reflection.strength": 0.6,
+      "material.refraction.hint": 0.2
+    },
+    "texture_tokens": {
+      "texture.kind": "frost_noise",
+      "texture.grain": 0.2,
+      "texture.scale": 0.6
+    },
+    "opacity_tokens": {
+      "opacity.surface": 0.35,
+      "opacity.glowMax": 0.9
+    },
+    "interaction_hypotheses": [
+      {"input": "value", "target": "material.emission.intensity", "curve": "easeOut"},
+      {"input": "hover", "target": "shadow.elevation", "curve": "easeInOut"},
+      {"input": "press", "target": "specular.intensity", "curve": "easeOut"}
+    ]
+  },
+
+  {
+    "id": "anodized_metal_brushed",
+    "label": "Anodized Metal (Brushed)",
+    "signal_profile": {
+      "translucency": [0.0, 0.2],
+      "specular": [0.45, 0.95],
+      "emission": [0.0, 0.2],
+      "texture_grain": [0.1, 0.6],
+      "anisotropy": [0.4, 1.0]
+    },
+    "layer_topology": [
+      "shadow_ambient",
+      "metal_base",
+      "anisotropic_sheen",
+      "edge_highlight",
+      "engraving_optional"
+    ],
+    "material_tokens": {
+      "material.type": "metal",
+      "material.finish": "anodized",
+      "material.anisotropy": 0.7,
+      "material.reflectivity": 0.55
+    },
+    "texture_tokens": {
+      "texture.kind": "brushed",
+      "texture.grain": 0.35,
+      "texture.directionality": 0.8
+    },
+    "opacity_tokens": {
+      "opacity.surface": 1.0
+    },
+    "interaction_hypotheses": [
+      {"input": "hover", "target": "highlight.intensity", "curve": "linear"}
+    ]
+  },
+
+  {
+    "id": "soft_plastic_led_diffuse",
+    "label": "Soft Plastic (LED Diffuse)",
+    "signal_profile": {
+      "translucency": [0.1, 0.45],
+      "specular": [0.15, 0.55],
+      "emission": [0.2, 0.95],
+      "texture_grain": [0.0, 0.4],
+      "anisotropy": [0.0, 0.35]
+    },
+    "layer_topology": [
+      "shadow_ambient",
+      "shadow_contact",
+      "plastic_body",
+      "soft_specular",
+      "internal_led_glow"
+    ],
+    "material_tokens": {
+      "material.type": "plastic",
+      "material.finish": "soft_touch",
+      "material.emission.diffusion": 0.85
+    },
+    "texture_tokens": {
+      "texture.kind": "micro_matte",
+      "texture.grain": 0.15
+    },
+    "opacity_tokens": {
+      "opacity.surface": 0.95,
+      "opacity.glowMax": 0.85
+    },
+    "interaction_hypotheses": [
+      {"input": "value", "target": "material.emission.intensity", "curve": "easeIn"}
+    ]
+  }
+]
+
+Implement:
+- score_recipe(signals) → score in [0..1]
+- match_best_recipe(global_signals, per_component_signals) → best recipe + confidence
+- optionally allow different recipes per component (if confidence differs strongly)
+
+---
+
+STEP 5 — AI SEMANTIC COMPRESSION (OPTIONAL, STRICT)
+
+Create:
+  server/ai/materialClassify.ts (or equivalent existing ai helper)
+
+Use fast model (gemini-2.5-flash if already integrated).
+Input:
+- image (downsampled)
+- CV component candidates + features
+- global/per-component signal vectors
+- allowed ontologies for:
+  - component labels
+  - material classes
+  - illumination models
+  - texture kinds
+  - interaction intent
+
+Output STRICT JSON only. No prose.
+
+Time out gracefully; never block saving a style.
+
+---
+
+STEP 6 — TOKEN + REPRESENTATION OUTPUT
+
+Add three outputs:
+
+A) DTCG Tokens (canonical)
+- continue assembling existing tokens
+- add any new standard tokens where possible:
+  - opacity tokens as numbers
+  - shadows as shadow composites if you already support them
+
+B) Namespaced Extensions (optional/portable)
+- components.*:
+  components.c1.bbox, components.c1.type, components.c1.confidence
+- material.*:
+  material.type, material.finish, material.translucency, material.reflectivity, material.emission.*
+- texture.*:
+  texture.kind, texture.grain, texture.anisotropy, texture.scale
+- interaction.*:
+  interaction.bindings[] as objects with input/target/curve
+
+Ensure these extensions do not break validators:
+- keep them under a single extension namespace root or clear prefixes
+- mark them as $type "object" where necessary
+
+Example extension token pattern:
+{
+  "material.type": { "$value": "glass", "$type": "string" },
+  "texture.grain": { "$value": 0.2, "$type": "number" },
+  "components.c1": { "$value": { "bbox":[...], "type":"button", "confidence":0.74 }, "$type":"object" }
+}
+
+---
+
+STEP 7 — API ENDPOINTS
+
+Add endpoints (do not remove existing ones):
+
+POST /api/pipeline/components
+- input: image
+- output: component candidates + labels (if available)
+
+POST /api/pipeline/material-signature
+- input: image (+ optional components)
+- output: signals, recipe match, material+texture+opacity tokens, interaction bindings, timings
+
+POST /api/pipeline/enrich-style
+- orchestrates: components → material-signature → existing assemble
+- returns enriched canonical style artifact
+
+All endpoints must return timing metadata and stage status.
+
+---
+
+STEP 8 — FRONTEND (FAST INSPECTION UX)
+
+In Style Inspector:
+- add “Components” overlay view:
+  - draw bounding boxes + labels
+  - allow selecting a component to show its recipe + signals
+- add “Material” panel:
+  - recipe label + confidence
+  - key signals (translucency/emission/specular/texture_grain/anisotropy)
+  - derived interaction intent + bindings (read-only)
+
+No editing in this phase.
+
+---
+
+PERSISTENCE + LINEAGE
+
+Store intermediate artifacts for audit/debug:
+- component candidates JSON
+- signal vectors JSON
+- recipe match JSON
+- AI result JSON (if used)
+- stage timing + version info
+
+Attach these to the style’s lineage/provenance record (existing concept).
+
+---
+
+SUCCESS CRITERIA
+
+- Component detection provides reasonable boxes for common UI controls
+- Material/texture/opacity signals are stable across similar images
+- Recipe matching produces consistent labels + sensible defaults
+- Pipeline remains usable even if AI is disabled
+- Output tokens are reusable by exporters and by image prompt scaffolding
+
+---
+
+NON-GOALS (FOR THIS PHASE)
+
+- Perfect component segmentation
+- Pixel-perfect reconstruction of materials
+- Full animation extraction (only bindings + intent)
+- GPU shader generation
+
+---
+
+IMPLEMENTATION INSTRUCTIONS
+
+1) Add the new python modules and wire them into the existing python pipeline server.
+2) Add the new Node/Express endpoints and connect them to the python pipeline HTTP API.
+3) Add frontend inspector panels and overlay visualization.
+4) Add tests:
+   - unit tests for signal extractors and recipe scoring
+   - contract tests for endpoint JSON schemas
+5) Ensure everything runs locally on Replit reliably.
+
+DELIVERABLES
+
+- New files:
+  python/components/detect.py
+  python/material/signals.py
+  python/texture/signals.py
+  python/material/recipes.py
+- New endpoints:
+  /api/pipeline/components
+  /api/pipeline/material-signature
+  /api/pipeline/enrich-style
+- Frontend additions:
+  Component overlay + Material panel
+- Documentation:
+  Explain each heuristic and its tradeoffs; include timing notes.
+
+END.
