@@ -1153,7 +1153,7 @@ export default ${safeName};`;
         {/* === SECTION 2: VISUAL TRUST STRIP === */}
         <section className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Source Image - Trust Signal */}
-          <div className="relative aspect-square rounded-lg overflow-hidden border border-border bg-muted">
+          <div className="relative aspect-square rounded-lg overflow-hidden border border-border bg-neutral-100 dark:bg-neutral-900">
             {(() => {
               const refImageIdSrc = summary.imageIds?.reference 
                 ? `/api/images/${summary.imageIds.reference}?size=medium`
@@ -1164,13 +1164,15 @@ export default ${safeName};`;
               if (refSrc) {
                 return (
                   <>
-                    <img 
-                      src={refSrc} 
-                      alt="Source reference"
-                      className="absolute inset-0 w-full h-full object-cover"
-                      loading="eager"
-                      data-testid="img-source-reference"
-                    />
+                    <div className="absolute inset-0 p-3 flex items-center justify-center">
+                      <img 
+                        src={refSrc} 
+                        alt="Source reference"
+                        className="max-w-full max-h-full object-contain rounded"
+                        loading="eager"
+                        data-testid="img-source-reference"
+                      />
+                    </div>
                     <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/70 text-white text-[10px] font-mono rounded">
                       Source
                     </div>
@@ -1201,7 +1203,7 @@ export default ${safeName};`;
           </div>
           
           {/* Software App UI - Style Output */}
-          <div className="relative aspect-square rounded-lg overflow-hidden border border-border bg-muted">
+          <div className="relative aspect-square rounded-lg overflow-hidden border border-border bg-neutral-100 dark:bg-neutral-900">
             {(() => {
               const uiImageIdSrc = summary.imageIds?.ui_software_app 
                 ? `/api/images/${summary.imageIds.ui_software_app}?size=medium`
@@ -1212,13 +1214,15 @@ export default ${safeName};`;
               if (uiSrc) {
                 return (
                   <>
-                    <img 
-                      src={uiSrc}
-                      alt="Applied UI"
-                      className="absolute inset-0 w-full h-full object-cover"
-                      loading="eager"
-                      data-testid="img-applied-ui"
-                    />
+                    <div className="absolute inset-0 p-3 flex items-center justify-center">
+                      <img 
+                        src={uiSrc}
+                        alt="Applied UI"
+                        className="max-w-full max-h-full object-contain rounded"
+                        loading="eager"
+                        data-testid="img-applied-ui"
+                      />
+                    </div>
                     <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/70 text-white text-[10px] font-mono rounded">
                       Applied
                     </div>
