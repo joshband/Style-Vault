@@ -47,8 +47,8 @@ Visual DNA Studio is a W3C DTCG 2025.10-compliant design token and style explore
 
 | Metric | Value |
 |--------|-------|
-| Database Tables | 14 |
-| API Endpoints | 80+ |
+| Database Tables | 23 |
+| API Endpoints | 102 |
 | Export Formats | 18 |
 | AI Providers | 4 (Gemini, OpenAI, Prodia, GCV) |
 | Metadata Tags | 26 categories |
@@ -124,65 +124,91 @@ sequenceDiagram
     participant U as User
     participant FE as Frontend
     participant API as Express API
-    participant CV as CV Pipeline
-    participant AI as Gemini AI
     participant DB as PostgreSQL
     participant OS as Object Storage
+    participant AI as Gemini/Prodia
 
-    U->>FE: Upload Reference Image
+    U->>FE: Upload Reference Image + Tokens
     FE->>API: POST /api/styles
     
-    API->>OS: Store Reference Image
-    OS-->>API: Image ID
+    Note over API: Validate with insertStyleSchema
+    API->>DB: storage.createStyle()
+    DB-->>API: Style Record (with ID)
     
-    par Token Extraction
-        API->>CV: Extract Tokens (Python)
-        CV-->>API: CV Tokens (color, spacing, etc.)
-    and AI Analysis
-        API->>AI: Analyze Image Style
-        AI-->>API: Style Description + Tags
-    end
-    
-    API->>API: Merge CV + AI Results
-    API->>DB: Create Style Record
-    
-    par Background Tasks
-        API->>AI: Generate Canonical Previews
-        API->>AI: Generate Mood Board
-        API->>AI: Enrich Metadata
-    end
-    
-    API-->>FE: Style Created (ID)
+    API-->>FE: 201 Created (Style ID)
     FE-->>U: Navigate to Style Inspector
+    
+    Note over API: Background Processing (async IIFE)
+    
+    rect rgb(240, 240, 255)
+        API->>OS: storeImageToObjectStorage(reference)
+        OS-->>API: Asset ID
+        API->>DB: Clear referenceImages array
+    end
+    
+    rect rgb(255, 240, 240)
+        alt Prodia Enabled
+            par Parallel Generation
+                API->>AI: generateMoodBoardWithProdia()
+                API->>AI: generateUiConceptsWithProdia()
+            end
+        else Gemini Fallback
+            API->>AI: generateAllMoodBoardAssets()
+        end
+        AI-->>API: Collage + UI Concepts (base64)
+        API->>DB: storage.updateStyleMoodBoard()
+        Note over API: DB persisted first (base64 in columns)
+        API->>OS: storeImageToObjectStorage() x4
+        Note over OS: Creates WebP variants + objectAssets records
+    end
+    
+    rect rgb(240, 255, 240)
+        Note over API: queueStyleForEnrichment (setTimeout 100ms)
+        API->>AI: enrichStyleMetadata()
+        AI-->>API: 26-Category Tags
+        API->>DB: Update metadataTags
+        API->>AI: enrichStyleSpec()
+        AI-->>API: Usage Guidelines
+        API->>DB: Update styleSpec
+    end
 ```
+
+**Note:** Token extraction via CV pipeline is optional and triggered separately through `/api/pipeline/extract-tokens` when `CV_EXTRACTION_ENABLED=true`. The main style creation flow accepts pre-formed tokens from the client.
 
 ### 2.3 Data Flow: Metadata Enrichment
 
 ```mermaid
 sequenceDiagram
-    participant Q as Queue
-    participant W as Worker
-    participant AI as Gemini AI
+    participant Caller as Caller (Route/Background)
+    participant Enrich as enrichStyleMetadata()
+    participant AI as Gemini 2.5 Flash
     participant DB as PostgreSQL
-    participant Cache as Cache
 
-    Q->>W: Style ID (queued)
-    W->>DB: Fetch Style Data
-    DB-->>W: Style + Tokens
+    Caller->>Enrich: queueStyleForEnrichment(styleId)
+    Note over Enrich: setTimeout(100ms) - Async dispatch
+    Enrich->>DB: Set status = "queued"
     
-    W->>AI: Build Enrichment Prompt
-    AI-->>W: 26-Category Tags JSON
+    Enrich->>DB: Fetch Style (tokens, name, description)
+    DB-->>Enrich: Style Data
     
-    W->>W: Normalize Tags
-    W->>DB: Update metadataTags
+    Enrich->>Enrich: Build 26-category prompt
+    Enrich->>AI: ai.models.generateContent()
+    AI-->>Enrich: JSON with tags
     
-    W->>AI: Generate Usage Guidelines
-    AI-->>W: StyleSpec JSON
+    Enrich->>Enrich: parseEnrichmentResponse()
+    Note over Enrich: Normalize tags (lowercase, hyphenate)
     
-    W->>DB: Update styleSpec
-    W->>Cache: Invalidate Style Cache
-    W->>DB: Set status = "complete"
+    Enrich->>DB: storage.updateStyleMetadata()
+    Note over DB: Set metadataTags, status = "complete"
+    
+    Enrich->>Enrich: enrichStyleSpec(styleId)
+    Enrich->>AI: Generate usage guidelines
+    AI-->>Enrich: StyleSpec JSON
+    
+    Enrich->>DB: storage.updateStyleSpec()
 ```
+
+**Implementation Note:** Enrichment uses a simple `setTimeout()` dispatch pattern rather than a persistent job queue. The `queueStyleForEnrichment()` function sets status to "queued" then immediately schedules the actual work via setTimeout. There is also a direct synchronous endpoint `POST /api/styles/:id/enrich` for on-demand enrichment.
 
 ### 2.4 Data Flow: Export Pipeline
 
@@ -365,25 +391,102 @@ erDiagram
 ```typescript
 // server/routes/styles-router.ts
 router.post("/api/styles", async (req, res) => {
-  const validatedData = insertStyleSchema.parse(req.body);
+  const userId = (req.user as any)?.claims?.sub;
+  
+  // 1. Validate input with Zod schema
+  const validatedData = insertStyleSchema.parse({
+    ...req.body,
+    creatorId: userId || null,
+  });
+
+  // 2. Persist to database (synchronous)
   const style = await storage.createStyle(validatedData);
+  cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
   
-  // Background: Store reference image to Object Storage
-  if (refImages?.length > 0) {
-    await storeImageToObjectStorage(refImages[0], "reference", style.id);
-  }
+  // 3. Return immediately - user sees style right away
+  res.status(201).json(style);
   
-  // Background: Generate mood board assets
-  generateAllMoodBoardAssets(style.id);
-  
-  // Background: Queue metadata enrichment
-  queueStyleForEnrichment(style.id);
+  // 4. Background processing (async IIFE - fire and forget)
+  (async () => {
+    // 4a. Migrate ONLY reference image to Object Storage
+    // Note: Dynamic import for tree-shaking
+    const refImages = style.referenceImages as string[] | null;
+    if (refImages?.length > 0 && isValidImageDataUri(refImages[0])) {
+      const { storeImageToObjectStorage } = await import("../object-image-service");
+      await storeImageToObjectStorage(refImages[0], "reference", style.id);
+      await storage.updateStyleFull(style.id, { referenceImages: [] });
+    }
+
+    // 4b. Generate mood board + UI concepts
+    // Note: Dynamic imports for Prodia modules
+    const { isProdiaEnabled } = await import("../prodia-service");
+    if (isProdiaEnabled()) {
+      const { generateMoodBoardWithProdia, generateUiConceptsWithProdia } = 
+        await import("../prodia-generation");
+      const [moodBoardResult, uiResult] = await Promise.all([
+        generateMoodBoardWithProdia({...}),
+        generateUiConceptsWithProdia({...}),
+      ]);
+      moodBoard = { collage: moodBoardResult.collage, status: "complete", history: [] };
+      uiConcepts = { softwareApp: uiResult.softwareApp, ... };
+    } else {
+      const result = await generateAllMoodBoardAssets({...});
+      moodBoard = result.moodBoard;
+      uiConcepts = result.uiConcepts;
+    }
+    
+    // Store to database first
+    await storage.updateStyleMoodBoard(style.id, moodBoard, uiConcepts);
+    cache.delete(CACHE_KEYS.STYLE_DETAIL(style.id));
+    
+    // 4c. THEN store generated images to Object Storage
+    try {
+      const { storeImageToObjectStorage } = await import("../object-image-service");
+      const storePromises: Promise<string>[] = [];
+      if (moodBoard?.collage) {
+        storePromises.push(storeImageToObjectStorage(moodBoard.collage, "mood_board", style.id));
+      }
+      if (uiConcepts?.softwareApp) {
+        storePromises.push(storeImageToObjectStorage(uiConcepts.softwareApp, "ui_software_app", style.id));
+      }
+      if (uiConcepts?.audioPlugin) {
+        storePromises.push(storeImageToObjectStorage(uiConcepts.audioPlugin, "ui_audio_plugin", style.id));
+      }
+      if (uiConcepts?.dashboard) {
+        storePromises.push(storeImageToObjectStorage(uiConcepts.dashboard, "ui_dashboard", style.id));
+      }
+      await Promise.all(storePromises);
+    } catch (storageError) {
+      logger.error("Failed to store images to Object Storage", storageError);
+    }
+    
+    // 4d. Queue metadata enrichment (setTimeout-based)
+    queueStyleForEnrichment(style.id);
+  })().catch(err => logger.error("Background processing failed", err));
 });
 ```
 
-#### Token Assembly Flow
+#### Key Design Decisions
+1. **Immediate Response**: Style is created synchronously; user doesn't wait for AI processing
+2. **Background IIFE**: Fire-and-forget async processing with error logging
+3. **Dynamic Imports**: Prodia/Object Storage modules are dynamically imported to reduce cold start
+4. **Dual Storage**: Generated images are stored in database (base64 in moodBoard/uiConcepts columns) AND in Object Storage (WebP variants via storeImageToObjectStorage)
+5. **Error Isolation**: Object Storage upload failure doesn't break style creation
+6. **Enrichment Deferred**: Metadata enrichment runs last via setTimeout dispatch
+7. **objectAssets Records**: Each storeImageToObjectStorage call:
+   - Converts base64 to WebP format (quality 90)
+   - Generates thumb (300px) and medium (800px) variants
+   - Uploads all three to Object Storage
+   - Inserts a record into `objectAssets` table with all paths and dimensions
+
+#### Token Assembly (Separate Endpoint)
+Tokens can come from two sources:
+- **Client-provided**: User uploads tokens via Create Style form
+- **CV Extraction**: Optional Python pipeline via `POST /api/pipeline/extract-tokens`
+
+When CV is used:
 1. **CV Extraction**: Python pipeline extracts color, spacing, radius, grid, elevation
-2. **AI Enhancement**: Gemini adds semantic meaning, names, descriptions
+2. **AI Enhancement**: Gemini adds semantic meaning, names, descriptions (optional)
 3. **DTCG Normalization**: Tokens converted to W3C standard format
 4. **Validation**: Schema validator ensures compliance
 
@@ -1028,7 +1131,121 @@ GET /api/jobs?styleId=<uuid>
 Response: { "jobs": [...] }
 ```
 
-### 7.5 Error Responses
+### 7.5 Admin Endpoints
+
+Admin routes are defined in `server/admin-routes.ts`. Most require `isAuthenticated` + `isAdmin` middleware (checks ADMIN_USER_IDS env var when feature toggle enabled):
+
+```http
+# Stats & Metrics (auth + admin required)
+GET  /api/admin/stats                   # System-wide statistics
+GET  /api/admin/metrics/summary         # Aggregated metrics summary
+GET  /api/admin/metrics                 # Detailed metrics with filtering
+POST /api/admin/metrics                 # Record a metric (internal)
+
+# Style Management (auth + admin required)
+GET  /api/admin/styles                  # List all styles with admin metadata
+POST /api/admin/styles/regenerate-images  # Regenerate specific image types
+POST /api/admin/styles/regenerate-full    # Full style regeneration
+POST /api/admin/styles/regenerate-all     # Batch regenerate all styles
+
+# Comprehensive Regeneration (auth + admin required)
+POST /api/admin/regeneration/comprehensive  # Full regeneration with options
+GET  /api/admin/regeneration/progress       # Get batch progress
+POST /api/admin/regeneration/cancel         # Cancel active regeneration
+GET  /api/admin/regeneration/report         # Get regeneration report
+POST /api/admin/regeneration/style/:styleId # Regenerate single style
+GET  /api/admin/regeneration/comparison/:styleId # Before/after comparison
+
+# Jobs & Batches (auth + admin required)
+GET  /api/admin/jobs                    # List all background jobs
+GET  /api/admin/batches                 # List batch operations
+POST /api/admin/batches/:batchId/resume # Resume paused batch
+
+# Object Storage Migration (auth + admin required)
+POST /api/admin/migrate-images          # Migrate legacy imageAssets
+POST /api/admin/migrate-to-object-storage # Migrate to Object Storage
+GET  /api/admin/migration-status        # Check migration progress
+GET  /api/admin/style/:styleId/image-status # Style image status
+
+# Feature Toggles (auth + admin required)
+GET  /api/admin/features                # List all toggles
+GET  /api/admin/features/:key           # Get specific toggle
+PUT  /api/admin/features/:key           # Update toggle
+
+# Testing Infrastructure
+POST /api/admin/test-runs               # Create test run (no auth guard)
+GET  /api/admin/test-runs               # List test runs (auth + admin)
+GET  /api/admin/test-runs/:id           # Get test run details (auth + admin)
+GET  /api/admin/test-metrics            # Aggregated test metrics (auth + admin)
+```
+
+### 7.6 Background Worker Lifecycle
+
+The background scheduler (`server/background-worker.ts`) runs every 60 seconds and dispatches jobs via `startJobInBackground`:
+
+```typescript
+// server/background-worker.ts
+const SCHEDULER_INTERVAL_MS = 60000;  // 1 minute
+const MAX_CONCURRENT_BACKGROUND_JOBS = 2;
+
+export function startBackgroundScheduler(): void {
+  if (schedulerRunning) return;
+  schedulerRunning = true;
+  
+  // Initial run after 5 second delay
+  setTimeout(() => runSchedulerCycle(), 5000);
+  
+  // Then every 60 seconds
+  setInterval(() => runSchedulerCycle(), SCHEDULER_INTERVAL_MS);
+}
+
+async function runSchedulerCycle(): Promise<void> {
+  // 1. Find styles with UUID-like names that need repair
+  const stylesWithBadNames = await storage.getStylesWithUuidNames();
+  for (const style of stylesWithBadNames) {
+    const hasActiveJob = await storage.hasActiveJobForStyle(style.id, ["style_name_repair"]);
+    if (!hasActiveJob) {
+      await startJobInBackground(
+        "style_name_repair",
+        { styleId: style.id },
+        async (input, onProgress) => { ... },
+        { maxRetries: 2, timeoutMs: 60000 },
+        style.id
+      );
+    }
+  }
+  
+  // 2. Find styles missing mood board or UI concepts
+  const stylesNeedingAssets = await storage.getStylesNeedingAssets();
+  for (const style of stylesNeedingAssets) {
+    const hasActiveJob = await storage.hasActiveJobForStyle(style.id, [
+      "background_asset_generation", "mood_board_generation", "ui_concepts_generation"
+    ]);
+    if (!hasActiveJob) {
+      await startJobInBackground(
+        "background_asset_generation",
+        { styleId: style.id },
+        async (input, onProgress) => { ... },
+        { maxRetries: 2, timeoutMs: 180000 },
+        style.id
+      );
+    }
+  }
+}
+```
+
+**Job Types Dispatched:**
+| Job Type | Purpose | Timeout | Max Retries |
+|----------|---------|---------|-------------|
+| `style_name_repair` | Re-analyze image to generate better style name | 60s | 2 |
+| `background_asset_generation` | Generate missing mood board/UI concepts | 180s | 2 |
+
+**Scheduler Features:**
+- Uses `p-limit` for concurrency control (max 2 concurrent jobs)
+- Checks for existing active jobs to prevent duplicate work
+- Dispatches through job-runner for retry logic and progress tracking
+
+### 7.7 Error Responses
 
 ```typescript
 interface ErrorResponse {
