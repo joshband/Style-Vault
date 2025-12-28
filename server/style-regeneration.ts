@@ -11,7 +11,7 @@ import { extractTokensWithCV } from "./cv-bridge";
 import { enrichStyleMetadata } from "./metadata-enrichment";
 import { pipelineBridge } from "./pipeline-bridge";
 import { generateMaterialTokensWithAI, type MaterialSignals, type TextureSignals } from "./component-ai-classification";
-import { storeImage } from "./image-service";
+import { storeImageToObjectStorage } from "./object-image-service";
 import crypto from "crypto";
 import type { Style, MetadataTags, InsertStyleVersion, MoodBoardAssets, UiConceptAssets } from "@shared/schema";
 import { logger } from "./logger";
@@ -333,7 +333,7 @@ async function regenerateStyle(style: Style): Promise<RegenerationResult> {
         if (!isDuplicate) {
           previews.portrait = portraitData;
           try {
-            await storeImage(portraitData, "preview_portrait", style.id);
+            await storeImageToObjectStorage(portraitData, "preview_portrait", style.id);
             storedCount++;
           } catch (storeErr) {
             logger.error("Failed to store portrait", storeErr, { module: 'StyleRegeneration', styleId: style.id });
@@ -347,7 +347,7 @@ async function regenerateStyle(style: Style): Promise<RegenerationResult> {
         if (!isDuplicate) {
           previews.landscape = landscapeData;
           try {
-            await storeImage(landscapeData, "preview_landscape", style.id);
+            await storeImageToObjectStorage(landscapeData, "preview_landscape", style.id);
             storedCount++;
           } catch (storeErr) {
             logger.error("Failed to store landscape", storeErr, { module: 'StyleRegeneration', styleId: style.id });
@@ -361,7 +361,7 @@ async function regenerateStyle(style: Style): Promise<RegenerationResult> {
         if (!isDuplicate) {
           previews.stillLife = stillLifeData;
           try {
-            await storeImage(stillLifeData, "preview_still_life", style.id);
+            await storeImageToObjectStorage(stillLifeData, "preview_still_life", style.id);
             storedCount++;
           } catch (storeErr) {
             logger.error("Failed to store still life", storeErr, { module: 'StyleRegeneration', styleId: style.id });
@@ -400,10 +400,10 @@ async function regenerateStyle(style: Style): Promise<RegenerationResult> {
         const existingUiConcepts = (currentStyle?.uiConcepts as UiConceptAssets) || { status: "pending", history: [] };
         await storage.updateStyleMoodBoard(style.id, moodBoardAssets, existingUiConcepts);
         
-        // Also store through image service for optimized WebP variants
+        // Also store to object storage for optimized WebP variants
         try {
           const moodBoardData = ensureDataUrl(moodResult.collage);
-          storedImageId = await storeImage(moodBoardData, "mood_board", style.id);
+          storedImageId = await storeImageToObjectStorage(moodBoardData, "mood_board", style.id);
         } catch (storeErr) {
           logger.error("Failed to store mood board", storeErr, { module: 'StyleRegeneration', styleId: style.id });
         }
@@ -438,11 +438,11 @@ async function regenerateStyle(style: Style): Promise<RegenerationResult> {
         const existingMoodBoard = (currentStyle?.moodBoard as MoodBoardAssets) || { status: "pending", history: [] };
         await storage.updateStyleMoodBoard(style.id, existingMoodBoard, uiConceptAssets);
         
-        // Also store UI concepts through image service for optimized WebP variants
+        // Also store UI concepts to object storage for optimized WebP variants
         if (uiResult.softwareApp) {
           try {
             const softwareAppData = ensureDataUrl(uiResult.softwareApp);
-            const softwareAppId = await storeImage(softwareAppData, "ui_software_app", style.id);
+            const softwareAppId = await storeImageToObjectStorage(softwareAppData, "ui_software_app", style.id);
             storedImageIds.push(softwareAppId);
           } catch (storeErr) {
             logger.error("Failed to store softwareApp UI concept", storeErr, { module: 'StyleRegeneration', styleId: style.id });
@@ -451,7 +451,7 @@ async function regenerateStyle(style: Style): Promise<RegenerationResult> {
         if (uiResult.audioPlugin) {
           try {
             const audioPluginData = ensureDataUrl(uiResult.audioPlugin);
-            const audioPluginId = await storeImage(audioPluginData, "ui_audio_plugin", style.id);
+            const audioPluginId = await storeImageToObjectStorage(audioPluginData, "ui_audio_plugin", style.id);
             storedImageIds.push(audioPluginId);
           } catch (storeErr) {
             logger.error("Failed to store audioPlugin UI concept", storeErr, { module: 'StyleRegeneration', styleId: style.id });
@@ -460,7 +460,7 @@ async function regenerateStyle(style: Style): Promise<RegenerationResult> {
         if (uiResult.dashboard) {
           try {
             const dashboardData = ensureDataUrl(uiResult.dashboard);
-            const dashboardId = await storeImage(dashboardData, "ui_dashboard", style.id);
+            const dashboardId = await storeImageToObjectStorage(dashboardData, "ui_dashboard", style.id);
             storedImageIds.push(dashboardId);
           } catch (storeErr) {
             logger.error("Failed to store dashboard UI concept", storeErr, { module: 'StyleRegeneration', styleId: style.id });

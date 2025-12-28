@@ -259,8 +259,17 @@ export async function enrichStyleMetadata(styleId: string): Promise<boolean> {
 export async function queueStyleForEnrichment(styleId: string): Promise<void> {
   await storage.updateStyleEnrichmentStatus(styleId, "queued");
   
-  setTimeout(() => {
-    enrichStyleMetadata(styleId).catch(err => logger.error("Async enrichment failed", err, { module: 'MetadataEnrichment', styleId }));
+  setTimeout(async () => {
+    try {
+      const metadataSuccess = await enrichStyleMetadata(styleId);
+      
+      if (metadataSuccess) {
+        await enrichStyleSpec(styleId);
+        logger.info("Completed full enrichment (metadata + spec)", { module: 'MetadataEnrichment', styleId });
+      }
+    } catch (err) {
+      logger.error("Async enrichment failed", err, { module: 'MetadataEnrichment', styleId });
+    }
   }, 100);
 }
 

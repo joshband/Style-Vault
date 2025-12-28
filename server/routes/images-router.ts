@@ -124,7 +124,7 @@ router.post("/api/admin/regenerate-software-app", async (req, res) => {
     
     (async () => {
       const { generateSingleUiConcept } = await import("../mood-board-generation");
-      const { storeImage } = await import("../image-service");
+      const { storeImageToObjectStorage } = await import("../object-image-service");
       
       logger.info(`Starting softwareApp regeneration for ${allStyles.length} styles`, { module: 'Images' });
       let successCount = 0;
@@ -141,7 +141,7 @@ router.post("/api/admin/regenerate-software-app", async (req, res) => {
           }, "softwareApp");
           
           if (softwareApp) {
-            await storeImage(softwareApp, "ui_software_app", style.id);
+            await storeImageToObjectStorage(softwareApp, "ui_software_app", style.id);
             
             const freshStyle = await storage.getStyleById(style.id);
             if (freshStyle) {

@@ -291,24 +291,24 @@ router.post("/api/styles", async (req, res) => {
         logger.info(`Mood board generation complete for style: ${style.id}`, { module: 'Styles', styleId: style.id });
         
         try {
-          const { storeImage } = await import("../image-service");
-          const storePromises: Promise<void>[] = [];
+          const { storeImageToObjectStorage } = await import("../object-image-service");
+          const storePromises: Promise<string>[] = [];
           
           if (moodBoard?.collage) {
-            storePromises.push(storeImage(moodBoard.collage, "mood_board", style.id).then(() => {}));
+            storePromises.push(storeImageToObjectStorage(moodBoard.collage, "mood_board", style.id));
           }
           if (uiConcepts?.softwareApp) {
-            storePromises.push(storeImage(uiConcepts.softwareApp, "ui_software_app", style.id).then(() => {}));
+            storePromises.push(storeImageToObjectStorage(uiConcepts.softwareApp, "ui_software_app", style.id));
           }
           if (uiConcepts?.audioPlugin) {
-            storePromises.push(storeImage(uiConcepts.audioPlugin, "ui_audio_plugin", style.id).then(() => {}));
+            storePromises.push(storeImageToObjectStorage(uiConcepts.audioPlugin, "ui_audio_plugin", style.id));
           }
           if (uiConcepts?.dashboard) {
-            storePromises.push(storeImage(uiConcepts.dashboard, "ui_dashboard", style.id).then(() => {}));
+            storePromises.push(storeImageToObjectStorage(uiConcepts.dashboard, "ui_dashboard", style.id));
           }
           
           await Promise.all(storePromises);
-          logger.info(`Stored ${storePromises.length} images for style: ${style.id}`, { module: 'Styles', styleId: style.id });
+          logger.info(`Stored ${storePromises.length} images to object storage for style: ${style.id}`, { module: 'Styles', styleId: style.id });
         } catch (storageError) {
           logger.error(`Failed to store images for ${style.id}`, storageError, { module: 'Styles', styleId: style.id });
         }
