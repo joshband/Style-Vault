@@ -229,7 +229,7 @@ const StyleCardComponent = memo(function StyleCard({ style, className, onDelete 
                     by {style.creatorName}
                   </span>
                 ) : (
-                  <span className="text-muted-foreground/40">Community</span>
+                  <span className="text-muted-foreground/40" data-testid="text-community">Community</span>
                 )}
                 <time dateTime={style.createdAt}>
                   {new Date(style.createdAt).toLocaleDateString(undefined, { 

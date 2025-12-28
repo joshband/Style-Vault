@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/use-auth";
 import { generateBrandKitPDF } from "@/lib/pdf-export";
 import { toast } from "sonner";
+import { isFeatureEnabled } from "@shared/featureFlags";
 
 interface StyleSummary {
   id: string;
@@ -1414,58 +1415,60 @@ export default ${safeName};`;
         {/* === COLLAPSED SECTIONS === */}
         <div className="border border-border rounded-lg divide-y divide-border">
           
-          {/* Canonical Previews */}
-          <details className="group">
-            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
-              <span className="text-sm font-medium text-foreground">Canonical Previews</span>
-              <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
-            </summary>
-            <div className="p-4 pt-0">
-              <div className="grid grid-cols-3 gap-2">
-                {['landscape', 'portrait', 'stillLife'].map((type) => {
-                  const key = type === 'stillLife' ? 'preview_still_life' : `preview_${type}`;
-                  const imageIdSrc = summary.imageIds?.[key] 
-                    ? `/api/images/${summary.imageIds[key]}?size=medium`
-                    : undefined;
-                  const base64Fallback = (previews as any)[type];
-                  const imgSrc = getSafeImageSrc(imageIdSrc, base64Fallback);
-                  // Use ?size=full for downloads - high quality original
-                  const fullSrc = summary.imageIds?.[key]
-                    ? `/api/images/${summary.imageIds[key]}?size=full`
-                    : (isSafeBase64(base64Fallback) ? base64Fallback : null);
-                  return (
-                    <div key={type} className="aspect-square bg-muted rounded-lg overflow-hidden border border-border relative group/preview">
-                      {imgSrc ? (
-                        <>
-                          <img src={imgSrc} alt={type} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
-                          <button
-                            onClick={() => {
-                              if (!fullSrc) return;
-                              const link = document.createElement("a");
-                              link.href = fullSrc;
-                              link.download = `${summary.name}-${type}.png`;
-                              document.body.appendChild(link);
-                              link.click();
-                              document.body.removeChild(link);
-                            }}
-                            className="absolute top-1 right-1 p-1.5 rounded-md bg-black/50 text-white opacity-0 group-hover/preview:opacity-100 transition-opacity hover:bg-black/70"
-                            title={`Download ${type}`}
-                            data-testid={`button-download-preview-${type}`}
-                          >
-                            <Download size={12} />
-                          </button>
-                        </>
-                      ) : (
-                        <div className="flex items-center justify-center h-full text-muted-foreground text-xs capitalize">
-                          {base64Fallback && !isSafeBase64(base64Fallback) ? 'Preview too large' : type}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+          {/* Canonical Previews - gated by feature flag */}
+          {isFeatureEnabled('inspect.previews') && (
+            <details className="group" data-testid="section-canonical-previews">
+              <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+                <span className="text-sm font-medium text-foreground">Canonical Previews</span>
+                <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+              </summary>
+              <div className="p-4 pt-0">
+                <div className="grid grid-cols-3 gap-2">
+                  {['landscape', 'portrait', 'stillLife'].map((type) => {
+                    const key = type === 'stillLife' ? 'preview_still_life' : `preview_${type}`;
+                    const imageIdSrc = summary.imageIds?.[key] 
+                      ? `/api/images/${summary.imageIds[key]}?size=medium`
+                      : undefined;
+                    const base64Fallback = (previews as any)[type];
+                    const imgSrc = getSafeImageSrc(imageIdSrc, base64Fallback);
+                    // Use ?size=full for downloads - high quality original
+                    const fullSrc = summary.imageIds?.[key]
+                      ? `/api/images/${summary.imageIds[key]}?size=full`
+                      : (isSafeBase64(base64Fallback) ? base64Fallback : null);
+                    return (
+                      <div key={type} className="aspect-square bg-muted rounded-lg overflow-hidden border border-border relative group/preview">
+                        {imgSrc ? (
+                          <>
+                            <img src={imgSrc} alt={type} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+                            <button
+                              onClick={() => {
+                                if (!fullSrc) return;
+                                const link = document.createElement("a");
+                                link.href = fullSrc;
+                                link.download = `${summary.name}-${type}.png`;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                              }}
+                              className="absolute top-1 right-1 p-1.5 rounded-md bg-black/50 text-white opacity-0 group-hover/preview:opacity-100 transition-opacity hover:bg-black/70"
+                              title={`Download ${type}`}
+                              data-testid={`button-download-preview-${type}`}
+                            >
+                              <Download size={12} />
+                            </button>
+                          </>
+                        ) : (
+                          <div className="flex items-center justify-center h-full text-muted-foreground text-xs capitalize">
+                            {base64Fallback && !isSafeBase64(base64Fallback) ? 'Preview too large' : type}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          </details>
+            </details>
+          )}
 
 
           {/* Create / Prompt Details */}

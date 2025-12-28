@@ -8,14 +8,14 @@ test.describe('Stage 3: Preview Features', () => {
     await page.waitForLoadState('networkidle');
   });
 
-  test.describe('Canonical Previews Section', () => {
-    test('should have a collapsible Canonical Previews section', async ({ page }) => {
-      const previewsSection = page.locator('details summary').filter({ hasText: 'Canonical Previews' });
+  test.describe('Canonical Previews Section (gated by inspect.previews flag)', () => {
+    test('should have a Canonical Previews section when flag is enabled', async ({ page }) => {
+      const previewsSection = page.locator('[data-testid="section-canonical-previews"]');
       await expect(previewsSection).toBeVisible();
     });
 
     test('should expand Canonical Previews when clicked', async ({ page }) => {
-      const previewsDetails = page.locator('details').filter({ has: page.locator('summary', { hasText: 'Canonical Previews' }) });
+      const previewsDetails = page.locator('[data-testid="section-canonical-previews"]');
       const summary = previewsDetails.locator('summary');
       
       await summary.click();
@@ -25,7 +25,7 @@ test.describe('Stage 3: Preview Features', () => {
     });
 
     test('should show three preview slots (landscape, portrait, stillLife)', async ({ page }) => {
-      const previewsDetails = page.locator('details').filter({ has: page.locator('summary', { hasText: 'Canonical Previews' }) });
+      const previewsDetails = page.locator('[data-testid="section-canonical-previews"]');
       await previewsDetails.locator('summary').click();
       await page.waitForTimeout(300);
       
@@ -62,7 +62,7 @@ test.describe('Stage 3: Preview Features', () => {
       await page.waitForLoadState('networkidle');
       
       const styleCard = page.locator('[data-testid^="card-style-"]').first();
-      const authorOrCommunity = styleCard.locator('text=/by|Community/');
+      const authorOrCommunity = styleCard.locator('[data-testid="text-author"], [data-testid="text-community"]');
       await expect(authorOrCommunity).toBeVisible();
     });
   });
