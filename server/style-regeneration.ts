@@ -7,8 +7,36 @@ import {
   generateMoodBoardWithGemini,
   generateUiConceptsWithGemini,
 } from "./prodia-generation";
-import { extractTokensWithCV } from "./cv-bridge";
+import { extractTokensWithCV, type CVColorToken } from "./cv-bridge";
 import { enrichStyleMetadata } from "./metadata-enrichment";
+
+function cvColorsToOklchStrings(colors: CVColorToken[]): string[] {
+  return colors.map(c => `oklch(${c.l} ${c.c} ${c.h})`);
+}
+
+function assembleColorTokensFromCV(colors: CVColorToken[]): Record<string, any> {
+  const colorNames = ['primary', 'secondary', 'tertiary', 'accent', 'neutral', 'background', 'surface', 'muted'];
+  const colorTokens: Record<string, any> = {};
+  
+  colors.slice(0, 8).forEach((color, i) => {
+    const name = colorNames[i] || `color${i + 1}`;
+    const oklchValue = `oklch(${color.l} ${color.c} ${color.h})`;
+    colorTokens[name] = {
+      $type: 'color',
+      $value: oklchValue,
+      $description: `${name} color from image analysis`,
+      $extensions: {
+        visualDNA: {
+          confidence: 0.85,
+          source: 'cv',
+          method: 'k-means',
+        },
+      },
+    };
+  });
+  
+  return colorTokens;
+}
 import { pipelineBridge } from "./pipeline-bridge";
 import { generateMaterialTokensWithAI, type MaterialSignals, type TextureSignals } from "./component-ai-classification";
 import { storeImageToObjectStorage, getReferenceImageBase64 } from "./object-image-service";
@@ -182,7 +210,24 @@ async function regenerateStyle(style: Style): Promise<RegenerationResult> {
     try {
       const tokenResult = await extractTokensWithCV(refImage, false);
       if (tokenResult.success && tokenResult.tokens) {
-        currentTokens = { ...currentTokens, ...tokenResult.tokens };
+        const cvTokens = tokenResult.tokens;
+        
+        if (cvTokens.color && Array.isArray(cvTokens.color) && cvTokens.color.length > 0) {
+          const dtcgColorTokens = assembleColorTokensFromCV(cvTokens.color);
+          currentTokens = { 
+            ...currentTokens, 
+            color: dtcgColorTokens,
+          };
+          logger.info(`Extracted ${cvTokens.color.length} colors from CV`, { module: 'StyleRegeneration', styleId: style.id });
+        }
+        
+        if (cvTokens.spacing && Array.isArray(cvTokens.spacing)) {
+          currentTokens.spacing = currentTokens.spacing || {};
+        }
+        if (cvTokens.borderRadius && Array.isArray(cvTokens.borderRadius)) {
+          currentTokens.radius = currentTokens.radius || {};
+        }
+        
         await storage.updateStyleFull(style.id, { tokens: currentTokens as any });
       }
       cvStage.status = "completed";
