@@ -1,8 +1,9 @@
 import { generateWithFluxSchnell, isProdiaEnabled, ProdiaGenerationResult } from "./prodia-service";
 import { storage } from "./storage";
-import { ai } from "./replit_integrations/image/client";
+import { ai, generateWithGemini, generateWithOpenAI, analyzeRenderingStyle, RenderingStyle } from "./replit_integrations/image/client";
 
 type ProgressCallback = (progress: number, message: string) => Promise<void>;
+type ImageProvider = "gemini" | "openai" | "prodia";
 
 interface ImageAnalysis {
   hasSubject: boolean;
@@ -189,6 +190,106 @@ async function generatePreviewImage(
   return generateWithFluxSchnell({ prompt });
 }
 
+interface MultiProviderResult {
+  success: boolean;
+  imageBase64?: string;
+  provider: ImageProvider;
+  error?: string;
+}
+
+async function generateWithStyleTransfer(
+  prompt: string,
+  referenceImageBase64?: string,
+  renderingStyle?: RenderingStyle | null,
+  preferredProvider: ImageProvider = "gemini"
+): Promise<MultiProviderResult> {
+  const providers: ImageProvider[] = preferredProvider === "gemini" 
+    ? ["gemini", "openai", "prodia"] 
+    : preferredProvider === "openai"
+    ? ["openai", "gemini", "prodia"]
+    : ["prodia", "gemini", "openai"];
+  
+  for (const provider of providers) {
+    try {
+      let imageBase64: string;
+      
+      switch (provider) {
+        case "gemini":
+          imageBase64 = await generateWithGemini(prompt, {
+            referenceImageBase64,
+            renderingStyle: renderingStyle || undefined,
+          });
+          break;
+          
+        case "openai":
+          imageBase64 = await generateWithOpenAI(prompt, {
+            renderingStyle: renderingStyle || undefined,
+          });
+          break;
+          
+        case "prodia":
+          if (!isProdiaEnabled()) {
+            throw new Error("Prodia not configured");
+          }
+          const prodiaResult = await generateWithFluxSchnell({ prompt });
+          if (!prodiaResult.success || !prodiaResult.imageBase64) {
+            throw new Error(prodiaResult.error || "Prodia generation failed");
+          }
+          imageBase64 = prodiaResult.imageBase64;
+          break;
+          
+        default:
+          throw new Error(`Unknown provider: ${provider}`);
+      }
+      
+      console.log(`[MultiProvider] Successfully generated with ${provider}`);
+      return { success: true, imageBase64, provider };
+      
+    } catch (error) {
+      console.warn(`[MultiProvider] ${provider} failed:`, error instanceof Error ? error.message : error);
+      continue;
+    }
+  }
+  
+  return { success: false, provider: providers[providers.length - 1], error: "All providers failed" };
+}
+
+async function generatePreviewWithGemini(
+  type: "portrait" | "landscape" | "stillLife",
+  styleName: string,
+  styleDescription: string,
+  summary: TokenSummary,
+  referenceImageBase64?: string,
+  renderingStyle?: RenderingStyle | null,
+  analysis?: ImageAnalysis | null
+): Promise<MultiProviderResult> {
+  let subject: string;
+  
+  if (analysis?.hasSubject && analysis.sceneDescription) {
+    const elements = analysis.dominantElements?.slice(0, 3).join(", ") || "";
+    const baseScene = analysis.sceneDescription;
+    
+    if (type === "portrait" && analysis.subjectType === "portrait") {
+      subject = baseScene;
+    } else if (type === "landscape" && analysis.subjectType === "landscape") {
+      subject = baseScene;
+    } else if (type === "stillLife" && analysis.subjectType === "still_life") {
+      subject = baseScene;
+    } else {
+      subject = `${baseScene}. Key elements: ${elements}. Rendered as a ${type === "stillLife" ? "still life composition" : type} view`;
+    }
+  } else {
+    subject = CANONICAL_SUBJECTS[type];
+  }
+  
+  const colorFragment = buildColorPromptFragment(summary);
+  const artisticHint = analysis?.artisticStyle ? `In ${analysis.artisticStyle} rendering style.` : "";
+  
+  const prompt = `${subject}. ${colorFragment} ${artisticHint} Style: "${styleName}".`;
+  
+  return generateWithStyleTransfer(prompt, referenceImageBase64, renderingStyle, "gemini");
+}
+
 export async function generateCanonicalPreviewsWithProdia(
   request: PreviewGenerationRequest
 ): Promise<PreviewResult> {
@@ -256,6 +357,247 @@ export async function generateCanonicalPreviewsWithProdia(
   }).catch(err => console.error("Failed to record preview metric:", err));
   
   return result;
+}
+
+/**
+ * Generate canonical previews using Gemini as the primary provider.
+ * Uses the reference image for style transfer and falls back to OpenAI/Prodia if needed.
+ */
+export async function generateCanonicalPreviewsWithGemini(
+  request: PreviewGenerationRequest
+): Promise<PreviewResult> {
+  const startTime = Date.now();
+  
+  const summary = request.tokens ? extractTokenSummary(request.tokens) : extractTokenSummary({});
+  
+  await request.onProgress?.(3, "Starting style-accurate preview generation...");
+  
+  // First, analyze the rendering style of the reference image
+  let renderingStyle: RenderingStyle | null = null;
+  let analysis: ImageAnalysis | null = null;
+  
+  if (request.referenceImageBase64) {
+    await request.onProgress?.(5, "Analyzing artistic rendering style...");
+    
+    const [rsResult, analysisResult] = await Promise.all([
+      analyzeRenderingStyle(request.referenceImageBase64),
+      analyzeReferenceImage(request.referenceImageBase64),
+    ]);
+    
+    renderingStyle = rsResult;
+    analysis = analysisResult;
+    
+    if (renderingStyle) {
+      console.log(`[Gemini] Rendering style detected: ${renderingStyle.medium}, ${renderingStyle.technique}`);
+      console.log(`[Gemini] Color palette: ${renderingStyle.colorPalette}`);
+      console.log(`[Gemini] Characteristics: ${renderingStyle.characteristics.join(", ")}`);
+    }
+    
+    if (analysis) {
+      console.log(`[Gemini] Content analyzed: ${analysis.subjectType} - ${analysis.sceneDescription?.slice(0, 50)}...`);
+    }
+  }
+  
+  await request.onProgress?.(15, "Generating portrait preview with style transfer...");
+  
+  // Generate previews in parallel using Gemini with style transfer
+  const [portraitResult, landscapeResult, stillLifeResult] = await Promise.all([
+    (async () => {
+      await request.onProgress?.(20, "Generating portrait preview...");
+      return generatePreviewWithGemini(
+        "portrait", 
+        request.styleName, 
+        request.styleDescription, 
+        summary,
+        request.referenceImageBase64,
+        renderingStyle,
+        analysis
+      );
+    })(),
+    (async () => {
+      await request.onProgress?.(40, "Generating landscape preview...");
+      return generatePreviewWithGemini(
+        "landscape", 
+        request.styleName, 
+        request.styleDescription, 
+        summary,
+        request.referenceImageBase64,
+        renderingStyle,
+        analysis
+      );
+    })(),
+    (async () => {
+      await request.onProgress?.(60, "Generating still life preview...");
+      return generatePreviewWithGemini(
+        "stillLife", 
+        request.styleName, 
+        request.styleDescription, 
+        summary,
+        request.referenceImageBase64,
+        renderingStyle,
+        analysis
+      );
+    })(),
+  ]);
+  
+  await request.onProgress?.(90, "Finalizing style-accurate previews...");
+  
+  const placeholder = generatePlaceholder(request.styleName);
+  
+  const result: PreviewResult = {
+    portrait: portraitResult.success && portraitResult.imageBase64 ? portraitResult.imageBase64 : placeholder,
+    landscape: landscapeResult.success && landscapeResult.imageBase64 ? landscapeResult.imageBase64 : placeholder,
+    stillLife: stillLifeResult.success && stillLifeResult.imageBase64 ? stillLifeResult.imageBase64 : placeholder,
+    allFailed: !portraitResult.success && !landscapeResult.success && !stillLifeResult.success,
+    processingTimeMs: Date.now() - startTime,
+  };
+  
+  await request.onProgress?.(100, "Style-accurate preview generation complete");
+  
+  const providers = [portraitResult.provider, landscapeResult.provider, stillLifeResult.provider];
+  console.log(`[Gemini] Generated previews in ${result.processingTimeMs}ms using providers: ${providers.join(", ")}`);
+  
+  // Record metrics
+  storage.recordMetric({
+    type: "preview_generation",
+    durationMs: result.processingTimeMs,
+    success: !result.allFailed,
+    metadata: { 
+      generator: "gemini-multi",
+      portrait: portraitResult.success,
+      landscape: landscapeResult.success,
+      stillLife: stillLifeResult.success,
+      portraitProvider: portraitResult.provider,
+      landscapeProvider: landscapeResult.provider,
+      stillLifeProvider: stillLifeResult.provider,
+      renderingStyleDetected: !!renderingStyle,
+    },
+  }).catch(err => console.error("Failed to record preview metric:", err));
+  
+  return result;
+}
+
+/**
+ * Generate UI concepts using Gemini as the primary provider with style transfer.
+ */
+export async function generateUiConceptsWithGemini(
+  styleName: string,
+  styleDescription: string,
+  tokens: Record<string, unknown>,
+  referenceImageBase64?: string,
+  metadataTags?: Record<string, string[]>,
+  onProgress?: ProgressCallback
+): Promise<UiConceptResult> {
+  const startTime = Date.now();
+  const summary = extractTokenSummary(tokens);
+  
+  await onProgress?.(5, "Analyzing style for UI concepts...");
+  
+  // Analyze rendering style for better UI generation
+  let renderingStyle: RenderingStyle | null = null;
+  if (referenceImageBase64) {
+    renderingStyle = await analyzeRenderingStyle(referenceImageBase64);
+  }
+  
+  const colorList = summary.colors.slice(0, 5).map(c => c.hex).join(", ");
+  const moodHint = metadataTags?.mood?.slice(0, 3).join(", ") || summary.mood.tone;
+  
+  const uiTypes = [
+    {
+      name: "softwareApp",
+      prompt: `Design a software application user interface in "${styleName}" style. Show a main window with sidebar navigation, content area, and toolbar. Modern but matching the artistic style. Color palette: ${colorList}. Mood: ${moodHint}. ${summary.lighting.type} lighting aesthetic.`,
+    },
+    {
+      name: "audioPlugin",
+      prompt: `Design an audio plugin/synthesizer interface in "${styleName}" style. Include knobs, faders, VU meters, and digital displays. Skeuomorphic with artistic flair. Color palette: ${colorList}. Mood: ${moodHint}. Professional audio software aesthetic.`,
+    },
+    {
+      name: "dashboard",
+      prompt: `Design an analytics dashboard interface in "${styleName}" style. Include charts, graphs, metrics cards, and data visualizations. Clean but artistically styled. Color palette: ${colorList}. Mood: ${moodHint}. Business intelligence aesthetic.`,
+    },
+  ];
+  
+  const results: { [key: string]: string | undefined } = {};
+  
+  for (let i = 0; i < uiTypes.length; i++) {
+    const ui = uiTypes[i];
+    await onProgress?.((i + 1) * 25, `Generating ${ui.name} UI concept...`);
+    
+    const result = await generateWithStyleTransfer(
+      ui.prompt,
+      referenceImageBase64,
+      renderingStyle,
+      "gemini"
+    );
+    
+    if (result.success && result.imageBase64) {
+      results[ui.name] = result.imageBase64;
+    }
+  }
+  
+  await onProgress?.(100, "UI concept generation complete");
+  
+  const processingTimeMs = Date.now() - startTime;
+  
+  // Record metrics
+  storage.recordMetric({
+    type: "ui_concept_generation",
+    durationMs: processingTimeMs,
+    success: Object.keys(results).length > 0,
+    metadata: { 
+      generator: "gemini-multi",
+      softwareApp: !!results.softwareApp,
+      audioPlugin: !!results.audioPlugin,
+      dashboard: !!results.dashboard,
+    },
+  }).catch(err => console.error("Failed to record UI concept metric:", err));
+  
+  return {
+    softwareApp: results.softwareApp,
+    audioPlugin: results.audioPlugin,
+    dashboard: results.dashboard,
+    processingTimeMs,
+  };
+}
+
+/**
+ * Generate mood board using Gemini as the primary provider.
+ */
+export async function generateMoodBoardWithGemini(
+  request: MoodBoardRequest
+): Promise<{ collage: string; processingTimeMs: number }> {
+  const startTime = Date.now();
+  
+  const summary = extractTokenSummary(request.tokens);
+  const colorList = summary.colors.slice(0, 4).map(c => c.hex).join(", ");
+  const moodKeywords = request.metadataTags?.mood?.slice(0, 3).join(", ") || summary.mood.tone;
+  
+  await request.onProgress?.(10, "Generating style-accurate mood board...");
+  
+  const prompt = `A sophisticated mood board collage for "${request.styleName}" style. Pinterest-style grid layout with 8-12 tiles. Color palette: ${colorList}. Mood: ${moodKeywords}. Includes texture samples, typography examples, color swatches, and artistic patterns. ${summary.lighting.type} lighting, ${summary.texture.finish} finish. Professional design mood board.`;
+  
+  const result = await generateWithStyleTransfer(prompt, undefined, undefined, "gemini");
+  
+  await request.onProgress?.(100, "Mood board complete");
+  
+  const processingTimeMs = Date.now() - startTime;
+  
+  // Record metrics
+  storage.recordMetric({
+    type: "mood_board_generation",
+    durationMs: processingTimeMs,
+    success: result.success,
+    metadata: { generator: result.provider },
+  }).catch(err => console.error("Failed to record mood board metric:", err));
+  
+  if (!result.success || !result.imageBase64) {
+    throw new Error(result.error || "Failed to generate mood board");
+  }
+  
+  return {
+    collage: result.imageBase64,
+    processingTimeMs,
+  };
 }
 
 export async function generateMoodBoardWithProdia(

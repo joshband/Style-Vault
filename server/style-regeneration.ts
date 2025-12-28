@@ -1,5 +1,12 @@
 import { storage } from "./storage";
-import { generateCanonicalPreviewsWithProdia, generateMoodBoardWithProdia, generateUiConceptsWithProdia } from "./prodia-generation";
+import { 
+  generateCanonicalPreviewsWithProdia, 
+  generateMoodBoardWithProdia, 
+  generateUiConceptsWithProdia,
+  generateCanonicalPreviewsWithGemini,
+  generateMoodBoardWithGemini,
+  generateUiConceptsWithGemini,
+} from "./prodia-generation";
 import { extractTokensWithCV } from "./cv-bridge";
 import { enrichStyleMetadata } from "./metadata-enrichment";
 import { pipelineBridge } from "./pipeline-bridge";
@@ -286,16 +293,24 @@ async function regenerateStyle(style: Style): Promise<RegenerationResult> {
   stages.push(previewStage);
   
   try {
-    const previewResult = await generateCanonicalPreviewsWithProdia({
+    // Use Gemini for style-accurate generation with reference image for style transfer
+    const previewResult = await generateCanonicalPreviewsWithGemini({
       styleName: style.name,
       styleDescription: style.description || style.name,
       tokens: currentTokens,
+      referenceImageBase64: refImage || undefined,
     });
     
     const previews: Record<string, string> = {};
     
+    // Helper to ensure data URL format (Gemini returns full URLs, handle both cases)
+    const ensureDataUrl = (img: string): string => {
+      if (img.startsWith("data:")) return img;
+      return `data:image/png;base64,${img}`;
+    };
+    
     if (previewResult.portrait) {
-      const portraitData = `data:image/png;base64,${previewResult.portrait}`;
+      const portraitData = ensureDataUrl(previewResult.portrait);
       const { isDuplicate } = isDuplicateArtifact(portraitData);
       if (!isDuplicate) {
         previews.portrait = portraitData;
@@ -303,7 +318,7 @@ async function regenerateStyle(style: Style): Promise<RegenerationResult> {
     }
     
     if (previewResult.landscape) {
-      const landscapeData = `data:image/png;base64,${previewResult.landscape}`;
+      const landscapeData = ensureDataUrl(previewResult.landscape);
       const { isDuplicate } = isDuplicateArtifact(landscapeData);
       if (!isDuplicate) {
         previews.landscape = landscapeData;
@@ -311,7 +326,7 @@ async function regenerateStyle(style: Style): Promise<RegenerationResult> {
     }
     
     if (previewResult.stillLife) {
-      const stillLifeData = `data:image/png;base64,${previewResult.stillLife}`;
+      const stillLifeData = ensureDataUrl(previewResult.stillLife);
       const { isDuplicate } = isDuplicateArtifact(stillLifeData);
       if (!isDuplicate) {
         previews.stillLife = stillLifeData;
@@ -336,29 +351,35 @@ async function regenerateStyle(style: Style): Promise<RegenerationResult> {
   stages.push(moodStage);
   
   try {
-    const moodResult = await generateMoodBoardWithProdia({
+    // Use Gemini for style-accurate generation
+    const moodResult = await generateMoodBoardWithGemini({
       styleName: style.name,
       styleDescription: style.description || style.name,
       tokens: currentTokens,
+      metadataTags: style.metadataTags as unknown as Record<string, string[]> || undefined,
     });
     
-    const uiResult = await generateUiConceptsWithProdia({
-      styleName: style.name,
-      styleDescription: style.description || style.name,
-      tokens: currentTokens,
-    });
+    // Use Gemini for UI concept generation with reference image for style transfer
+    const uiResult = await generateUiConceptsWithGemini(
+      style.name,
+      style.description || style.name,
+      currentTokens,
+      refImage || undefined,
+      style.metadataTags as unknown as Record<string, string[]> || undefined,
+    );
     
+    // Gemini functions return full data URLs, so no prefix needed
     const moodBoardAssets: MoodBoardAssets = {
       status: "complete",
-      collage: moodResult.collage ? `data:image/png;base64,${moodResult.collage}` : undefined,
+      collage: moodResult.collage || undefined,
       history: [],
     };
     
     const uiConceptAssets: UiConceptAssets = {
       status: "complete",
-      softwareApp: uiResult.softwareApp ? `data:image/png;base64,${uiResult.softwareApp}` : undefined,
-      audioPlugin: uiResult.audioPlugin ? `data:image/png;base64,${uiResult.audioPlugin}` : undefined,
-      dashboard: uiResult.dashboard ? `data:image/png;base64,${uiResult.dashboard}` : undefined,
+      softwareApp: uiResult.softwareApp || undefined,
+      audioPlugin: uiResult.audioPlugin || undefined,
+      dashboard: uiResult.dashboard || undefined,
       history: [],
     };
     
