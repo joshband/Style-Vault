@@ -11,6 +11,7 @@ import { extractTokensWithCV } from "./cv-bridge";
 import { enrichStyleMetadata } from "./metadata-enrichment";
 import { pipelineBridge } from "./pipeline-bridge";
 import { generateMaterialTokensWithAI, type MaterialSignals, type TextureSignals } from "./component-ai-classification";
+import { storeImage } from "./image-service";
 import crypto from "crypto";
 import type { Style, MetadataTags, InsertStyleVersion, MoodBoardAssets, UiConceptAssets } from "@shared/schema";
 
@@ -302,6 +303,7 @@ async function regenerateStyle(style: Style): Promise<RegenerationResult> {
     });
     
     const previews: Record<string, string> = {};
+    const storedImageIds: string[] = [];
     
     // Helper to ensure data URL format (Gemini returns full URLs, handle both cases)
     const ensureDataUrl = (img: string): string => {
@@ -314,6 +316,14 @@ async function regenerateStyle(style: Style): Promise<RegenerationResult> {
       const { isDuplicate } = isDuplicateArtifact(portraitData);
       if (!isDuplicate) {
         previews.portrait = portraitData;
+        // Store in image service - this automatically associates with the style
+        try {
+          const portraitId = await storeImage(portraitData, "preview_portrait", style.id);
+          storedImageIds.push(portraitId);
+          console.log(`[Regeneration] Stored portrait preview with ID: ${portraitId}`);
+        } catch (storeErr) {
+          console.error("[Regeneration] Failed to store portrait in image service:", storeErr);
+        }
       }
     }
     
@@ -322,6 +332,14 @@ async function regenerateStyle(style: Style): Promise<RegenerationResult> {
       const { isDuplicate } = isDuplicateArtifact(landscapeData);
       if (!isDuplicate) {
         previews.landscape = landscapeData;
+        // Store in image service - this automatically associates with the style
+        try {
+          const landscapeId = await storeImage(landscapeData, "preview_landscape", style.id);
+          storedImageIds.push(landscapeId);
+          console.log(`[Regeneration] Stored landscape preview with ID: ${landscapeId}`);
+        } catch (storeErr) {
+          console.error("[Regeneration] Failed to store landscape in image service:", storeErr);
+        }
       }
     }
     
@@ -330,6 +348,14 @@ async function regenerateStyle(style: Style): Promise<RegenerationResult> {
       const { isDuplicate } = isDuplicateArtifact(stillLifeData);
       if (!isDuplicate) {
         previews.stillLife = stillLifeData;
+        // Store in image service - this automatically associates with the style
+        try {
+          const stillLifeId = await storeImage(stillLifeData, "preview_still_life", style.id);
+          storedImageIds.push(stillLifeId);
+          console.log(`[Regeneration] Stored still life preview with ID: ${stillLifeId}`);
+        } catch (storeErr) {
+          console.error("[Regeneration] Failed to store still life in image service:", storeErr);
+        }
       }
     }
     
@@ -340,7 +366,7 @@ async function regenerateStyle(style: Style): Promise<RegenerationResult> {
     previewStage.status = "completed";
     previewStage.completedAt = new Date();
     previewStage.durationMs = Date.now() - previewStage.startedAt!.getTime();
-    previewStage.output = { generatedCount: Object.keys(previews).length };
+    previewStage.output = { generatedCount: Object.keys(previews).length, storedInImageService: storedImageIds.length };
   } catch (error) {
     previewStage.status = "failed";
     previewStage.error = String(error);

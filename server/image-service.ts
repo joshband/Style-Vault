@@ -155,13 +155,16 @@ export async function getImage(
 export async function getImagesByStyle(
   styleId: string
 ): Promise<Record<ImageAssetType, string>> {
+  // Order by createdAt ASC so newer images overwrite older ones in the result map
   const assets = await db
-    .select({ id: imageAssets.id, type: imageAssets.type })
+    .select({ id: imageAssets.id, type: imageAssets.type, createdAt: imageAssets.createdAt })
     .from(imageAssets)
-    .where(eq(imageAssets.styleId, styleId));
+    .where(eq(imageAssets.styleId, styleId))
+    .orderBy(imageAssets.createdAt);
 
   const result: Record<string, string> = {};
   for (const asset of assets) {
+    // Later (newer) images overwrite earlier ones for the same type
     result[asset.type] = asset.id;
   }
   return result as Record<ImageAssetType, string>;
