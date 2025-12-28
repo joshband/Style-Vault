@@ -139,28 +139,29 @@ async function generateSinglePreview(
   type: "portrait" | "landscape" | "stillLife",
   colorPalette: string[] = []
 ): Promise<string | null> {
-  const aspectRatios = {
-    portrait: "3:4 vertical",
-    landscape: "16:9 horizontal",
-    stillLife: "1:1 square",
+  // Aspect ratio descriptions for prompts
+  const aspectRatioDescriptions = {
+    portrait: "3:4 vertical portrait orientation",
+    landscape: "16:9 wide horizontal landscape orientation",
+    stillLife: "1:1 square format",
+  };
+  
+  // Gemini API aspect ratio values (must match supported ratios)
+  const aspectRatioConfigs = {
+    portrait: "3:4",
+    landscape: "16:9",
+    stillLife: "1:1",
   };
 
   // Build token-weighted prompt
   const hasTokenColors = colorPalette.length > 0;
   const tokenSection = hasTokenColors
     ? `================================================================================
-PRIMARY DIRECTIVE: DESIGN TOKENS (HIGHEST PRIORITY)
+COLOR PALETTE (Apply to the scene below)
 ================================================================================
-The following colors were extracted from the source image as Design Tokens. These are AUTHORITATIVE specifications:
+Use these colors throughout the image:
+${colorPalette.map(c => `  ${c}`).join("\n")}
 
-MANDATORY COLOR PALETTE - Use ONLY these exact hex values:
-${colorPalette.map(c => `  ${c} (EXACT - no substitution)`).join("\n")}
-
-ALL major color areas in the image MUST use these exact hex values. Do NOT substitute with similar colors.
-
-================================================================================
-SECONDARY: SEMANTIC CONTEXT (Use to Inform Technique)
-================================================================================
 `
     : "";
 
@@ -172,22 +173,36 @@ SECONDARY: SEMANTIC CONTEXT (Use to Inform Technique)
           role: "user",
           parts: [
             {
-              text: `Generate a ${type} image (${aspectRatios[type]} aspect ratio) for the "${styleName}" style.
+              text: `CREATE A NEW ORIGINAL IMAGE - DO NOT REPLICATE ANY REFERENCE IMAGE.
 
-${tokenSection}Style Description: ${styleDescription}
+Generate a ${aspectRatioDescriptions[type]} illustration for the visual style called "${styleName}".
+
+${tokenSection}Style characteristics: ${styleDescription}
 
 ================================================================================
-SUBJECT & COMPOSITION
+REQUIRED SUBJECT (YOU MUST DEPICT THIS EXACT SCENE)
 ================================================================================
-Subject: ${CANONICAL_SUBJECTS[type]}
+${CANONICAL_SUBJECTS[type]}
 
-Render this subject using${hasTokenColors ? " the Design Token colors above and" : ""} the style's visual characteristics. The image should demonstrate the style's color palette, lighting, texture, and mood.`,
+================================================================================
+CRITICAL INSTRUCTIONS
+================================================================================
+1. CREATE an entirely new image depicting the EXACT subject described above
+2. DO NOT copy, replicate, or recreate any input/reference images
+3. Apply the style's color palette and artistic characteristics to the NEW subject
+4. The subject MUST match the description: ${type === "portrait" ? "artist in studio" : type === "landscape" ? "cityscape promenade" : "studio desk arrangement"}
+5. Output aspect ratio MUST be ${aspectRatioDescriptions[type]}
+
+This is a canonical preview that will be used to compare styles. Each style gets the SAME subjects rendered differently.`,
             },
           ],
         },
       ],
       config: {
         responseModalities: ["image", "text"],
+        imageConfig: {
+          aspectRatio: aspectRatioConfigs[type],
+        },
       },
     });
 

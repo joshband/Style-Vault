@@ -197,9 +197,9 @@ Visual Era: ${eraKeywords}
 Mood Keywords: ${moodKeywords}
 
 ================================================================================
-UI LAYOUT & ELEMENTS
+UI LAYOUT & ELEMENTS (1:1 Square Format)
 ================================================================================
-Create a clean, professional web application interface in 16:9 landscape format showcasing standard UI components:
+Create a clean, professional web application interface in 1:1 square format showcasing standard UI components:
 
 NAVIGATION:
 - Top navigation bar with logo area and menu items using token colors
@@ -269,7 +269,7 @@ Visual Era: ${eraKeywords}
 Mood Keywords: ${moodKeywords}
 
 ================================================================================
-UI LAYOUT & ELEMENTS (16:9 Landscape Format)
+UI LAYOUT & ELEMENTS (1:1 Square Format)
 ================================================================================
 Create a DETAILED, COMPLEX software interface with multiple UI layers and components.
 
