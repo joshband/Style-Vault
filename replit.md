@@ -19,6 +19,7 @@ Preferred communication style: Simple, everyday language.
 - **Authentication**: Replit Auth (OpenID Connect) handles user sign-ins, session management via PostgreSQL, and user profiles.
 - **Data Storage**: PostgreSQL with Drizzle ORM manages all persistent data, including `styles`, `users`, `sessions`, `bookmarks`, `ratings`, and `generatedImages`.
 - **AI Integration**: Leverages Google Gemini via Replit AI Integrations for image analysis, canonical preview generation, styled image generation, and metadata enrichment. AI image generation prioritizes Design Tokens.
+- **UI Concept Style Transfer**: The `generateSingleUiConcept` function in `server/mood-board-generation.ts` now passes the reference image directly to Gemini for proper style transfer, ensuring UI mockups (softwareApp, audioPlugin, dashboard) match the artistic rendering style of the source reference image.
 - **Comprehensive DTCG Generator**: Combines CV, Vision API, and AI to produce full W3C DTCG 2025.10 token structures, encompassing 12 categories (color, spacing, typography, etc.) with confidence tracking and source attribution.
 - **Token Export Pipeline**: A modular pipeline exports design tokens into 18 different formats, including various code, mobile, design tool, and game engine formats.
 - **One-Click Deploy**: Supports deployment to Vercel and Netlify by generating platform-specific configurations and bundling necessary assets.

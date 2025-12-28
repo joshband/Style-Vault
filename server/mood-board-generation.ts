@@ -361,13 +361,50 @@ export async function generateSingleUiConcept(
     dashboard: "16:9",     // Landscape format
   };
   
+  // Build parts array - include reference image for style transfer if available
+  const parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> = [];
+  
+  // Add reference image FIRST so Gemini can analyze the artistic style
+  if (request.referenceImageBase64) {
+    const mimeMatch = request.referenceImageBase64.match(/^data:(image\/[a-z]+);base64,/);
+    const mimeType = mimeMatch?.[1] || "image/jpeg";
+    const base64Data = request.referenceImageBase64.replace(/^data:image\/[a-z]+;base64,/, "");
+    
+    parts.push({
+      inlineData: {
+        mimeType,
+        data: base64Data,
+      },
+    });
+  }
+  
+  // Build enhanced prompt with style transfer instructions when reference image is present
+  let enhancedPrompt = prompt;
+  if (request.referenceImageBase64) {
+    enhancedPrompt = `STYLE TRANSFER INSTRUCTIONS:
+Study the artistic style, rendering technique, color treatment, and visual aesthetic of the reference image above.
+Apply this EXACT same artistic style to the UI mockup described below.
+
+Key requirements:
+- Match the color palette, saturation, and contrast from the reference
+- Preserve the artistic rendering style (if illustrated, keep it illustrated; if painterly, keep it painterly)
+- Apply similar lighting, texture, and mood
+- DO NOT render as generic dark UI or photorealistic if the reference is artistic/stylized
+
+================================================================================
+
+${prompt}`;
+  }
+  
+  parts.push({ text: enhancedPrompt });
+  
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-image",
       contents: [
         {
           role: "user",
-          parts: [{ text: prompt }],
+          parts,
         },
       ],
       config: {

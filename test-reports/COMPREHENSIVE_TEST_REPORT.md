@@ -1,6 +1,6 @@
 # Visual DNA Comprehensive Test Report
 
-**Generated:** 2025-12-28T01:16:44.990Z
+**Generated:** 2025-12-28T01:36:12.383Z
 **Base URL:** http://localhost:5000
 
 ## Summary
@@ -12,7 +12,7 @@
 | Failed | 0 |
 | Skipped | 0 |
 | Pass Rate | 100% |
-| Total Duration | 6601ms |
+| Total Duration | 8817ms |
 
 ---
 
@@ -22,45 +22,45 @@
 
 | Test | Status | Duration | Details |
 |------|--------|----------|--------|
-| GET /api/styles returns styles list | ✅ | 1603ms | Found 18 styles |
-| GET /api/styles includes imageIds | ✅ | 40ms | 18/18 styles have images |
-| GET /api/styles/:id returns style details | ✅ | 243ms | Retrieved style: Wired Nostalgia Art |
-| GET /api/images/:id returns image | ✅ | 426ms | Image 2cc9ccef-5497-4dc2-8ee4-ae34026e49bd loaded |
-| Image compression variants available | ✅ | 25ms | Thumb and medium variants available |
-| GET /api/health returns status | ✅ | 1577ms | Health check status: 200 |
-| GET /api/diagnostics returns system info | ✅ | 1620ms | Diagnostics status: 200 |
-| Paginated styles API works | ✅ | 287ms | Paginated: 5 items, 18 total |
+| GET /api/styles returns styles list | ✅ | 1668ms | Found 18 styles |
+| GET /api/styles includes imageIds | ✅ | 16ms | 18/18 styles have images |
+| GET /api/styles/:id returns style details | ✅ | 341ms | Retrieved style: Wired Nostalgia Art |
+| GET /api/images/:id returns image | ✅ | 707ms | Image 2cc9ccef-5497-4dc2-8ee4-ae34026e49bd loaded |
+| Image compression variants available | ✅ | 22ms | Thumb and medium variants available |
+| GET /api/health returns status | ✅ | 1699ms | Health check status: 200 |
+| GET /api/diagnostics returns system info | ✅ | 2627ms | Diagnostics status: 200 |
+| Paginated styles API works | ✅ | 353ms | Paginated: 5 items, 18 total |
 
 ### ✅ Error Handling
 
 | Test | Status | Duration | Details |
 |------|--------|----------|--------|
-| GET /api/styles/:id handles 404 | ✅ | 10ms | Returns 404 for non-existent style |
-| GET /api/images/:id handles 404 | ✅ | 10ms | Returns 404 for non-existent image |
-| SPA fallback handles client routes | ✅ | 13ms | SPA fallback returns 200 for client routing |
+| GET /api/styles/:id handles 404 | ✅ | 16ms | Returns 404 for non-existent style |
+| GET /api/images/:id handles 404 | ✅ | 6ms | Returns 404 for non-existent image |
+| SPA fallback handles client routes | ✅ | 12ms | SPA fallback returns 200 for client routing |
 
 ### ✅ Page Accessibility
 
 | Test | Status | Duration | Details |
 |------|--------|----------|--------|
-| Home/Explore page accessible | ✅ | 35ms | Status: 200 |
-| Create Style page accessible | ✅ | 15ms | Status: 200 |
-| Compare Styles page accessible | ✅ | 14ms | Status: 200 |
-| Saved Styles page accessible | ✅ | 22ms | Status: 200 |
-| Tools page accessible | ✅ | 13ms | Status: 200 |
-| Features page accessible | ✅ | 11ms | Status: 200 |
-| Analytics page accessible | ✅ | 11ms | Status: 200 |
-| Admin Dashboard page accessible | ✅ | 13ms | Status: 200 |
-| Remix page accessible | ✅ | 8ms | Status: 200 |
-| Batch Upload page accessible | ✅ | 10ms | Status: 200 |
+| Home/Explore page accessible | ✅ | 16ms | Status: 200 |
+| Create Style page accessible | ✅ | 8ms | Status: 200 |
+| Compare Styles page accessible | ✅ | 8ms | Status: 200 |
+| Saved Styles page accessible | ✅ | 7ms | Status: 200 |
+| Tools page accessible | ✅ | 8ms | Status: 200 |
+| Features page accessible | ✅ | 9ms | Status: 200 |
+| Analytics page accessible | ✅ | 8ms | Status: 200 |
+| Admin Dashboard page accessible | ✅ | 10ms | Status: 200 |
+| Remix page accessible | ✅ | 6ms | Status: 200 |
+| Batch Upload page accessible | ✅ | 7ms | Status: 200 |
 
 ### ✅ Data Integrity
 
 | Test | Status | Duration | Details |
 |------|--------|----------|--------|
-| Styles have valid structure | ✅ | 12ms | 18/18 styles have valid structure |
-| Styles have design tokens | ✅ | 196ms | Tokens present |
-| Image IDs reference valid images | ✅ | 387ms | 8/8 images valid |
+| Styles have valid structure | ✅ | 8ms | 18/18 styles have valid structure |
+| Styles have design tokens | ✅ | 238ms | Tokens present |
+| Image IDs reference valid images | ✅ | 1017ms | 8/8 images valid |
 
 ---
 
@@ -68,8 +68,8 @@
 
 | Metric | Value | Target | Status |
 |--------|-------|--------|--------|
-| API Response Time (GET /api/styles) | 8ms | <500ms | ✅ |
-| Image Load Time (thumbnail) | 14ms | <200ms | ✅ |
+| API Response Time (GET /api/styles) | 4ms | <500ms | ✅ |
+| Image Load Time (thumbnail) | 9ms | <200ms | ✅ |
 
 ---
 

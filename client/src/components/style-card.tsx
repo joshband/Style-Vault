@@ -166,12 +166,14 @@ const StyleCardComponent = memo(function StyleCard({ style, className, onDelete 
             }}
             transition={{ duration: 0.2, ease: "easeOut" }}
           >
-            {/* Preview Image - prioritize style-matching previews over UI concepts */}
+            {/* Preview Image - prioritize UI software app (core purpose of tool) then fallback to other previews */}
             <div className="relative aspect-[16/10] bg-muted overflow-hidden">
-              {(style.imageIds?.preview_portrait || style.imageIds?.preview_landscape || style.imageIds?.preview_still_life || style.imageIds?.reference || style.thumbnailPreview) ? (
+              {(style.imageIds?.ui_software_app || style.imageIds?.preview_portrait || style.imageIds?.preview_landscape || style.imageIds?.preview_still_life || style.imageIds?.reference || style.thumbnailPreview) ? (
                 <img 
                   src={
-                    style.imageIds?.preview_portrait
+                    style.imageIds?.ui_software_app
+                      ? `/api/images/${style.imageIds.ui_software_app}?size=medium`
+                      : style.imageIds?.preview_portrait
                       ? `/api/images/${style.imageIds.preview_portrait}?size=medium`
                       : style.imageIds?.preview_landscape 
                       ? `/api/images/${style.imageIds.preview_landscape}?size=medium`
