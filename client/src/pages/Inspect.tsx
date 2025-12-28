@@ -1664,7 +1664,7 @@ export default ${safeName};`;
             </div>
           </details>
 
-          {/* Design DNA - Tokens section, collapsed by default */}
+          {/* Design DNA - Tokens & Material Intelligence section, collapsed by default */}
           <details className="group" onToggle={(e) => { if ((e.target as HTMLDetailsElement).open) setTokensExpanded(true); }}>
             <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
               <span className="text-sm font-medium text-foreground">Design DNA</span>
@@ -1681,21 +1681,24 @@ export default ${safeName};`;
                     <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">All Tokens</h4>
                     <TokenViewer tokens={summary.tokens} />
                   </div>
+                  
+                  {/* Material Intelligence - inside Design DNA */}
+                  <div>
+                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Material Intelligence</h4>
+                    <MaterialIntelligencePanel
+                      styleId={summary.id}
+                      referenceImage={getSafeImageSrc(
+                        summary.imageIds?.reference
+                          ? `/api/images/${summary.imageIds.reference}?size=large`
+                          : undefined,
+                        isSafeBase64(summary.referenceImages?.[0]) ? summary.referenceImages?.[0] : undefined
+                      ) || undefined}
+                    />
+                  </div>
                 </>
               )}
             </div>
           </details>
-
-          {/* Material Intelligence Panel */}
-          <MaterialIntelligencePanel
-            styleId={summary.id}
-            referenceImage={getSafeImageSrc(
-              summary.imageIds?.reference
-                ? `/api/images/${summary.imageIds.reference}?size=large`
-                : undefined,
-              isSafeBase64(summary.referenceImages?.[0]) ? summary.referenceImages?.[0] : undefined
-            ) || undefined}
-          />
         </div>
 
         {/* Try It Now Dialog */}

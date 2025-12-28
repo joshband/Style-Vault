@@ -57,17 +57,22 @@ interface Props {
   className?: string;
 }
 
-function SignalBar({ label, value, color }: { label: string; value: number; color: string }) {
-  const percent = Math.round(value * 100);
+function SignalBar({ label, value, color }: { label: string; value: number | undefined | null; color: string }) {
+  const safeValue = typeof value === 'number' && !isNaN(value) ? value : 0;
+  const percent = Math.round(safeValue * 100);
+  const isAvailable = typeof value === 'number' && !isNaN(value);
+  
   return (
     <div className="space-y-1">
       <div className="flex justify-between text-xs">
         <span className="text-muted-foreground">{label}</span>
-        <span className="font-mono text-foreground">{percent}%</span>
+        <span className="font-mono text-foreground">
+          {isAvailable ? `${percent}%` : 'N/A'}
+        </span>
       </div>
       <div className="h-1.5 bg-muted rounded-full overflow-hidden">
         <div
-          className={cn("h-full rounded-full transition-all", color)}
+          className={cn("h-full rounded-full transition-all", color, !isAvailable && "opacity-30")}
           style={{ width: `${percent}%` }}
         />
       </div>
