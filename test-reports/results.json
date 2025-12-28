@@ -1,0 +1,309 @@
+{
+  "generatedAt": "2025-12-28T01:11:21.217Z",
+  "baseUrl": "http://localhost:5000",
+  "summary": {
+    "total": 18,
+    "passed": 18,
+    "failed": 0,
+    "skipped": 0,
+    "passRate": 100,
+    "totalDuration": 4264
+  },
+  "results": [
+    {
+      "name": "GET /api/styles returns styles list",
+      "category": "API Endpoints",
+      "status": "pass",
+      "duration": 1574,
+      "details": "Found 18 styles"
+    },
+    {
+      "name": "GET /api/styles includes imageIds",
+      "category": "API Endpoints",
+      "status": "pass",
+      "duration": 24,
+      "details": "18/18 styles have images"
+    },
+    {
+      "name": "GET /api/styles/:id returns style details",
+      "category": "API Endpoints",
+      "status": "pass",
+      "duration": 347,
+      "details": "Retrieved style: Wired Nostalgia Art"
+    },
+    {
+      "name": "GET /api/images/:id returns image",
+      "category": "API Endpoints",
+      "status": "pass",
+      "duration": 414,
+      "details": "Image 2cc9ccef-5497-4dc2-8ee4-ae34026e49bd loaded"
+    },
+    {
+      "name": "Image compression variants available",
+      "category": "API Endpoints",
+      "status": "pass",
+      "duration": 35,
+      "details": "Thumb and medium variants available"
+    },
+    {
+      "name": "Home/Explore page accessible",
+      "category": "Page Accessibility",
+      "status": "pass",
+      "duration": 32,
+      "details": "Status: 200"
+    },
+    {
+      "name": "Create Style page accessible",
+      "category": "Page Accessibility",
+      "status": "pass",
+      "duration": 15,
+      "details": "Status: 200"
+    },
+    {
+      "name": "Compare Styles page accessible",
+      "category": "Page Accessibility",
+      "status": "pass",
+      "duration": 11,
+      "details": "Status: 200"
+    },
+    {
+      "name": "Saved Styles page accessible",
+      "category": "Page Accessibility",
+      "status": "pass",
+      "duration": 320,
+      "details": "Status: 200"
+    },
+    {
+      "name": "Tools page accessible",
+      "category": "Page Accessibility",
+      "status": "pass",
+      "duration": 359,
+      "details": "Status: 200"
+    },
+    {
+      "name": "Features page accessible",
+      "category": "Page Accessibility",
+      "status": "pass",
+      "duration": 230,
+      "details": "Status: 200"
+    },
+    {
+      "name": "Analytics page accessible",
+      "category": "Page Accessibility",
+      "status": "pass",
+      "duration": 116,
+      "details": "Status: 200"
+    },
+    {
+      "name": "Admin Dashboard page accessible",
+      "category": "Page Accessibility",
+      "status": "pass",
+      "duration": 14,
+      "details": "Status: 200"
+    },
+    {
+      "name": "Remix page accessible",
+      "category": "Page Accessibility",
+      "status": "pass",
+      "duration": 9,
+      "details": "Status: 200"
+    },
+    {
+      "name": "Batch Upload page accessible",
+      "category": "Page Accessibility",
+      "status": "pass",
+      "duration": 10,
+      "details": "Status: 200"
+    },
+    {
+      "name": "Styles have valid structure",
+      "category": "Data Integrity",
+      "status": "pass",
+      "duration": 11,
+      "details": "18/18 styles have valid structure"
+    },
+    {
+      "name": "Styles have design tokens",
+      "category": "Data Integrity",
+      "status": "pass",
+      "duration": 204,
+      "details": "Tokens present"
+    },
+    {
+      "name": "Image IDs reference valid images",
+      "category": "Data Integrity",
+      "status": "pass",
+      "duration": 539,
+      "details": "8/8 images valid"
+    }
+  ],
+  "categories": [
+    {
+      "name": "API Endpoints",
+      "passed": 5,
+      "failed": 0,
+      "tests": [
+        {
+          "name": "GET /api/styles returns styles list",
+          "category": "API Endpoints",
+          "status": "pass",
+          "duration": 1574,
+          "details": "Found 18 styles"
+        },
+        {
+          "name": "GET /api/styles includes imageIds",
+          "category": "API Endpoints",
+          "status": "pass",
+          "duration": 24,
+          "details": "18/18 styles have images"
+        },
+        {
+          "name": "GET /api/styles/:id returns style details",
+          "category": "API Endpoints",
+          "status": "pass",
+          "duration": 347,
+          "details": "Retrieved style: Wired Nostalgia Art"
+        },
+        {
+          "name": "GET /api/images/:id returns image",
+          "category": "API Endpoints",
+          "status": "pass",
+          "duration": 414,
+          "details": "Image 2cc9ccef-5497-4dc2-8ee4-ae34026e49bd loaded"
+        },
+        {
+          "name": "Image compression variants available",
+          "category": "API Endpoints",
+          "status": "pass",
+          "duration": 35,
+          "details": "Thumb and medium variants available"
+        }
+      ]
+    },
+    {
+      "name": "Page Accessibility",
+      "passed": 10,
+      "failed": 0,
+      "tests": [
+        {
+          "name": "Home/Explore page accessible",
+          "category": "Page Accessibility",
+          "status": "pass",
+          "duration": 32,
+          "details": "Status: 200"
+        },
+        {
+          "name": "Create Style page accessible",
+          "category": "Page Accessibility",
+          "status": "pass",
+          "duration": 15,
+          "details": "Status: 200"
+        },
+        {
+          "name": "Compare Styles page accessible",
+          "category": "Page Accessibility",
+          "status": "pass",
+          "duration": 11,
+          "details": "Status: 200"
+        },
+        {
+          "name": "Saved Styles page accessible",
+          "category": "Page Accessibility",
+          "status": "pass",
+          "duration": 320,
+          "details": "Status: 200"
+        },
+        {
+          "name": "Tools page accessible",
+          "category": "Page Accessibility",
+          "status": "pass",
+          "duration": 359,
+          "details": "Status: 200"
+        },
+        {
+          "name": "Features page accessible",
+          "category": "Page Accessibility",
+          "status": "pass",
+          "duration": 230,
+          "details": "Status: 200"
+        },
+        {
+          "name": "Analytics page accessible",
+          "category": "Page Accessibility",
+          "status": "pass",
+          "duration": 116,
+          "details": "Status: 200"
+        },
+        {
+          "name": "Admin Dashboard page accessible",
+          "category": "Page Accessibility",
+          "status": "pass",
+          "duration": 14,
+          "details": "Status: 200"
+        },
+        {
+          "name": "Remix page accessible",
+          "category": "Page Accessibility",
+          "status": "pass",
+          "duration": 9,
+          "details": "Status: 200"
+        },
+        {
+          "name": "Batch Upload page accessible",
+          "category": "Page Accessibility",
+          "status": "pass",
+          "duration": 10,
+          "details": "Status: 200"
+        }
+      ]
+    },
+    {
+      "name": "Data Integrity",
+      "passed": 3,
+      "failed": 0,
+      "tests": [
+        {
+          "name": "Styles have valid structure",
+          "category": "Data Integrity",
+          "status": "pass",
+          "duration": 11,
+          "details": "18/18 styles have valid structure"
+        },
+        {
+          "name": "Styles have design tokens",
+          "category": "Data Integrity",
+          "status": "pass",
+          "duration": 204,
+          "details": "Tokens present"
+        },
+        {
+          "name": "Image IDs reference valid images",
+          "category": "Data Integrity",
+          "status": "pass",
+          "duration": 539,
+          "details": "8/8 images valid"
+        }
+      ]
+    }
+  ],
+  "performance": [
+    {
+      "metric": "API Response Time (GET /api/styles)",
+      "value": 8,
+      "target": 500,
+      "status": "good"
+    },
+    {
+      "metric": "Image Load Time (thumbnail)",
+      "value": 7,
+      "target": 200,
+      "status": "good"
+    }
+  ],
+  "recommendations": [
+    "Add end-to-end tests for user authentication flows",
+    "Add accessibility (a11y) testing with axe-core",
+    "Consider adding visual regression tests",
+    "Monitor bundle size to prevent bloat"
+  ]
+}

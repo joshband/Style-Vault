@@ -593,8 +593,18 @@ export async function registerRoutes(
         cache.set(CACHE_KEYS.STYLE_SUMMARIES, styles, 30 * 1000);
       }
       
+      // Add imageIds to styles for thumbnail display
+      const styleIds = styles.map(s => s.id);
+      const imageIdsMap = await storage.getImageIdsByStyleIds(styleIds);
+      
+      const stylesWithImageIds = styles.map(style => ({
+        ...style,
+        thumbnailPreview: null,
+        imageIds: imageIdsMap.get(style.id) || {},
+      }));
+      
       // Filter to show public styles + user's own private styles
-      const visibleStyles = styles.filter((s: any) => 
+      const visibleStyles = stylesWithImageIds.filter((s: any) => 
         s.isPublic !== false || s.creatorId === userId
       );
       
