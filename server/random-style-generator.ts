@@ -130,7 +130,7 @@ function generateColorPalette(baseHue: number): RandomColorPalette {
 }
 
 function generateRandomTokens(palette: RandomColorPalette, theme: typeof STYLE_THEMES[0]): Record<string, any> {
-  const borderRadiusScale = randomElement([
+  const radiusScale = randomElement([
     [0, 2, 4, 8, 12, 16, 24, 9999],
     [0, 4, 8, 16, 24, 32, 48, 9999],
     [0, 1, 2, 4, 6, 8, 12, 9999],
@@ -158,15 +158,15 @@ function generateRandomTokens(palette: RandomColorPalette, theme: typeof STYLE_T
       "10": { $type: "dimension", $value: "40px", $description: "2x large" },
       "12": { $type: "dimension", $value: "48px", $description: "3x large" },
     },
-    borderRadius: {
-      none: { $type: "dimension", $value: `${borderRadiusScale[0]}px`, $description: "No rounding" },
-      sm: { $type: "dimension", $value: `${borderRadiusScale[1]}px`, $description: "Small" },
-      md: { $type: "dimension", $value: `${borderRadiusScale[2]}px`, $description: "Medium" },
-      lg: { $type: "dimension", $value: `${borderRadiusScale[3]}px`, $description: "Large" },
-      xl: { $type: "dimension", $value: `${borderRadiusScale[4]}px`, $description: "Extra large" },
-      "2xl": { $type: "dimension", $value: `${borderRadiusScale[5]}px`, $description: "2x large" },
-      "3xl": { $type: "dimension", $value: `${borderRadiusScale[6]}px`, $description: "3x large" },
-      full: { $type: "dimension", $value: `${borderRadiusScale[7]}px`, $description: "Full/pill" },
+    radius: {
+      none: { $type: "dimension", $value: `${radiusScale[0]}px`, $description: "No rounding" },
+      sm: { $type: "dimension", $value: `${radiusScale[1]}px`, $description: "Small" },
+      md: { $type: "dimension", $value: `${radiusScale[2]}px`, $description: "Medium" },
+      lg: { $type: "dimension", $value: `${radiusScale[3]}px`, $description: "Large" },
+      xl: { $type: "dimension", $value: `${radiusScale[4]}px`, $description: "Extra large" },
+      "2xl": { $type: "dimension", $value: `${radiusScale[5]}px`, $description: "2x large" },
+      "3xl": { $type: "dimension", $value: `${radiusScale[6]}px`, $description: "3x large" },
+      full: { $type: "dimension", $value: `${radiusScale[7]}px`, $description: "Full/pill" },
     },
     shadow: {
       sm: {

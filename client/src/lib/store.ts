@@ -207,7 +207,7 @@ export const SAMPLE_TOKENS: DTCGTokenGroup = {
     "2xl": { "$type": "dimension", "$value": "48px" },
     "3xl": { "$type": "dimension", "$value": "64px" }
   },
-  "borderRadius": {
+  "radius": {
     "none": { "$type": "dimension", "$value": "0px" },
     "sm": { "$type": "dimension", "$value": "2px" },
     "md": { "$type": "dimension", "$value": "4px" },

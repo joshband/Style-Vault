@@ -174,12 +174,12 @@ function extractSpacing(tokens: DTCGTokenGroup): { name: string; value: string }
 }
 
 function extractBorderRadius(tokens: DTCGTokenGroup): { name: string; value: string }[] {
-  const borderRadius = tokens.borderRadius;
-  if (!borderRadius || typeof borderRadius !== "object") return [];
+  const radius = tokens.radius;
+  if (!radius || typeof radius !== "object") return [];
   
   const values: { name: string; value: string }[] = [];
   
-  for (const [key, value] of Object.entries(borderRadius)) {
+  for (const [key, value] of Object.entries(radius)) {
     if (isToken(value) && value.$type === "dimension") {
       values.push({ name: key, value: String(value.$value) });
     }

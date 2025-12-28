@@ -65,13 +65,13 @@ describe('Random Style Generator', () => {
       expect(result.tokens.typography.fontSize).toBeDefined();
     });
 
-    it('should generate border radius tokens', () => {
+    it('should generate radius tokens', () => {
       const result = generateRandomStyle();
       
-      expect(result.tokens.borderRadius).toBeDefined();
-      expect(result.tokens.borderRadius.sm).toBeDefined();
-      expect(result.tokens.borderRadius.md).toBeDefined();
-      expect(result.tokens.borderRadius.lg).toBeDefined();
+      expect(result.tokens.radius).toBeDefined();
+      expect(result.tokens.radius.sm).toBeDefined();
+      expect(result.tokens.radius.md).toBeDefined();
+      expect(result.tokens.radius.lg).toBeDefined();
     });
 
     it('should generate shadow tokens', () => {

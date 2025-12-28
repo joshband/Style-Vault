@@ -111,7 +111,7 @@ function convertToXDEntity(token: NormalizedToken): XDEntity | null {
 
     case 'dimension':
     case 'spacing':
-    case 'borderRadius':
+    case 'radius':
     case 'borderWidth':
     case 'fontSize':
     case 'lineHeight':

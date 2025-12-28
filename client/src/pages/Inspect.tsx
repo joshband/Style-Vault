@@ -522,7 +522,7 @@ export default function Inspect() {
     const categoryLabels: Record<string, string> = {
       color: 'Colors',
       spacing: 'Spacing', 
-      borderRadius: 'Border Radius',
+      radius: 'Border Radius',
       typography: 'Typography',
       shadow: 'Shadows',
       elevation: 'Elevation',
@@ -606,7 +606,7 @@ export default function Inspect() {
     
     if (tokens.color) config.theme.extend.colors = flattenTokens(tokens.color);
     if (tokens.spacing) config.theme.extend.spacing = flattenTokens(tokens.spacing);
-    if (tokens.borderRadius) config.theme.extend.borderRadius = flattenTokens(tokens.borderRadius);
+    if (tokens.radius) config.theme.extend.borderRadius = flattenTokens(tokens.radius);
     if (tokens.shadow) config.theme.extend.boxShadow = flattenTokens(tokens.shadow);
     if (tokens.typography) config.theme.extend.fontSize = flattenTokens(tokens.typography);
     if (tokens.fontWeight) config.theme.extend.fontWeight = flattenTokens(tokens.fontWeight);
@@ -806,7 +806,7 @@ export default ${safeName};`;
       if (type === 'color' || (typeof value === 'string' && /^#|^rgb/.test(value))) {
         resolvedType = 'COLOR';
         resolvedValue = hexToFigmaColor(String(value));
-      } else if (type === 'dimension' || type === 'spacing' || type === 'borderRadius') {
+      } else if (type === 'dimension' || type === 'spacing' || type === 'radius') {
         resolvedType = 'FLOAT';
         resolvedValue = parseFloat(String(value).replace(/[^\d.-]/g, '')) || 0;
       } else if (typeof value === 'number') {

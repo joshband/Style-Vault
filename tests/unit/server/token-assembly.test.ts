@@ -14,7 +14,7 @@ describe('Token Assembly', () => {
       expect(result.color).toBeDefined();
       expect(result.spacing).toBeDefined();
       expect(result.typography).toBeDefined();
-      expect(result.borderRadius).toBeDefined();
+      expect(result.radius).toBeDefined();
       expect(result.shadow).toBeDefined();
       expect(result.opacity).toBeDefined();
       expect(result.depth).toBeDefined();
@@ -82,14 +82,14 @@ describe('Token Assembly', () => {
       expect(Object.keys(result.spacing).length).toBeGreaterThan(0);
     });
 
-    it('should generate border radius tokens from CV result', () => {
+    it('should generate radius tokens from CV result', () => {
       const cvResult: CVExtractionResult = {
         borderRadius: [4, 8, 12],
       };
       
       const result = assembleTokens(cvResult);
       
-      expect(Object.keys(result.borderRadius).length).toBeGreaterThan(0);
+      expect(Object.keys(result.radius).length).toBeGreaterThan(0);
     });
   });
 });

@@ -142,7 +142,7 @@ function convertToTokensStudioToken(
       tsValue = String(rawValue);
       break;
 
-    case 'borderRadius':
+    case 'radius':
       tsType = 'borderRadius';
       tsValue = String(rawValue);
       break;
@@ -225,7 +225,7 @@ function mapTokenType(type: string): string {
     color: 'color',
     dimension: 'dimension',
     spacing: 'dimension',
-    borderRadius: 'borderRadius',
+    radius: 'borderRadius',
     borderWidth: 'borderWidth',
     fontSize: 'fontSizes',
     lineHeight: 'lineHeights',

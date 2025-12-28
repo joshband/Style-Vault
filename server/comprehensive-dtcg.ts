@@ -9,7 +9,7 @@
  * - dimension (spacing, sizing)
  * - fontFamily, fontSize, fontWeight, lineHeight
  * - shadow
- * - borderWidth, borderRadius
+ * - borderWidth, radius
  * - gradient
  * - opacity
  * - duration, cubicBezier (motion)
@@ -79,7 +79,7 @@ export interface ComprehensiveDTCG {
   spacing: DTCGTokenGroup;
   sizing: DTCGTokenGroup;
   typography: DTCGTokenGroup;
-  borderRadius: DTCGTokenGroup;
+  radius: DTCGTokenGroup;
   borderWidth: DTCGTokenGroup;
   shadow: DTCGTokenGroup;
   gradient: DTCGTokenGroup;
@@ -420,7 +420,7 @@ function assembleTypographyTokens(typographyRecommendations?: TypographyRecommen
   return { tokens, confidence: 0.1 };
 }
 
-function assembleBorderRadiusTokens(cvBorderRadius: number[] | undefined): {
+function assembleRadiusTokens(cvBorderRadius: number[] | undefined): {
   tokens: DTCGTokenGroup;
   confidence: number;
 } {
@@ -435,7 +435,7 @@ function assembleBorderRadiusTokens(cvBorderRadius: number[] | undefined): {
       tokens[name] = createToken(
         "dimension",
         i === 7 ? "9999px" : `${Math.round(value)}px`,
-        `Border radius ${name}`,
+        `Radius ${name}`,
         0.75,
         "cv",
         "corner-detection"
@@ -451,7 +451,7 @@ function assembleBorderRadiusTokens(cvBorderRadius: number[] | undefined): {
     tokens[names[i]] = createToken(
       "dimension",
       `${value}px`,
-      `Border radius ${names[i]} (default)`,
+      `Radius ${names[i]} (default)`,
       0.1,
       "inferred"
     );
@@ -779,7 +779,7 @@ export function generateComprehensiveDTCG(input: ComprehensiveDTCGInput): Compre
   const spacingResult = assembleSpacingTokens(cvTokens?.spacing);
   const sizingResult = assembleSizingTokens();
   const typographyResult = assembleTypographyTokens(typographyRecommendations);
-  const borderRadiusResult = assembleBorderRadiusTokens(cvTokens?.borderRadius);
+  const radiusResult = assembleRadiusTokens(cvTokens?.borderRadius);
   const borderWidthResult = assembleBorderWidthTokens(cvTokens?.strokeWidth);
   const shadowResult = assembleShadowTokens(cvTokens?.elevation);
   const gradientResult = assembleGradientTokens(cvTokens?.color);
@@ -793,7 +793,7 @@ export function generateComprehensiveDTCG(input: ComprehensiveDTCGInput): Compre
     spacing: spacingResult.confidence,
     sizing: sizingResult.confidence,
     typography: typographyResult.confidence,
-    borderRadius: borderRadiusResult.confidence,
+    radius: radiusResult.confidence,
     borderWidth: borderWidthResult.confidence,
     shadow: shadowResult.confidence,
     gradient: gradientResult.confidence,
@@ -822,7 +822,7 @@ export function generateComprehensiveDTCG(input: ComprehensiveDTCGInput): Compre
     spacing: spacingResult.tokens,
     sizing: sizingResult.tokens,
     typography: typographyResult.tokens,
-    borderRadius: borderRadiusResult.tokens,
+    radius: radiusResult.tokens,
     borderWidth: borderWidthResult.tokens,
     shadow: shadowResult.tokens,
     gradient: gradientResult.tokens,

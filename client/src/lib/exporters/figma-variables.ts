@@ -57,7 +57,7 @@ export const exportFigmaVariables: ExporterDefinition = {
             a: parsed.a,
           };
         }
-      } else if (['dimension', 'spacing', 'borderRadius', 'number'].includes(token.type)) {
+      } else if (['dimension', 'spacing', 'radius', 'number'].includes(token.type)) {
         resolvedType = 'FLOAT';
         resolvedValue = parseFloat(String(token.value).replace(/[^\d.-]/g, '')) || 0;
       } else if (typeof token.value === 'number') {

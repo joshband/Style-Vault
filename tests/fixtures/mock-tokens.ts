@@ -135,7 +135,7 @@ export const mockDTCGTokens = {
       },
     },
   },
-  borderRadius: {
+  radius: {
     sm: {
       $type: "dimension",
       $value: "4px",
