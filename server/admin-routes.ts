@@ -8,7 +8,9 @@ import { db } from "./db";
 import { testRuns, testCases } from "@shared/schema";
 import { desc, eq, sql } from "drizzle-orm";
 import { regenerateAllStyles, regenerateSingleStyle, getRegenerationProgress, cancelRegeneration, generateRegenerationReport, type BatchRegenerationProgress, type RegenerationResult } from "./style-regeneration";
-import { migrateStyleImages, storeImage } from "./image-service";
+import { migrateStyleImages } from "./image-service";
+import { storeImageToObjectStorage, getObjectAssetsByStyle } from "./object-image-service";
+import { imageAssets } from "@shared/schema";
 
 type ImageType = "reference" | "previews" | "mood_board" | "ui_concepts" | "all";
 
@@ -882,6 +884,141 @@ export function registerAdminRoutes(app: Express) {
     } catch (error) {
       logger.error("Error during image migration", error, { module: 'Admin' });
       res.status(500).json({ error: "Failed to migrate images" });
+    }
+  });
+  
+  // Migrate images from imageAssets (database base64) to objectAssets (object storage)
+  app.post("/api/admin/migrate-to-object-storage", isAuthenticated, isAdmin, async (req: Request, res: Response) => {
+    try {
+      const { styleIds, dryRun = true, deleteAfterMigration = false, limit = 10 } = req.body;
+      
+      // Get imageAssets that need migration
+      const assetsToMigrate = await db
+        .select()
+        .from(imageAssets)
+        .limit(limit);
+      
+      // Group by styleId
+      const assetsByStyle = new Map<string, typeof assetsToMigrate>();
+      for (const asset of assetsToMigrate) {
+        const key = asset.styleId || 'orphan';
+        if (styleIds && !styleIds.includes(key)) continue;
+        if (!assetsByStyle.has(key)) {
+          assetsByStyle.set(key, []);
+        }
+        assetsByStyle.get(key)!.push(asset);
+      }
+      
+      const results: Array<{
+        styleId: string;
+        assetId: string;
+        type: string;
+        migrated: boolean;
+        newAssetId?: string;
+        error?: string;
+      }> = [];
+      
+      let successCount = 0;
+      let skipCount = 0;
+      let failCount = 0;
+      
+      for (const [styleId, assets] of Array.from(assetsByStyle.entries())) {
+        for (const asset of assets) {
+          try {
+            // Check if already migrated to object storage
+            const existingObjectAssets = await getObjectAssetsByStyle(styleId === 'orphan' ? '' : styleId);
+            if (existingObjectAssets[asset.type as keyof typeof existingObjectAssets]) {
+              skipCount++;
+              results.push({
+                styleId,
+                assetId: asset.id,
+                type: asset.type,
+                migrated: false,
+                error: 'Already exists in object storage',
+              });
+              continue;
+            }
+            
+            if (dryRun) {
+              results.push({
+                styleId,
+                assetId: asset.id,
+                type: asset.type,
+                migrated: false,
+                error: 'Dry run - would migrate',
+              });
+              continue;
+            }
+            
+            // Migrate to object storage
+            const newAssetId = await storeImageToObjectStorage(
+              asset.originalData,
+              asset.type as any,
+              styleId === 'orphan' ? undefined : styleId
+            );
+            
+            successCount++;
+            results.push({
+              styleId,
+              assetId: asset.id,
+              type: asset.type,
+              migrated: true,
+              newAssetId,
+            });
+            
+            // Optionally delete from imageAssets after successful migration
+            if (deleteAfterMigration) {
+              await db.delete(imageAssets).where(eq(imageAssets.id, asset.id));
+            }
+            
+            // Small delay to avoid overwhelming the system
+            await new Promise(resolve => setTimeout(resolve, 50));
+            
+          } catch (error) {
+            failCount++;
+            results.push({
+              styleId,
+              assetId: asset.id,
+              type: asset.type,
+              migrated: false,
+              error: String(error),
+            });
+            logger.error("Error migrating asset to object storage", error, { module: 'Admin', assetId: asset.id });
+          }
+        }
+      }
+      
+      res.json({
+        total: assetsToMigrate.length,
+        success: successCount,
+        skipped: skipCount,
+        failed: failCount,
+        dryRun,
+        deleteAfterMigration,
+        results,
+      });
+    } catch (error) {
+      logger.error("Error during object storage migration", error, { module: 'Admin' });
+      res.status(500).json({ error: "Failed to migrate to object storage" });
+    }
+  });
+  
+  // Get count of images still in imageAssets (pending migration)
+  app.get("/api/admin/migration-status", isAuthenticated, isAdmin, async (req: Request, res: Response) => {
+    try {
+      const [imageAssetsCount] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(imageAssets);
+      
+      res.json({
+        imageAssetsCount: imageAssetsCount?.count || 0,
+        message: imageAssetsCount?.count === 0 
+          ? 'All images migrated to object storage' 
+          : `${imageAssetsCount?.count} images pending migration`,
+      });
+    } catch (error) {
+      logger.error("Error fetching migration status", error, { module: 'Admin' });
+      res.status(500).json({ error: "Failed to fetch migration status" });
     }
   });
   

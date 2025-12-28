@@ -101,6 +101,11 @@ async function generateResizedVariants(buffer: Buffer): Promise<{
   };
 }
 
+/**
+ * @deprecated Use storeImageToObjectStorage from object-image-service.ts instead.
+ * This function stores base64 data directly in the database which causes performance issues.
+ * Will be removed after migration to object storage is complete.
+ */
 export async function storeImage(
   base64Data: string,
   type: ImageAssetType,
@@ -122,6 +127,11 @@ export async function storeImage(
   return asset.id;
 }
 
+/**
+ * @deprecated Use getObjectAsset from object-image-service.ts instead.
+ * This function retrieves base64 data from the database which is inefficient.
+ * Will be removed after migration to object storage is complete.
+ */
 export async function getImage(
   id: string,
   size: "thumb" | "medium" | "full" = "medium"
@@ -153,6 +163,11 @@ export async function getImage(
   };
 }
 
+/**
+ * @deprecated Use getObjectAssetsByStyleId from object-image-service.ts instead.
+ * This function queries the old imageAssets table.
+ * Will be removed after migration to object storage is complete.
+ */
 export async function getImagesByStyle(
   styleId: string
 ): Promise<Record<ImageAssetType, string>> {
@@ -171,6 +186,11 @@ export async function getImagesByStyle(
   return result as Record<ImageAssetType, string>;
 }
 
+/**
+ * @deprecated Migration utility for moving base64 images to imageAssets table.
+ * Use migrateToObjectStorage admin endpoint to migrate to object storage instead.
+ * Will be removed after all styles are migrated to object storage.
+ */
 export async function migrateStyleImages(styleId: string, styleData: {
   referenceImages?: string[];
   previews?: { portrait?: string; landscape?: string; stillLife?: string };
@@ -223,6 +243,11 @@ export async function migrateStyleImages(styleId: string, styleData: {
   return imageIds;
 }
 
+/**
+ * @deprecated Use deleteObjectAssetsByStyle from object-image-service.ts instead.
+ * This function deletes from the old imageAssets table.
+ * Will be removed after migration to object storage is complete.
+ */
 export async function deleteStyleImages(styleId: string): Promise<void> {
   await db.delete(imageAssets).where(eq(imageAssets.styleId, styleId));
 }
