@@ -107,7 +107,7 @@ export const defaultFeatureFlags: FeatureFlags = {
   'auth.enabled': true,
   
   // Pages - DISABLED (except vault)
-  'inspect.enabled': false,
+  'inspect.enabled': true,
   'create.enabled': false,
   'generate.enabled': false,
   'batch.enabled': false,
@@ -172,7 +172,7 @@ export const defaultFeatureFlags: FeatureFlags = {
   
   // API endpoints - Only list enabled
   'api.styles.list': true,
-  'api.styles.detail': false,
+  'api.styles.detail': true,
   'api.styles.create': false,
   'api.styles.delete': false,
   'api.regenerate': false,
