@@ -152,7 +152,7 @@ export default function Explore() {
   }, [selectedForCompare, navigate]);
 
   useEffect(() => {
-    if (!sentinelRef.current || !containerRef.current) return;
+    if (!paginationEnabled || !sentinelRef.current || !containerRef.current) return;
     
     const observer = new IntersectionObserver(
       (entries) => {
@@ -165,7 +165,7 @@ export default function Explore() {
     
     observer.observe(sentinelRef.current);
     return () => observer.disconnect();
-  }, [hasNextPage, fetchNextPage, isFetchingNextPage]);
+  }, [paginationEnabled, hasNextPage, fetchNextPage, isFetchingNextPage]);
 
   if (isLoading) {
     return (
