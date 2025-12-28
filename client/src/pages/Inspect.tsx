@@ -1426,8 +1426,9 @@ export default ${safeName};`;
                     : undefined;
                   const base64Fallback = (previews as any)[type];
                   const imgSrc = getSafeImageSrc(imageIdSrc, base64Fallback);
+                  // Use ?size=full for downloads - high quality original
                   const fullSrc = summary.imageIds?.[key]
-                    ? `/api/images/${summary.imageIds[key]}`
+                    ? `/api/images/${summary.imageIds[key]}?size=full`
                     : (isSafeBase64(base64Fallback) ? base64Fallback : null);
                   return (
                     <div key={type} className="aspect-square bg-muted rounded-lg overflow-hidden border border-border relative group/preview">

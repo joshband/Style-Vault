@@ -325,7 +325,7 @@ async function regenerateStyle(style: Style): Promise<RegenerationResult> {
       });
       
       const previews: Record<string, string> = {};
-      const storedImageIds: string[] = [];
+      let storedCount = 0;
       
       if (previewResult.portrait) {
         const portraitData = ensureDataUrl(previewResult.portrait);
@@ -333,8 +333,8 @@ async function regenerateStyle(style: Style): Promise<RegenerationResult> {
         if (!isDuplicate) {
           previews.portrait = portraitData;
           try {
-            const portraitId = await storeImage(portraitData, "preview_portrait", style.id);
-            storedImageIds.push(portraitId);
+            await storeImage(portraitData, "preview_portrait", style.id);
+            storedCount++;
           } catch (storeErr) {
             logger.error("Failed to store portrait", storeErr, { module: 'StyleRegeneration', styleId: style.id });
           }
@@ -347,8 +347,8 @@ async function regenerateStyle(style: Style): Promise<RegenerationResult> {
         if (!isDuplicate) {
           previews.landscape = landscapeData;
           try {
-            const landscapeId = await storeImage(landscapeData, "preview_landscape", style.id);
-            storedImageIds.push(landscapeId);
+            await storeImage(landscapeData, "preview_landscape", style.id);
+            storedCount++;
           } catch (storeErr) {
             logger.error("Failed to store landscape", storeErr, { module: 'StyleRegeneration', styleId: style.id });
           }
@@ -361,8 +361,8 @@ async function regenerateStyle(style: Style): Promise<RegenerationResult> {
         if (!isDuplicate) {
           previews.stillLife = stillLifeData;
           try {
-            const stillLifeId = await storeImage(stillLifeData, "preview_still_life", style.id);
-            storedImageIds.push(stillLifeId);
+            await storeImage(stillLifeData, "preview_still_life", style.id);
+            storedCount++;
           } catch (storeErr) {
             logger.error("Failed to store still life", storeErr, { module: 'StyleRegeneration', styleId: style.id });
           }
@@ -374,10 +374,10 @@ async function regenerateStyle(style: Style): Promise<RegenerationResult> {
         await storage.updateStyleFull(style.id, { previews: previews as any });
       }
       
-      return { generatedCount: Object.keys(previews).length, storedInImageService: storedImageIds.length };
+      return { generatedCount: Object.keys(previews).length, storedInImageService: storedCount };
     })(),
     
-    // Task 2: Mood Board Generation - persists its own output
+    // Task 2: Mood Board Generation - persists its own output + stores optimized image
     (async () => {
       const moodResult = await generateMoodBoardWithGemini({
         styleName: style.name,
@@ -385,6 +385,8 @@ async function regenerateStyle(style: Style): Promise<RegenerationResult> {
         tokens: tokensForGeneration,
         metadataTags: style.metadataTags as unknown as Record<string, string[]> || undefined,
       });
+      
+      let storedImageId: string | null = null;
       
       // Persist mood board immediately
       if (moodResult.collage) {
@@ -397,12 +399,20 @@ async function regenerateStyle(style: Style): Promise<RegenerationResult> {
         const currentStyle = await storage.getStyleById(style.id);
         const existingUiConcepts = (currentStyle?.uiConcepts as UiConceptAssets) || { status: "pending", history: [] };
         await storage.updateStyleMoodBoard(style.id, moodBoardAssets, existingUiConcepts);
+        
+        // Also store through image service for optimized WebP variants
+        try {
+          const moodBoardData = ensureDataUrl(moodResult.collage);
+          storedImageId = await storeImage(moodBoardData, "mood_board", style.id);
+        } catch (storeErr) {
+          logger.error("Failed to store mood board", storeErr, { module: 'StyleRegeneration', styleId: style.id });
+        }
       }
       
-      return { collage: moodResult.collage || undefined };
+      return { collage: moodResult.collage || undefined, storedInImageService: storedImageId ? 1 : 0 };
     })(),
     
-    // Task 3: UI Concepts Generation - persists its own output
+    // Task 3: UI Concepts Generation - persists its own output + stores optimized images
     (async () => {
       const uiResult = await generateUiConceptsWithGemini(
         style.name,
@@ -411,6 +421,8 @@ async function regenerateStyle(style: Style): Promise<RegenerationResult> {
         refImage || undefined,
         style.metadataTags as unknown as Record<string, string[]> || undefined,
       );
+      
+      const storedImageIds: string[] = [];
       
       // Persist UI concepts immediately
       if (uiResult.softwareApp || uiResult.audioPlugin || uiResult.dashboard) {
@@ -425,12 +437,42 @@ async function regenerateStyle(style: Style): Promise<RegenerationResult> {
         const currentStyle = await storage.getStyleById(style.id);
         const existingMoodBoard = (currentStyle?.moodBoard as MoodBoardAssets) || { status: "pending", history: [] };
         await storage.updateStyleMoodBoard(style.id, existingMoodBoard, uiConceptAssets);
+        
+        // Also store UI concepts through image service for optimized WebP variants
+        if (uiResult.softwareApp) {
+          try {
+            const softwareAppData = ensureDataUrl(uiResult.softwareApp);
+            const softwareAppId = await storeImage(softwareAppData, "ui_software_app", style.id);
+            storedImageIds.push(softwareAppId);
+          } catch (storeErr) {
+            logger.error("Failed to store softwareApp UI concept", storeErr, { module: 'StyleRegeneration', styleId: style.id });
+          }
+        }
+        if (uiResult.audioPlugin) {
+          try {
+            const audioPluginData = ensureDataUrl(uiResult.audioPlugin);
+            const audioPluginId = await storeImage(audioPluginData, "ui_audio_plugin", style.id);
+            storedImageIds.push(audioPluginId);
+          } catch (storeErr) {
+            logger.error("Failed to store audioPlugin UI concept", storeErr, { module: 'StyleRegeneration', styleId: style.id });
+          }
+        }
+        if (uiResult.dashboard) {
+          try {
+            const dashboardData = ensureDataUrl(uiResult.dashboard);
+            const dashboardId = await storeImage(dashboardData, "ui_dashboard", style.id);
+            storedImageIds.push(dashboardId);
+          } catch (storeErr) {
+            logger.error("Failed to store dashboard UI concept", storeErr, { module: 'StyleRegeneration', styleId: style.id });
+          }
+        }
       }
       
       return {
         softwareApp: uiResult.softwareApp || undefined,
         audioPlugin: uiResult.audioPlugin || undefined,
         dashboard: uiResult.dashboard || undefined,
+        storedInImageService: storedImageIds.length,
       };
     })(),
     

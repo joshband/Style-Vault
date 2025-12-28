@@ -356,10 +356,11 @@ export async function generateSingleUiConcept(
   const prompt = buildUiConceptPrompt(request, summary, conceptType);
   
   // Define aspect ratios for each concept type
+  // softwareApp uses 1:1 square for optimal display as detail view squares and vault thumbnails
   const aspectRatios: Record<string, string> = {
-    softwareApp: "16:9",   // Landscape for gallery thumbnails (matches 16:10 display)
-    audioPlugin: "16:9",   // Landscape format
-    dashboard: "16:9",     // Landscape format
+    softwareApp: "1:1",    // Square for detail view and vault thumbnail cropping
+    audioPlugin: "16:9",   // Landscape format for audio plugin UI
+    dashboard: "1:1",      // Square for consistent gallery display
   };
   
   // Build parts array - include reference image for style transfer if available
