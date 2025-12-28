@@ -12,6 +12,7 @@ import { Link, useLocation } from "wouter";
 import { NoStylesEmpty, NoSearchResultsEmpty, ErrorState } from "@/components/empty-state";
 import { PageTransition } from "@/components/page-transition";
 import { notify } from "@/lib/notifications";
+import { useFeatureFlag } from "@/lib/feature-flags";
 
 interface PaginatedResponse {
   items: Style[];
@@ -32,6 +33,11 @@ export default function Explore() {
   const [filters, setFilters] = useState<StyleFiltersState>(DEFAULT_FILTERS);
   const [compareMode, setCompareMode] = useState(false);
   const [selectedForCompare, setSelectedForCompare] = useState<Set<string>>(new Set());
+  
+  const searchEnabled = useFeatureFlag('search.enabled');
+  const compareEnabled = useFeatureFlag('compare.enabled');
+  const deleteEnabled = useFeatureFlag('delete.enabled');
+  const paginationEnabled = useFeatureFlag('pagination.enabled');
   
   const filtersQueryKey = useMemo(() => {
     return JSON.stringify({
@@ -173,7 +179,9 @@ export default function Explore() {
               </p>
             </div>
           </div>
-          <StyleFilters filters={filters} onFiltersChange={handleFiltersChange} />
+          {searchEnabled && (
+            <StyleFilters filters={filters} onFiltersChange={handleFiltersChange} />
+          )}
           <div 
             className="grid gap-6"
             style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${CARD_MIN_WIDTH}px, 1fr))` }}
@@ -207,29 +215,33 @@ export default function Explore() {
                     : "Community styles"}
               </p>
             </div>
-            <Button
-              variant={compareMode ? "default" : "outline"}
-              size="sm"
-              onClick={toggleCompareMode}
-              data-testid="button-toggle-compare"
-              className="gap-2"
-            >
-              {compareMode ? (
-                <>
-                  <X className="w-4 h-4" />
-                  Cancel
-                </>
-              ) : (
-                <>
-                  <GitCompareArrows className="w-4 h-4" />
-                  Compare
-                </>
-              )}
-            </Button>
+            {compareEnabled && (
+              <Button
+                variant={compareMode ? "default" : "outline"}
+                size="sm"
+                onClick={toggleCompareMode}
+                data-testid="button-toggle-compare"
+                className="gap-2"
+              >
+                {compareMode ? (
+                  <>
+                    <X className="w-4 h-4" />
+                    Cancel
+                  </>
+                ) : (
+                  <>
+                    <GitCompareArrows className="w-4 h-4" />
+                    Compare
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </div>
 
-        <StyleFilters filters={filters} onFiltersChange={handleFiltersChange} />
+        {searchEnabled && (
+          <StyleFilters filters={filters} onFiltersChange={handleFiltersChange} />
+        )}
 
         {isError && (
           <ErrorState 
@@ -263,7 +275,7 @@ export default function Explore() {
                     transition={{ duration: 0.3, delay: Math.min(index * 0.03, 0.3), ease: "easeOut" }}
                     className="relative"
                   >
-                    {compareMode && (
+                    {compareEnabled && compareMode && (
                       <button
                         onClick={() => toggleStyleSelection(style.id)}
                         className={`absolute top-3 left-3 z-10 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
@@ -276,8 +288,8 @@ export default function Explore() {
                         {selectedForCompare.has(style.id) && <Check className="w-4 h-4" />}
                       </button>
                     )}
-                    <div className={compareMode ? "pointer-events-none" : ""}>
-                      <StyleCard style={style} onDelete={handleStyleDelete} />
+                    <div className={compareEnabled && compareMode ? "pointer-events-none" : ""}>
+                      <StyleCard style={style} onDelete={deleteEnabled ? handleStyleDelete : undefined} />
                     </div>
                   </motion.div>
                 ))}
@@ -303,7 +315,7 @@ export default function Explore() {
           </>
         )}
 
-        {compareMode && selectedForCompare.size === 2 && (
+        {compareEnabled && compareMode && selectedForCompare.size === 2 && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
