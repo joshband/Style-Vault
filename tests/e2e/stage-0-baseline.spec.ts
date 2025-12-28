@@ -22,8 +22,8 @@ test.describe('Stage 0: Baseline MVP Tests', () => {
       await expect(styleCards.first()).toBeVisible({ timeout: 10000 });
     });
 
-    test('should show placeholder style "Welcome to Visual DNA"', async ({ page }) => {
-      await expect(page.getByText('Welcome to Visual DNA')).toBeVisible({ timeout: 10000 });
+    test('should show placeholder style "Retro Industrial Audio"', async ({ page }) => {
+      await expect(page.getByText('Retro Industrial Audio')).toBeVisible({ timeout: 10000 });
     });
 
     test('should NOT show search/filter controls (disabled in Phase 1)', async ({ page }) => {

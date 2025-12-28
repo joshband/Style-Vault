@@ -79,7 +79,7 @@ describe('API Contract Tests - Style Detail', () => {
       const response = await fetch(`${baseUrl}/api/styles/${validStyleId}`);
       const data = await response.json();
       
-      expect(data.name).toBe('Welcome to Visual DNA');
+      expect(data.name).toBe('Retro Industrial Audio');
       expect(typeof data.description).toBe('string');
     });
 
@@ -91,7 +91,7 @@ describe('API Contract Tests - Style Detail', () => {
     });
   });
 
-  describe('Feature Flag Behavior (Stage 2)', () => {
+  describe('Feature Flag Behavior (Stage 3)', () => {
     it('api.styles.detail flag should be true', () => {
       expect(defaultFeatureFlags['api.styles.detail']).toBe(true);
     });
@@ -110,6 +110,10 @@ describe('API Contract Tests - Style Detail', () => {
 
     it('inspect.summary flag should be true', () => {
       expect(defaultFeatureFlags['inspect.summary']).toBe(true);
+    });
+
+    it('inspect.previews flag should be true', () => {
+      expect(defaultFeatureFlags['inspect.previews']).toBe(true);
     });
   });
 });

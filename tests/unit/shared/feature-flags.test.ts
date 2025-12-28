@@ -87,8 +87,8 @@ describe('Feature Flags System', () => {
       });
     });
 
-    it('should have exactly the Stage 2 flags enabled', () => {
-      const stage2EnabledFlags: (keyof FeatureFlags)[] = [
+    it('should have exactly the Stage 3 flags enabled', () => {
+      const stage3EnabledFlags: (keyof FeatureFlags)[] = [
         'vault.enabled',
         'auth.enabled',
         'nav.basic',
@@ -99,15 +99,16 @@ describe('Feature Flags System', () => {
         'inspect.summary',
         'inspect.tokens',
         'inspect.palette',
+        'inspect.previews',
       ];
 
-      stage2EnabledFlags.forEach(key => {
+      stage3EnabledFlags.forEach(key => {
         expect(defaultFeatureFlags[key]).toBe(true);
       });
     });
 
-    it('should have all non-Stage 2 features disabled', () => {
-      const stage2EnabledFlags = new Set([
+    it('should have all non-Stage 3 features disabled', () => {
+      const stage3EnabledFlags = new Set([
         'vault.enabled',
         'auth.enabled',
         'nav.basic',
@@ -118,10 +119,11 @@ describe('Feature Flags System', () => {
         'inspect.summary',
         'inspect.tokens',
         'inspect.palette',
+        'inspect.previews',
       ]);
 
       Object.entries(defaultFeatureFlags).forEach(([key, value]) => {
-        if (!stage2EnabledFlags.has(key)) {
+        if (!stage3EnabledFlags.has(key)) {
           expect(value).toBe(false);
         }
       });
@@ -176,7 +178,7 @@ describe('Feature Flags System', () => {
   });
 
   describe('getEnabledFeatures', () => {
-    it('should return all Stage 2 enabled features', () => {
+    it('should return all Stage 3 enabled features', () => {
       const enabled = getEnabledFeatures();
       expect(enabled).toContain('vault.enabled');
       expect(enabled).toContain('auth.enabled');
@@ -188,7 +190,8 @@ describe('Feature Flags System', () => {
       expect(enabled).toContain('inspect.summary');
       expect(enabled).toContain('inspect.tokens');
       expect(enabled).toContain('inspect.palette');
-      expect(enabled.length).toBe(10);
+      expect(enabled).toContain('inspect.previews');
+      expect(enabled.length).toBe(11);
     });
 
     it('should not include any disabled features', () => {

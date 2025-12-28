@@ -54,7 +54,7 @@ test.describe('Stage 2: Inspect Panel Tests', () => {
 
   test.describe('Style Summary Section', () => {
     test('should display style name prominently', async ({ page }) => {
-      await expect(page.getByText('Welcome to Visual DNA')).toBeVisible();
+      await expect(page.getByText('Retro Industrial Audio')).toBeVisible();
     });
 
     test('should display style description', async ({ page }) => {

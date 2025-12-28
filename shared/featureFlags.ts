@@ -139,7 +139,7 @@ export const defaultFeatureFlags: FeatureFlags = {
   
   // Inspect page features - DISABLED
   'inspect.summary': true,
-  'inspect.previews': false,
+  'inspect.previews': true,
   'inspect.tokens': true,
   'inspect.palette': true,
   'moodboard.enabled': false,

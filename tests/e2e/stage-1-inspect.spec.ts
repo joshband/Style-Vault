@@ -26,7 +26,7 @@ test.describe('Stage 1: Inspect Read-Only Tests', () => {
     test('style detail page should show style name', async ({ page }) => {
       await page.goto(`/style/${placeholderStyleId}`);
       
-      await expect(page.getByText('Welcome to Visual DNA')).toBeVisible({ timeout: 10000 });
+      await expect(page.getByText('Retro Industrial Audio')).toBeVisible({ timeout: 10000 });
     });
 
     test('style detail page should have back navigation', async ({ page }) => {
