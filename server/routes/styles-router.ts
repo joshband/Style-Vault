@@ -287,45 +287,42 @@ router.post("/api/styles", async (req, res) => {
           }
         }
 
-        logger.info(`Starting background mood board generation for style: ${style.id}`, { module: 'Styles', styleId: style.id });
+        logger.info(`Starting parallel asset generation for style: ${style.id}`, { module: 'Styles', styleId: style.id });
         
         let moodBoard: any;
         let uiConcepts: any;
+        let previews: any;
         
         const { isProdiaEnabled } = await import("../prodia-service");
         if (isProdiaEnabled()) {
-          const { generateMoodBoardWithProdia, generateUiConceptsWithProdia } = await import("../prodia-generation");
+          // Use generateAllAssetsWithProdia for maximum parallelization:
+          // Generates canonical previews + mood board + UI concepts ALL in parallel
+          const { generateAllAssetsWithProdia } = await import("../prodia-generation");
           
-          const [moodBoardResult, uiResult] = await Promise.all([
-            generateMoodBoardWithProdia({
-              styleName: style.name,
-              styleDescription: style.description,
-              tokens: style.tokens || {},
-              metadataTags: (style.metadataTags || getDefaultMetadataTags()) as unknown as Record<string, string[]>,
-            }),
-            generateUiConceptsWithProdia({
-              styleName: style.name,
-              styleDescription: style.description,
-              tokens: style.tokens || {},
-              metadataTags: (style.metadataTags || getDefaultMetadataTags()) as unknown as Record<string, string[]>,
-            }),
-          ]);
+          const allAssets = await generateAllAssetsWithProdia({
+            styleName: style.name,
+            styleDescription: style.description,
+            tokens: style.tokens || {},
+            metadataTags: (style.metadataTags || getDefaultMetadataTags()) as unknown as Record<string, string[]>,
+          });
+          
+          previews = allAssets.previews;
           
           moodBoard = {
-            collage: moodBoardResult.collage,
+            collage: allAssets.moodBoard.collage,
             status: "complete" as const,
             history: [],
           };
           
           uiConcepts = {
-            softwareApp: uiResult.softwareApp,
-            audioPlugin: uiResult.audioPlugin,
-            dashboard: uiResult.dashboard,
+            softwareApp: allAssets.uiConcepts.softwareApp,
+            audioPlugin: allAssets.uiConcepts.audioPlugin,
+            dashboard: allAssets.uiConcepts.dashboard,
             status: "complete" as const,
             history: [],
           };
           
-          logger.info(`Generated mood board and UI concepts`, { module: 'Styles', duration: moodBoardResult.processingTimeMs + uiResult.processingTimeMs });
+          logger.info(`Generated all assets in parallel`, { module: 'Styles', duration: allAssets.totalProcessingTimeMs });
         } else {
           const result = await generateAllMoodBoardAssets({
             styleName: style.name,
@@ -341,12 +338,24 @@ router.post("/api/styles", async (req, res) => {
         await storage.updateStyleMoodBoard(style.id, moodBoard, uiConcepts);
         cache.delete(CACHE_KEYS.STYLE_DETAIL(style.id));
         cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
-        logger.info(`Mood board generation complete for style: ${style.id}`, { module: 'Styles', styleId: style.id });
+        logger.info(`Asset generation complete for style: ${style.id}`, { module: 'Styles', styleId: style.id });
         
         try {
           const { storeImageToObjectStorage } = await import("../object-image-service");
           const storePromises: Promise<string>[] = [];
           
+          // Store canonical previews
+          if (previews?.portrait) {
+            storePromises.push(storeImageToObjectStorage(previews.portrait, "preview_portrait", style.id));
+          }
+          if (previews?.landscape) {
+            storePromises.push(storeImageToObjectStorage(previews.landscape, "preview_landscape", style.id));
+          }
+          if (previews?.stillLife) {
+            storePromises.push(storeImageToObjectStorage(previews.stillLife, "preview_still_life", style.id));
+          }
+          
+          // Store mood board and UI concepts
           if (moodBoard?.collage) {
             storePromises.push(storeImageToObjectStorage(moodBoard.collage, "mood_board", style.id));
           }
