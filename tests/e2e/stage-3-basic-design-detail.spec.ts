@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Stage 3: Minimal Design Detail Page (Previews Only)', () => {
+test.describe('Stage 4: Design Detail Page (Previews + Design DNA)', () => {
   const styleId = '22076530-40ae-4ab9-affb-2f5ae80be1a8';
 
   test.beforeEach(async ({ page }) => {
@@ -15,13 +15,25 @@ test.describe('Stage 3: Minimal Design Detail Page (Previews Only)', () => {
       await expect(styleName).toContainText('Retro Industrial Audio');
     });
 
-    test('should show canonical previews section (only visible dropdown)', async ({ page }) => {
+    test('should show canonical previews section', async ({ page }) => {
       const previewsSection = page.locator('[data-testid="section-canonical-previews"]');
       await expect(previewsSection).toBeVisible();
     });
+
+    test('should show Design DNA section', async ({ page }) => {
+      const designDnaSection = page.locator('[data-testid="section-design-dna"]');
+      await expect(designDnaSection).toBeVisible();
+    });
+
+    test('should display color palette swatches when Design DNA is expanded', async ({ page }) => {
+      const designDnaSection = page.locator('[data-testid="section-design-dna"]');
+      await designDnaSection.click();
+      const colorPaletteHeading = page.getByText('Color Palette');
+      await expect(colorPaletteHeading).toBeVisible();
+    });
   });
 
-  test.describe('Dropdown Sections (all disabled except previews)', () => {
+  test.describe('Dropdown Sections (disabled)', () => {
     test('should NOT show Style Guide section', async ({ page }) => {
       const section = page.locator('[data-testid="section-style-guide"]');
       await expect(section).not.toBeVisible();
@@ -44,11 +56,6 @@ test.describe('Stage 3: Minimal Design Detail Page (Previews Only)', () => {
 
     test('should NOT show Share & Rate section', async ({ page }) => {
       const section = page.locator('[data-testid="section-share-rate"]');
-      await expect(section).not.toBeVisible();
-    });
-
-    test('should NOT show Design DNA section', async ({ page }) => {
-      const section = page.locator('[data-testid="section-design-dna"]');
       await expect(section).not.toBeVisible();
     });
   });
