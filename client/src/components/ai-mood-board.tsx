@@ -40,12 +40,25 @@ function DownloadButton({ src, filename }: { src: string; filename: string }) {
   );
 }
 
+interface AssetRefs {
+  mood_board?: string;
+  ui_software_app?: string;
+  ui_audio_plugin?: string;
+  ui_dashboard?: string;
+}
+
 interface AiMoodBoardProps {
   styleId: string;
   styleName: string;
   moodBoard?: MoodBoardAssets | null;
   uiConcepts?: UiConceptAssets | null;
+  assetRefs?: AssetRefs | null;
   className?: string;
+}
+
+function getImageUrl(assetId: string | undefined, size: 'thumb' | 'medium' | 'full' = 'medium'): string | null {
+  if (!assetId) return null;
+  return `/api/images/${assetId}?size=${size}`;
 }
 
 async function regenerateMoodBoard(styleId: string) {
@@ -64,12 +77,18 @@ export function AiMoodBoard({
   styleName,
   moodBoard,
   uiConcepts,
+  assetRefs,
   className,
 }: AiMoodBoardProps) {
   const queryClient = useQueryClient();
 
   const isGenerating = moodBoard?.status === "generating" || uiConcepts?.status === "generating";
   const isPending = moodBoard?.status === "pending" || uiConcepts?.status === "pending";
+  
+  const collageUrl = moodBoard?.collage || getImageUrl(assetRefs?.mood_board);
+  const softwareAppUrl = uiConcepts?.softwareApp || getImageUrl(assetRefs?.ui_software_app);
+  const audioPluginUrl = uiConcepts?.audioPlugin || getImageUrl(assetRefs?.ui_audio_plugin);
+  const dashboardUrl = uiConcepts?.dashboard || getImageUrl(assetRefs?.ui_dashboard);
 
   useQuery({
     queryKey: ["/api/styles", styleId, "poll"],
@@ -94,11 +113,10 @@ export function AiMoodBoard({
     },
   });
 
-  // Show images immediately when available, even if still generating
-  const hasCollage = !!moodBoard?.collage;
-  const hasSoftwareApp = !!uiConcepts?.softwareApp;
-  const hasAudioPlugin = !!uiConcepts?.audioPlugin;
-  const hasDashboard = !!uiConcepts?.dashboard;
+  const hasCollage = !!collageUrl;
+  const hasSoftwareApp = !!softwareAppUrl;
+  const hasAudioPlugin = !!audioPluginUrl;
+  const hasDashboard = !!dashboardUrl;
   const hasAnyAssets = hasCollage || hasSoftwareApp || hasAudioPlugin || hasDashboard;
   
   // Track what's still loading
@@ -186,12 +204,12 @@ export function AiMoodBoard({
           {hasCollage ? (
             <div className="relative group rounded-lg overflow-hidden border border-border" data-testid="img-container-collage">
               <img
-                src={moodBoard?.collage}
+                src={collageUrl!}
                 alt={`${styleName} mood board`}
                 className="w-full h-auto"
                 data-testid="img-collage"
               />
-              <DownloadButton src={moodBoard?.collage || ""} filename={`${styleName}-mood-board.png`} />
+              <DownloadButton src={collageUrl || ""} filename={`${styleName}-mood-board.png`} />
             </div>
           ) : (
             <LoadingPlaceholder label="Exploring mood..." />
@@ -209,12 +227,12 @@ export function AiMoodBoard({
           {hasSoftwareApp ? (
             <div className="relative group rounded-lg overflow-hidden border border-border" data-testid="img-container-software-app">
               <img
-                src={uiConcepts?.softwareApp}
+                src={softwareAppUrl!}
                 alt={`${styleName} software app`}
                 className="w-full h-auto"
                 data-testid="img-software-app"
               />
-              <DownloadButton src={uiConcepts?.softwareApp || ""} filename={`${styleName}-software-app.png`} />
+              <DownloadButton src={softwareAppUrl || ""} filename={`${styleName}-software-app.png`} />
             </div>
           ) : (
             <LoadingPlaceholder label="Sketching interface..." />
@@ -234,12 +252,12 @@ export function AiMoodBoard({
             {hasAudioPlugin ? (
               <div className="relative group rounded-lg overflow-hidden border border-border" data-testid="img-container-audio">
                 <img
-                  src={uiConcepts?.audioPlugin}
+                  src={audioPluginUrl!}
                   alt={`${styleName} audio plugin`}
                   className="w-full h-auto"
                   data-testid="img-audio"
                 />
-                <DownloadButton src={uiConcepts?.audioPlugin || ""} filename={`${styleName}-audio-plugin.png`} />
+                <DownloadButton src={audioPluginUrl || ""} filename={`${styleName}-audio-plugin.png`} />
                 <div className="p-2 bg-white text-center">
                   <span className="text-xs text-muted-foreground">Audio Plugin</span>
                 </div>
@@ -252,12 +270,12 @@ export function AiMoodBoard({
             {hasDashboard ? (
               <div className="relative group rounded-lg overflow-hidden border border-border" data-testid="img-container-dashboard">
                 <img
-                  src={uiConcepts?.dashboard}
+                  src={dashboardUrl!}
                   alt={`${styleName} dashboard`}
                   className="w-full h-auto"
                   data-testid="img-dashboard"
                 />
-                <DownloadButton src={uiConcepts?.dashboard || ""} filename={`${styleName}-dashboard.png`} />
+                <DownloadButton src={dashboardUrl || ""} filename={`${styleName}-dashboard.png`} />
                 <div className="p-2 bg-white text-center">
                   <span className="text-xs text-muted-foreground">Dashboard</span>
                 </div>

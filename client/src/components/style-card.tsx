@@ -48,15 +48,17 @@ const StyleCardComponent = memo(function StyleCard({ style, className, onDelete 
         entries.forEach((entry) => {
           if (entry.isIntersecting && !hasPreloaded.current) {
             hasPreloaded.current = true;
-            // Prioritize preview images that match the source style aesthetic
-            const fullImageUrl = style.imageIds?.preview_portrait
+            // Prioritize reference image (source) as vault thumbnail
+            const fullImageUrl = style.imageIds?.reference
+              ? `/api/images/${style.imageIds.reference}`
+              : style.imageIds?.ui_software_app
+              ? `/api/images/${style.imageIds.ui_software_app}`
+              : style.imageIds?.preview_portrait
               ? `/api/images/${style.imageIds.preview_portrait}`
               : style.imageIds?.preview_landscape 
               ? `/api/images/${style.imageIds.preview_landscape}`
               : style.imageIds?.preview_still_life
               ? `/api/images/${style.imageIds.preview_still_life}`
-              : style.imageIds?.reference
-              ? `/api/images/${style.imageIds.reference}`
               : null;
             
             if (fullImageUrl) {
@@ -156,7 +158,7 @@ const StyleCardComponent = memo(function StyleCard({ style, className, onDelete 
         >
           <motion.div 
             className={cn(
-              "relative flex flex-col bg-card border border-border rounded-lg overflow-hidden",
+              "relative flex flex-col bg-card border border-gray-200 rounded-lg overflow-hidden",
               "transition-shadow duration-200",
               isDragging && "cursor-grabbing"
             )}
@@ -166,13 +168,16 @@ const StyleCardComponent = memo(function StyleCard({ style, className, onDelete 
             }}
             transition={{ duration: 0.2, ease: "easeOut" }}
           >
-            {/* Preview Image - prioritize UI software app (core purpose of tool) then fallback to other previews */}
+            {/* Preview Image - prioritize source/reference image as the vault thumbnail */}
+            {/* This shows the original uploaded style reference, not generated outputs */}
             {/* Use ?size=thumb for vault view (optimized 300px WebP) to reduce bandwidth */}
             <div className="relative aspect-[16/10] bg-muted overflow-hidden">
-              {(style.imageIds?.ui_software_app || style.imageIds?.preview_portrait || style.imageIds?.preview_landscape || style.imageIds?.preview_still_life || style.imageIds?.reference || style.thumbnailPreview) ? (
+              {(style.imageIds?.reference || style.imageIds?.ui_software_app || style.imageIds?.preview_portrait || style.imageIds?.preview_landscape || style.imageIds?.preview_still_life || style.thumbnailPreview) ? (
                 <img 
                   src={
-                    style.imageIds?.ui_software_app
+                    style.imageIds?.reference
+                      ? `/api/images/${style.imageIds.reference}?size=thumb`
+                      : style.imageIds?.ui_software_app
                       ? `/api/images/${style.imageIds.ui_software_app}?size=thumb`
                       : style.imageIds?.preview_portrait
                       ? `/api/images/${style.imageIds.preview_portrait}?size=thumb`
@@ -180,8 +185,6 @@ const StyleCardComponent = memo(function StyleCard({ style, className, onDelete 
                       ? `/api/images/${style.imageIds.preview_landscape}?size=thumb`
                       : style.imageIds?.preview_still_life
                       ? `/api/images/${style.imageIds.preview_still_life}?size=thumb`
-                      : style.imageIds?.reference
-                      ? `/api/images/${style.imageIds.reference}?size=thumb`
                       : style.thumbnailPreview!
                   } 
                   alt={style.name}
@@ -197,26 +200,47 @@ const StyleCardComponent = memo(function StyleCard({ style, className, onDelete 
               )}
             </div>
 
-            {/* Content - Editorial minimalism: image, name, description, date */}
-            <div className="p-4 flex flex-col gap-1.5">
+            {/* Content - Editorial minimalism: image, name, metadata tags, author */}
+            <div className="p-4 flex flex-col gap-2">
               <h3 className="font-serif font-medium text-base leading-tight text-foreground">
                 {style.name}
               </h3>
               
-              <p className="text-sm text-muted-foreground line-clamp-1 leading-relaxed">
-                {style.description}
-              </p>
+              {/* Metadata Tags as chips */}
+              {style.metadataTags && (
+                <div className="flex flex-wrap gap-1">
+                  {[
+                    ...(style.metadataTags.mood || []).slice(0, 2),
+                    ...(style.metadataTags.colorFamily || []).slice(0, 2),
+                    ...(style.metadataTags.era || []).slice(0, 1),
+                  ].slice(0, 4).map((tag: string, i: number) => (
+                    <span 
+                      key={`${tag}-${i}`}
+                      className="inline-flex px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-500 border border-gray-200"
+                      data-testid={`tag-${tag}`}
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
 
-              <time 
-                dateTime={style.createdAt}
-                className="text-xs text-muted-foreground/60 mt-1"
-              >
-                {new Date(style.createdAt).toLocaleDateString(undefined, { 
-                  month: 'short', 
-                  day: 'numeric',
-                  year: 'numeric'
-                })}
-              </time>
+              {/* Author and date row */}
+              <div className="flex items-center justify-between text-xs text-muted-foreground/60 mt-0.5">
+                {style.creatorName ? (
+                  <span className="truncate max-w-[60%]" data-testid="text-author">
+                    by {style.creatorName}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground/40" data-testid="text-community">Community</span>
+                )}
+                <time dateTime={style.createdAt}>
+                  {new Date(style.createdAt).toLocaleDateString(undefined, { 
+                    month: 'short', 
+                    day: 'numeric'
+                  })}
+                </time>
+              </div>
             </div>
           </motion.div>
         </Link>

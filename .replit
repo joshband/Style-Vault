@@ -1,9 +1,10 @@
-modules = ["nodejs-20", "web", "postgresql-16"]
+modules = ["nodejs-20", "web", "postgresql-16", "python-3.12"]
 run = "npm run dev"
 hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
 [nix]
 channel = "stable-24_05"
+packages = ["libxcrypt", "pkg-config", "xsimd"]
 
 [[ports]]
 localPort = 5000
@@ -41,3 +42,6 @@ waitForPort = 5000
 
 [agent]
 mockupState = "FULLSTACK"
+
+[objectStorage]
+defaultBucketID = "replit-objstore-624da568-6473-4f27-a6b8-f5b0e21292e1"

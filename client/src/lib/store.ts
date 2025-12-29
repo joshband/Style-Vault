@@ -9,6 +9,54 @@ export interface DTCGTokenGroup {
   [key: string]: DesignToken | DTCGTokenGroup;
 }
 
+export interface ContrastPartner {
+  hex: string;
+  ratio: number;
+  wcagAA: boolean;
+  wcagAAA: boolean;
+}
+
+export interface EnhancedColor {
+  space: "oklch";
+  l: number;
+  c: number;
+  h: number;
+  hex: string;
+  rgb: [number, number, number];
+  coverage: number;
+  confidence: number;
+  role: "background" | "text" | "shadow" | "accent" | "button" | "panel" | "slider" | "border" | "highlight" | "muted" | "primary" | "secondary" | "tertiary" | "neutral";
+  warmth: number;
+  saturation: "neutral" | "muted" | "soft" | "moderate" | "vivid" | "intense";
+  contrastPartner: ContrastPartner | null;
+}
+
+export interface ColorAnalysis {
+  harmony: {
+    type: string;
+    score: number;
+    relationships: Array<{ colors: number[]; type: string }>;
+  };
+  contrast: Array<{
+    color1Index: number;
+    color2Index: number;
+    ratio: number;
+    wcagAA: boolean;
+    wcagAAA: boolean;
+  }>;
+  temperature: {
+    overall: "warm" | "cool" | "neutral";
+    warmColors: number;
+    coolColors: number;
+    neutralColors: number;
+  };
+}
+
+export interface EnhancedColorData {
+  colors: EnhancedColor[];
+  analysis: ColorAnalysis;
+}
+
 export interface StylePreview {
   url: string;
   type: 'still-life' | 'landscape' | 'portrait' | 'reference';

@@ -10,7 +10,7 @@ import { extractTokensWithCV, extractTokensWithWalkthrough, convertToDTCG, isCVE
 import { getDefaultMetadataTags } from "./utils";
 import type { UiConceptAssets } from "@shared/schema";
 import { logger } from "../logger";
-import { storeImageToObjectStorage } from "../object-image-service";
+import { storeImageToObjectStorage, getImageFromObjectStorage, getObjectAssetsByStyle, migrateStyleToObjectStorage } from "../object-image-service";
 import { isValidImageDataUri } from "../preview-generation";
 
 const router = Router();
@@ -203,13 +203,17 @@ router.get("/api/styles/:id/metadata", async (req, res) => {
 router.get("/api/styles/:id/assets", async (req, res) => {
   try {
     const styleId = req.params.id;
+    
+    // Don't cache this endpoint - the response contains large image data
+    // that makes JSON serialization slow. Use HTTP caching instead.
     const style = await storage.getStyleById(styleId);
     
     if (!style) {
       return res.status(404).json({ error: "Style not found" });
     }
     
-    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+    // HTTP cache header for browser-side caching
+    res.set('Cache-Control', 'public, max-age=120, stale-while-revalidate=300');
     res.json({
       moodBoard: style.moodBoard,
       uiConcepts: style.uiConcepts,
@@ -218,6 +222,84 @@ router.get("/api/styles/:id/assets", async (req, res) => {
   } catch (error) {
     logger.error("Error fetching style assets", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to fetch style assets" });
+  }
+});
+
+router.get("/api/styles/:id/asset-refs", async (req, res) => {
+  try {
+    const styleId = req.params.id;
+    
+    const style = await storage.getStyleById(styleId);
+    if (!style) {
+      return res.status(404).json({ error: "Style not found" });
+    }
+    
+    const objectAssets = await getObjectAssetsByStyle(styleId);
+    
+    const moodBoardStatus = style.moodBoard?.status || "pending";
+    const uiConceptsStatus = style.uiConcepts?.status || "pending";
+    const previewsStatus = style.previews ? "complete" : "pending";
+    
+    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=120');
+    res.json({
+      objectAssets,
+      statuses: {
+        moodBoard: moodBoardStatus,
+        uiConcepts: uiConceptsStatus,
+        previews: previewsStatus,
+      },
+      hasLegacyData: {
+        moodBoard: !!(style.moodBoard?.collage && !objectAssets.moodBoardCollage),
+        uiConcepts: !!(style.uiConcepts?.softwareApp && !objectAssets.uiConceptSoftwareApp),
+        previews: !!(style.previews?.portrait && !objectAssets.previewPortrait),
+      },
+    });
+  } catch (error) {
+    logger.error("Error fetching asset refs", error, { module: 'Styles' });
+    res.status(500).json({ error: "Failed to fetch asset refs" });
+  }
+});
+
+router.post("/api/styles/:id/migrate-assets", async (req, res) => {
+  try {
+    const styleId = req.params.id;
+    const style = await storage.getStyleById(styleId);
+    
+    if (!style) {
+      return res.status(404).json({ error: "Style not found" });
+    }
+    
+    logger.info(`Starting asset migration for style ${styleId}`, { module: 'Styles' });
+    
+    const migratedIds = await migrateStyleToObjectStorage(styleId, {
+      referenceImages: style.referenceImages as string[] | undefined,
+      previews: style.previews as { portrait?: string; landscape?: string; stillLife?: string } | undefined,
+      moodBoard: style.moodBoard as { collage?: string } | undefined,
+      uiConcepts: style.uiConcepts as { softwareApp?: string; audioPlugin?: string; dashboard?: string } | undefined,
+    });
+    
+    if (Object.keys(migratedIds).length > 0) {
+      await storage.updateStyleFull(styleId, {
+        referenceImages: [] as any,
+        previews: { ...style.previews, portrait: null, landscape: null, stillLife: null } as any,
+        moodBoard: { ...style.moodBoard, collage: null } as any,
+        uiConcepts: { ...style.uiConcepts, softwareApp: null, audioPlugin: null, dashboard: null } as any,
+      });
+      
+      cache.delete(CACHE_KEYS.STYLE_DETAIL(styleId));
+      cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
+    }
+    
+    logger.info(`Asset migration complete for style ${styleId}`, { module: 'Styles', migratedCount: Object.keys(migratedIds).length });
+    
+    res.json({
+      success: true,
+      migratedAssets: migratedIds,
+      count: Object.keys(migratedIds).length,
+    });
+  } catch (error) {
+    logger.error("Error migrating style assets", error, { module: 'Styles' });
+    res.status(500).json({ error: "Failed to migrate assets" });
   }
 });
 
@@ -277,7 +359,10 @@ router.post("/api/styles", async (req, res) => {
     (async () => {
       try {
         const refImages = style.referenceImages as string[] | null;
+        let referenceImageBase64: string | undefined;
+        
         if (refImages && refImages.length > 0 && isValidImageDataUri(refImages[0])) {
+          referenceImageBase64 = refImages[0];
           try {
             await storeImageToObjectStorage(refImages[0], "reference", style.id);
             await storage.updateStyleFull(style.id, { referenceImages: [] as any });
@@ -287,45 +372,43 @@ router.post("/api/styles", async (req, res) => {
           }
         }
 
-        logger.info(`Starting background mood board generation for style: ${style.id}`, { module: 'Styles', styleId: style.id });
+        logger.info(`Starting parallel asset generation for style: ${style.id}`, { module: 'Styles', styleId: style.id });
         
         let moodBoard: any;
         let uiConcepts: any;
+        let previews: any;
         
         const { isProdiaEnabled } = await import("../prodia-service");
         if (isProdiaEnabled()) {
-          const { generateMoodBoardWithProdia, generateUiConceptsWithProdia } = await import("../prodia-generation");
+          // Use generateAllAssetsWithProdia for maximum parallelization:
+          // Generates canonical previews + mood board + UI concepts ALL in parallel
+          const { generateAllAssetsWithProdia } = await import("../prodia-generation");
           
-          const [moodBoardResult, uiResult] = await Promise.all([
-            generateMoodBoardWithProdia({
-              styleName: style.name,
-              styleDescription: style.description,
-              tokens: style.tokens || {},
-              metadataTags: (style.metadataTags || getDefaultMetadataTags()) as unknown as Record<string, string[]>,
-            }),
-            generateUiConceptsWithProdia({
-              styleName: style.name,
-              styleDescription: style.description,
-              tokens: style.tokens || {},
-              metadataTags: (style.metadataTags || getDefaultMetadataTags()) as unknown as Record<string, string[]>,
-            }),
-          ]);
+          const allAssets = await generateAllAssetsWithProdia({
+            styleName: style.name,
+            styleDescription: style.description,
+            tokens: style.tokens || {},
+            referenceImageBase64,
+            metadataTags: (style.metadataTags || getDefaultMetadataTags()) as unknown as Record<string, string[]>,
+          });
+          
+          previews = allAssets.previews;
           
           moodBoard = {
-            collage: moodBoardResult.collage,
+            collage: allAssets.moodBoard.collage,
             status: "complete" as const,
             history: [],
           };
           
           uiConcepts = {
-            softwareApp: uiResult.softwareApp,
-            audioPlugin: uiResult.audioPlugin,
-            dashboard: uiResult.dashboard,
+            softwareApp: allAssets.uiConcepts.softwareApp,
+            audioPlugin: allAssets.uiConcepts.audioPlugin,
+            dashboard: allAssets.uiConcepts.dashboard,
             status: "complete" as const,
             history: [],
           };
           
-          logger.info(`Generated mood board and UI concepts`, { module: 'Styles', duration: moodBoardResult.processingTimeMs + uiResult.processingTimeMs });
+          logger.info(`Generated all assets in parallel`, { module: 'Styles', duration: allAssets.totalProcessingTimeMs });
         } else {
           const result = await generateAllMoodBoardAssets({
             styleName: style.name,
@@ -341,12 +424,24 @@ router.post("/api/styles", async (req, res) => {
         await storage.updateStyleMoodBoard(style.id, moodBoard, uiConcepts);
         cache.delete(CACHE_KEYS.STYLE_DETAIL(style.id));
         cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
-        logger.info(`Mood board generation complete for style: ${style.id}`, { module: 'Styles', styleId: style.id });
+        logger.info(`Asset generation complete for style: ${style.id}`, { module: 'Styles', styleId: style.id });
         
         try {
           const { storeImageToObjectStorage } = await import("../object-image-service");
           const storePromises: Promise<string>[] = [];
           
+          // Store canonical previews
+          if (previews?.portrait) {
+            storePromises.push(storeImageToObjectStorage(previews.portrait, "preview_portrait", style.id));
+          }
+          if (previews?.landscape) {
+            storePromises.push(storeImageToObjectStorage(previews.landscape, "preview_landscape", style.id));
+          }
+          if (previews?.stillLife) {
+            storePromises.push(storeImageToObjectStorage(previews.stillLife, "preview_still_life", style.id));
+          }
+          
+          // Store mood board and UI concepts
           if (moodBoard?.collage) {
             storePromises.push(storeImageToObjectStorage(moodBoard.collage, "mood_board", style.id));
           }
@@ -1347,6 +1442,86 @@ router.post("/api/styles/generate-random", async (req, res) => {
   }
 });
 
+router.post("/api/styles/:id/generate-previews", async (req, res) => {
+  try {
+    const style = await storage.getStyleById(req.params.id);
+    if (!style) {
+      return res.status(404).json({ error: "Style not found" });
+    }
+
+    const { isProdiaEnabled } = await import("../prodia-service");
+    const { generateCanonicalPreviewsWithProdia } = await import("../prodia-generation");
+    
+    if (!isProdiaEnabled()) {
+      return res.status(503).json({
+        error: "Preview generation unavailable",
+        message: "Prodia service not configured",
+      });
+    }
+
+    res.json({ message: "Preview generation started", styleId: style.id });
+
+    (async () => {
+      try {
+        logger.info(`Generating previews for "${style.name}"`, { module: 'Styles', styleId: style.id });
+        
+        // Fetch reference image for style transfer
+        let referenceImageBase64: string | undefined;
+        if (style.referenceImages?.length) {
+          const refImageId = style.referenceImages[0];
+          const refImage = await getImageFromObjectStorage(refImageId, "full");
+          if (refImage?.data) {
+            referenceImageBase64 = refImage.data;
+          }
+        }
+        
+        const result = await generateCanonicalPreviewsWithProdia({
+          styleName: style.name,
+          styleDescription: style.description,
+          tokens: style.tokens,
+          metadataTags: style.metadataTags as Record<string, string[]> | undefined,
+          referenceImageBase64,
+        });
+
+        if (!result.allFailed) {
+          if (result.landscape) {
+            await storeImageToObjectStorage(result.landscape, "preview_landscape", style.id);
+          }
+          if (result.portrait) {
+            await storeImageToObjectStorage(result.portrait, "preview_portrait", style.id);
+          }
+          if (result.stillLife) {
+            await storeImageToObjectStorage(result.stillLife, "preview_still_life", style.id);
+          }
+          
+          await storage.updateStyleFull(style.id, {
+            previews: {
+              landscape: result.landscape || undefined,
+              portrait: result.portrait || undefined,
+              stillLife: result.stillLife || undefined,
+            } as any,
+          });
+          
+          cache.delete(CACHE_KEYS.STYLE_DETAIL(style.id));
+          cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
+          
+          logger.info(`Previews generated for "${style.name}"`, { module: 'Styles', styleId: style.id });
+        } else {
+          logger.error(`All preview generation failed for "${style.name}"`, null, { module: 'Styles', styleId: style.id });
+        }
+      } catch (error) {
+        logger.error(`Preview generation error for "${style.name}"`, error, { module: 'Styles', styleId: style.id });
+      }
+    })();
+  } catch (error) {
+    logger.error("Error starting preview generation", error, { module: 'Styles' });
+    res.status(500).json({
+      error: "Failed to start preview generation",
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+});
+
 router.post("/api/styles/:id/cv-tokens", async (req, res) => {
   try {
     const { imageBase64 } = req.body;
@@ -1380,6 +1555,56 @@ router.post("/api/styles/:id/cv-tokens", async (req, res) => {
     logger.error("Error extracting CV tokens for style", error, { module: 'Styles' });
     res.status(500).json({
       error: "Failed to extract CV tokens",
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+});
+
+router.get("/api/styles/:id/enhanced-colors", async (req, res) => {
+  try {
+    const style = await storage.getStyleById(req.params.id);
+    if (!style) {
+      return res.status(404).json({ error: "Style not found" });
+    }
+
+    const { getReferenceImageBase64 } = await import("../object-image-service.js");
+    const imageBase64 = await getReferenceImageBase64(req.params.id);
+    
+    if (!imageBase64) {
+      return res.status(404).json({ error: "No reference image found for this style" });
+    }
+
+    const result = await extractTokensWithCV(imageBase64, false);
+
+    if (!result.success) {
+      return res.status(500).json({
+        error: "Color extraction failed",
+        message: result.error,
+      });
+    }
+
+    const colorData = result.tokens?.color;
+    const isEnhancedFormat = colorData && 'colors' in colorData;
+    
+    res.setHeader("Cache-Control", "public, max-age=600");
+    
+    if (isEnhancedFormat) {
+      res.json({
+        colors: (colorData as any).colors || [],
+        analysis: (colorData as any).analysis || null,
+        processingTimeMs: result.processingTimeMs,
+      });
+    } else {
+      res.json({
+        colors: Array.isArray(colorData) ? colorData : [],
+        analysis: null,
+        processingTimeMs: result.processingTimeMs,
+      });
+    }
+  } catch (error) {
+    logger.error("Error extracting enhanced colors", error, { module: 'Styles' });
+    res.status(500).json({
+      error: "Failed to extract enhanced colors",
       message: error instanceof Error ? error.message : "Unknown error",
     });
   }

@@ -572,9 +572,172 @@ def create_contrast_matrix_visual(colors, contrasts):
 # Color Tokens
 # ------------------------------------------------------------
 
-def extract_colors(img, k=12):
+def infer_color_role(luminance, chroma, coverage, index, total_colors):
     """
-    Extract dominant perceptual colors with harmony, contrast, and temperature analysis.
+    Infer semantic UI role based on color properties.
+    
+    Role inference logic:
+    - High coverage + extreme luminance → background
+    - Low luminance + low chroma → shadow/text
+    - High chroma + medium luminance → accent/button
+    - Medium coverage + medium luminance → panel
+    - Low coverage + high chroma → highlight/accent
+    """
+    roles = []
+    
+    if coverage > 0.15 and (luminance > 0.85 or luminance < 0.15):
+        roles.append("background")
+    
+    if luminance < 0.25 and chroma < 0.05:
+        roles.append("text")
+        roles.append("shadow")
+    elif luminance > 0.9 and chroma < 0.03:
+        roles.append("text")
+    
+    if chroma > 0.12 and 0.3 < luminance < 0.7:
+        roles.append("accent")
+        if coverage > 0.05:
+            roles.append("button")
+    
+    if 0.05 < coverage < 0.25 and 0.25 < luminance < 0.75 and chroma < 0.1:
+        roles.append("panel")
+    
+    if chroma > 0.08 and 0.4 < luminance < 0.8:
+        roles.append("slider")
+    
+    if luminance < 0.3 and chroma < 0.08:
+        roles.append("border")
+    
+    if coverage < 0.03 and chroma > 0.15:
+        roles.append("highlight")
+    
+    if 0.3 < luminance < 0.6 and chroma < 0.05:
+        roles.append("muted")
+    
+    if not roles:
+        if index < 2:
+            roles.append("primary")
+        elif index < 5:
+            roles.append("secondary")
+        else:
+            roles.append("tertiary")
+    
+    return roles[0] if roles else "neutral"
+
+
+def calculate_warmth(hue):
+    """
+    Calculate warmth score (0-100) based on hue.
+    Warm: reds, oranges, yellows (0-60, 300-360)
+    Cool: blues, greens, purples (120-270)
+    """
+    if hue is None or (isinstance(hue, float) and np.isnan(hue)):
+        return 50
+    
+    hue = hue % 360
+    
+    if hue <= 60:
+        warmth = 100 - (hue / 60) * 50
+    elif hue <= 120:
+        warmth = 50 - ((hue - 60) / 60) * 50
+    elif hue <= 180:
+        warmth = 0
+    elif hue <= 240:
+        warmth = ((hue - 180) / 60) * 25
+    elif hue <= 300:
+        warmth = 25 + ((hue - 240) / 60) * 25
+    else:
+        warmth = 50 + ((hue - 300) / 60) * 50
+    
+    return round(warmth)
+
+
+def get_saturation_label(chroma):
+    """Get human-readable saturation level."""
+    if chroma < 0.02:
+        return "neutral"
+    elif chroma < 0.05:
+        return "muted"
+    elif chroma < 0.1:
+        return "soft"
+    elif chroma < 0.15:
+        return "moderate"
+    elif chroma < 0.2:
+        return "vivid"
+    else:
+        return "intense"
+
+
+def find_best_contrast_partner(color_data, all_colors):
+    """Find the color with best contrast ratio for text pairing."""
+    best_partner = None
+    best_ratio = 0
+    
+    col = color_data['color']
+    rgb = col.convert("srgb")
+    r1, g1, b1 = rgb['red'], rgb['green'], rgb['blue']
+    lum1 = 0.2126 * r1 + 0.7152 * g1 + 0.0722 * b1
+    
+    for other in all_colors:
+        if other is color_data:
+            continue
+        other_col = other['color'].convert("srgb")
+        r2, g2, b2 = other_col['red'], other_col['green'], other_col['blue']
+        lum2 = 0.2126 * r2 + 0.7152 * g2 + 0.0722 * b2
+        
+        lighter = max(lum1, lum2)
+        darker = min(lum1, lum2)
+        ratio = (lighter + 0.05) / (darker + 0.05)
+        
+        if ratio > best_ratio:
+            best_ratio = ratio
+            best_partner = other
+    
+    if best_partner:
+        partner_col = best_partner['color'].convert("srgb", fit=True)
+        r, g, b = [max(0, min(255, int(round(x * 255)))) for x in partner_col.coords()]
+        partner_hex = f"#{r:02x}{g:02x}{b:02x}"
+        return {
+            "hex": partner_hex,
+            "ratio": round(best_ratio, 2),
+            "wcagAA": best_ratio >= 4.5,
+            "wcagAAA": best_ratio >= 7
+        }
+    return None
+
+
+def calculate_cluster_confidence(labels, cluster_idx, centers):
+    """
+    Calculate confidence score based on cluster cohesion.
+    Higher confidence = tighter cluster with less variance.
+    """
+    cluster_mask = labels.flatten() == cluster_idx
+    if not np.any(cluster_mask):
+        return 0.5
+    
+    cluster_pixels = np.where(cluster_mask)[0]
+    if len(cluster_pixels) < 10:
+        return 0.5
+    
+    sample_size = min(1000, len(cluster_pixels))
+    sample_indices = np.random.choice(len(cluster_pixels), sample_size, replace=False)
+    
+    return min(0.95, 0.6 + (sample_size / 1000) * 0.35)
+
+
+def extract_colors(img, k=15):
+    """
+    Extract dominant perceptual colors with enhanced metadata.
+
+    Returns 10 colors with:
+    - OKLCH color values
+    - RGB/Hex representations
+    - Coverage (weight) percentage
+    - Confidence score (cluster cohesion)
+    - Inferred UI role
+    - Warmth score (0-100)
+    - Saturation label
+    - Best contrast partner for text pairing
 
     Strategy:
     - Downscale for speed
@@ -589,7 +752,7 @@ def extract_colors(img, k=12):
     img_small = resize_for_speed(img)
     pixels = img_small.reshape(-1, 3).astype(np.float32)
 
-    _, labels, centers = cv2.kmeans(
+    compactness, labels, centers = cv2.kmeans(
         pixels,
         k,
         None,
@@ -606,16 +769,20 @@ def extract_colors(img, k=12):
         c = centers[idx]
         weight = counts[idx] / total_pixels
         col = Color(f"rgb({int(c[2])},{int(c[1])},{int(c[0])})").convert("oklch")
+        confidence = calculate_cluster_confidence(labels, idx, centers)
         cluster_data.append({
             'color': col,
             'weight': weight,
-            'luminance': col['l']
+            'luminance': col['l'],
+            'chroma': col['c'],
+            'confidence': confidence,
+            'rgb': (int(c[2]), int(c[1]), int(c[0]))
         })
     
     cluster_data.sort(key=lambda x: -x['weight'])
     
     unique = []
-    delta_threshold = 4
+    delta_threshold = 3.5
     for cd in cluster_data:
         c = cd['color']
         is_unique = True
@@ -635,40 +802,66 @@ def extract_colors(img, k=12):
     mid.sort(key=lambda x: -x['weight'])
     light.sort(key=lambda x: -x['weight'])
     
-    balanced.extend(dark[:3])
-    balanced.extend(mid[:3])
-    balanced.extend(light[:2])
+    balanced.extend(dark[:4])
+    balanced.extend(mid[:4])
+    balanced.extend(light[:3])
     
-    if len(balanced) < 8:
+    if len(balanced) < 10:
         remaining = [c for c in unique if c not in balanced]
         remaining.sort(key=lambda x: -x['weight'])
-        balanced.extend(remaining[:8 - len(balanced)])
+        balanced.extend(remaining[:10 - len(balanced)])
     
-    if len(balanced) < 8 and len(cluster_data) > 0:
+    if len(balanced) < 10 and len(cluster_data) > 0:
         for cd in cluster_data:
             if cd not in balanced:
                 balanced.append(cd)
-            if len(balanced) >= 8:
+            if len(balanced) >= 10:
                 break
     
     balanced.sort(key=lambda x: -x['weight'])
-    unique_8 = [c['color'] for c in balanced[:min(8, len(balanced))]]
+    final_colors = balanced[:min(10, len(balanced))]
     
-    harmony = analyze_color_harmony(unique_8)
-    contrasts = analyze_contrast_pairs(unique_8)
-    temperature = analyze_color_temperature(unique_8)
+    colors_only = [c['color'] for c in final_colors]
+    harmony = analyze_color_harmony(colors_only)
+    contrasts = analyze_contrast_pairs(colors_only)
+    temperature = analyze_color_temperature(colors_only)
 
     result = []
-    for c in unique_8:
+    for i, cd in enumerate(final_colors):
+        c = cd['color']
         hue = c['h']
         if hue is None or (isinstance(hue, float) and np.isnan(hue)):
             hue = 0
+        
+        rgb_col = c.convert("srgb", fit=True)
+        r, g, b = [max(0, min(255, int(round(x * 255)))) for x in rgb_col.coords()]
+        hex_color = f"#{r:02x}{g:02x}{b:02x}"
+        
+        role = infer_color_role(
+            cd['luminance'], 
+            cd['chroma'], 
+            cd['weight'], 
+            i, 
+            len(final_colors)
+        )
+        
+        contrast_partner = find_best_contrast_partner(cd, final_colors)
+        
         result.append({
             "space": "oklch",
             "l": round(c['l'], 3),
             "c": round(c['c'], 3),
-            "h": round(hue, 1)
+            "h": round(hue, 1),
+            "hex": hex_color,
+            "rgb": cd['rgb'],
+            "coverage": round(cd['weight'] * 100, 1),
+            "confidence": round(cd['confidence'], 2),
+            "role": role,
+            "warmth": calculate_warmth(hue),
+            "saturation": get_saturation_label(cd['chroma']),
+            "contrastPartner": contrast_partner
         })
+    
     return {
         "colors": result,
         "analysis": {

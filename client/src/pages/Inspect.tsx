@@ -1,8 +1,9 @@
 import { useRoute, useLocation } from "wouter";
-import { type StyleSpec } from "@/lib/store";
+import { type StyleSpec, type EnhancedColor } from "@/lib/store";
 import { Layout } from "@/components/layout";
 import { TokenViewer } from "@/components/token-viewer";
 import { ColorPaletteSwatches } from "@/components/color-palette-swatches";
+import { ColorDetails } from "@/components/color-details";
 import { StyleSpecEditor } from "@/components/style-spec-editor";
 import { MaterialIntelligencePanel } from "@/components/material-intelligence-panel";
 import { ArrowLeft, ArrowRight, Download, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Share2, Check, Copy, Bookmark, Star, User, FolderPlus, Folder, Plus, FileCode, FileJson, Paintbrush, History, RotateCcw, Save, Sparkles, X, ChevronLeft, ChevronRight, Palette, FileText } from "lucide-react";
@@ -20,6 +21,7 @@ import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/use-auth";
 import { generateBrandKitPDF } from "@/lib/pdf-export";
 import { toast } from "sonner";
+import { isFeatureEnabled } from "@shared/featureFlags";
 
 interface StyleSummary {
   id: string;
@@ -74,21 +76,9 @@ function SectionHeader({ title, description }: { title: string; description?: st
   );
 }
 
-const MAX_SAFE_BASE64_LENGTH = 100000;
-
-function isSafeBase64(src: string | undefined): boolean {
-  if (!src) return false;
-  if (src.startsWith('/api/')) return true;
-  if (src.startsWith('data:') || src.length > 100) {
-    return src.length < MAX_SAFE_BASE64_LENGTH;
-  }
-  return true;
-}
-
-function getSafeImageSrc(imageIdSrc: string | undefined, base64Fallback: string | undefined): string | null {
-  if (imageIdSrc) return imageIdSrc;
-  if (base64Fallback && isSafeBase64(base64Fallback)) return base64Fallback;
-  return null;
+function getImageUrl(imageId: string | undefined, size: 'thumb' | 'medium' | 'full' = 'medium'): string | null {
+  if (!imageId) return null;
+  return `/api/images/${imageId}?size=${size}`;
 }
 
 function PreviewSkeleton({ aspect }: { aspect: string }) {
@@ -109,9 +99,9 @@ export default function Inspect() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [summary, setSummary] = useState<StyleSummary | null>(null);
   const [assets, setAssets] = useState<StyleAssets | null>(null);
+  const [assetRefs, setAssetRefs] = useState<Record<string, string> | null>(null);
   const [loading, setLoading] = useState(true);
   const [assetsLoading, setAssetsLoading] = useState(true);
-  const [tokensExpanded, setTokensExpanded] = useState(false);
   const [shareCode, setShareCode] = useState<string | null>(null);
   const [shareLoading, setShareLoading] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -157,6 +147,10 @@ export default function Inspect() {
   const [tryItGenerating, setTryItGenerating] = useState(false);
   const [tryItImage, setTryItImage] = useState<string | null>(null);
   const [tryItError, setTryItError] = useState<string | null>(null);
+  
+  // Enhanced Colors from Python CV
+  const [enhancedColors, setEnhancedColors] = useState<EnhancedColor[]>([]);
+  const [enhancedColorsLoading, setEnhancedColorsLoading] = useState(false);
   
   // Check if current user is the creator
   const isOwner = isAuthenticated && user?.id === summary?.creatorId;
@@ -439,20 +433,52 @@ export default function Inspect() {
       })
       .finally(() => setLoading(false));
     
-    fetch(`/api/styles/${id}/assets`)
+    fetch(`/api/styles/${id}/asset-refs`)
       .then(res => res.ok ? res.json() : null)
-      .then((data: StyleAssets | null) => {
-        setAssets(data);
+      .then((data: { objectAssets?: Record<string, string>; statuses?: Record<string, string> } | null) => {
+        if (data?.objectAssets) {
+          setAssetRefs(data.objectAssets);
+        }
+        if (data?.statuses) {
+          setAssets(prev => ({
+            ...prev,
+            moodBoard: { status: data.statuses?.moodBoard || 'pending' },
+            uiConcepts: { status: data.statuses?.uiConcepts || 'pending' },
+            previews: prev?.previews || {},
+          }));
+        }
       })
       .finally(() => setAssetsLoading(false));
+    
+    // Fetch enhanced colors from Python CV
+    setEnhancedColorsLoading(true);
+    fetch(`/api/styles/${id}/enhanced-colors`)
+      .then(res => res.ok ? res.json() : null)
+      .then((data: { colors?: EnhancedColor[] } | null) => {
+        if (data?.colors) {
+          setEnhancedColors(data.colors);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setEnhancedColorsLoading(false));
   }, [id]);
 
   const refetchAssets = useCallback(() => {
     if (!id) return;
-    fetch(`/api/styles/${id}/assets`)
+    fetch(`/api/styles/${id}/asset-refs`)
       .then(res => res.ok ? res.json() : null)
-      .then((data: StyleAssets | null) => {
-        if (data) setAssets(data);
+      .then((data: { objectAssets?: Record<string, string>; statuses?: Record<string, string> } | null) => {
+        if (data?.objectAssets) {
+          setAssetRefs(data.objectAssets);
+        }
+        if (data?.statuses) {
+          setAssets(prev => ({
+            ...prev,
+            moodBoard: { status: data.statuses?.moodBoard || 'pending' },
+            uiConcepts: { status: data.statuses?.uiConcepts || 'pending' },
+            previews: prev?.previews || {},
+          }));
+        }
       });
   }, [id]);
 
@@ -1123,8 +1149,8 @@ export default ${safeName};`;
           
           {/* Title + Vibe */}
           <div className="space-y-1">
-            <h1 className="text-2xl md:text-3xl font-serif font-medium text-foreground leading-tight">{summary.name}</h1>
-            <p className="text-muted-foreground text-base font-light leading-relaxed">{summary.description}</p>
+            <h1 className="text-2xl md:text-3xl font-serif font-medium text-foreground leading-tight" data-testid="style-name">{summary.name}</h1>
+            <p className="text-muted-foreground text-base font-light leading-relaxed" data-testid="style-description">{summary.description}</p>
           </div>
           
           {/* Subtle metadata row: creator + rating */}
@@ -1155,11 +1181,7 @@ export default ${safeName};`;
           {/* Source Image - Trust Signal */}
           <div className="relative aspect-square rounded-lg overflow-hidden border border-border bg-neutral-100 dark:bg-neutral-900">
             {(() => {
-              const refImageIdSrc = summary.imageIds?.reference 
-                ? `/api/images/${summary.imageIds.reference}?size=medium`
-                : undefined;
-              const refBase64Fallback = summary.referenceImages?.[0];
-              const refSrc = getSafeImageSrc(refImageIdSrc, refBase64Fallback);
+              const refSrc = getImageUrl(summary.imageIds?.reference, 'medium');
               
               if (refSrc) {
                 return (
@@ -1177,12 +1199,6 @@ export default ${safeName};`;
                       Source
                     </div>
                   </>
-                );
-              } else if (refBase64Fallback && !isSafeBase64(refBase64Fallback)) {
-                return (
-                  <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
-                    Image too large to display
-                  </div>
                 );
               } else if (summary.tokens) {
                 return (
@@ -1205,11 +1221,7 @@ export default ${safeName};`;
           {/* Software App UI - Style Output */}
           <div className="relative aspect-square rounded-lg overflow-hidden border border-border bg-neutral-100 dark:bg-neutral-900">
             {(() => {
-              const uiImageIdSrc = summary.imageIds?.ui_software_app 
-                ? `/api/images/${summary.imageIds.ui_software_app}?size=medium`
-                : undefined;
-              const uiBase64Fallback = assets?.uiConcepts?.softwareApp;
-              const uiSrc = getSafeImageSrc(uiImageIdSrc, uiBase64Fallback);
+              const uiSrc = getImageUrl(summary.imageIds?.ui_software_app, 'medium');
               
               if (uiSrc) {
                 return (
@@ -1249,8 +1261,80 @@ export default ${safeName};`;
 
         {/* === SECTION 3: QUICK READ === */}
         <section className="space-y-4">
-          {/* Palette Strip - Visual only */}
-          {primaryColors.length > 0 && (
+          {/* Enhanced Palette Strip - Colors with roles and coverage */}
+          {enhancedColors.length > 0 ? (
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-start gap-2">
+                {enhancedColors.slice(0, 10).map((color, i) => {
+                  const roleColors: Record<string, string> = {
+                    primary: "bg-blue-500/20 text-blue-700 dark:text-blue-300",
+                    secondary: "bg-purple-500/20 text-purple-700 dark:text-purple-300",
+                    tertiary: "bg-teal-500/20 text-teal-700 dark:text-teal-300",
+                    accent: "bg-orange-500/20 text-orange-700 dark:text-orange-300",
+                    background: "bg-gray-500/20 text-gray-700 dark:text-gray-300",
+                    text: "bg-slate-500/20 text-slate-700 dark:text-slate-300",
+                    panel: "bg-indigo-500/20 text-indigo-700 dark:text-indigo-300",
+                    button: "bg-pink-500/20 text-pink-700 dark:text-pink-300",
+                    slider: "bg-amber-500/20 text-amber-700 dark:text-amber-300",
+                    shadow: "bg-neutral-500/20 text-neutral-700 dark:text-neutral-300",
+                    highlight: "bg-yellow-500/20 text-yellow-700 dark:text-yellow-300",
+                    border: "bg-stone-500/20 text-stone-700 dark:text-stone-300",
+                    muted: "bg-zinc-500/20 text-zinc-700 dark:text-zinc-300",
+                    neutral: "bg-gray-400/20 text-gray-600 dark:text-gray-400",
+                  };
+                  const roleClass = roleColors[color.role] || roleColors.neutral;
+                  const warmthLabel = color.warmth > 60 ? "Warm" : color.warmth < 40 ? "Cool" : "Neutral";
+                  const wcagStatus = color.contrastPartner?.wcagAAA ? "AAA" : color.contrastPartner?.wcagAA ? "AA" : "";
+                  
+                  return (
+                    <div key={i} className="group relative" data-testid={`color-swatch-enhanced-${i}`}>
+                      {/* Color swatch with coverage indicator */}
+                      <div className="flex flex-col items-center gap-1">
+                        <div 
+                          className="w-12 h-12 rounded-lg shadow-sm border border-border/50 cursor-pointer transition-transform hover:scale-110"
+                          style={{ backgroundColor: color.hex }}
+                          title={`${color.hex} • ${color.role} • ${color.coverage.toFixed(1)}% coverage`}
+                        />
+                        {/* Role badge */}
+                        <span className={`px-1.5 py-0.5 text-[9px] font-medium rounded-full ${roleClass}`}>
+                          {color.role}
+                        </span>
+                      </div>
+                      
+                      {/* Hover tooltip with details */}
+                      <div className="absolute z-50 left-1/2 -translate-x-1/2 bottom-full mb-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150">
+                        <div className="bg-popover border border-border rounded-lg shadow-lg p-2 min-w-[140px] text-xs">
+                          <div className="font-mono text-foreground mb-1">{color.hex}</div>
+                          <div className="space-y-0.5 text-muted-foreground">
+                            <div className="flex justify-between">
+                              <span>Coverage</span>
+                              <span className="font-medium text-foreground">{color.coverage.toFixed(1)}%</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Warmth</span>
+                              <span className="font-medium text-foreground">{warmthLabel}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Saturation</span>
+                              <span className="font-medium text-foreground capitalize">{color.saturation}</span>
+                            </div>
+                            {wcagStatus && (
+                              <div className="flex justify-between">
+                                <span>Contrast</span>
+                                <span className={`font-medium ${wcagStatus === "AAA" ? "text-green-600" : "text-yellow-600"}`}>
+                                  WCAG {wcagStatus}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : primaryColors.length > 0 ? (
             <div className="flex items-center gap-1.5">
               {primaryColors.map((color, i) => (
                 <div
@@ -1261,7 +1345,7 @@ export default ${safeName};`;
                 />
               ))}
             </div>
-          )}
+          ) : null}
           
           {/* Human Traits - No technical language, no numbers */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
@@ -1279,320 +1363,340 @@ export default ${safeName};`;
 
         {/* === SECTION 4: PRIMARY ACTIONS CTA === */}
         <section className="flex flex-col sm:flex-row gap-2">
-          {/* Save */}
-          <button
-            onClick={isAuthenticated ? handleToggleBookmark : undefined}
-            disabled={bookmarkLoading || !isAuthenticated}
-            className={`flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium rounded-lg border transition-colors disabled:opacity-50 ${
-              isBookmarked 
-                ? "border-yellow-500 bg-yellow-500/10 text-yellow-600" 
-                : "border-border bg-muted/50 hover:bg-muted"
-            }`}
-            data-testid="button-save-style"
-            title={!isAuthenticated ? "Sign in to save" : undefined}
-          >
-            {bookmarkLoading ? <Loader2 size={16} className="animate-spin" /> : <Bookmark size={16} className={isBookmarked ? "fill-current" : ""} />}
-            {isBookmarked ? "Saved" : "Save"}
-          </button>
+          {/* Save - gated by bookmark.enabled */}
+          {isFeatureEnabled('bookmark.enabled') && (
+            <button
+              onClick={isAuthenticated ? handleToggleBookmark : undefined}
+              disabled={bookmarkLoading || !isAuthenticated}
+              className={`flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium rounded-lg border transition-colors disabled:opacity-50 ${
+                isBookmarked 
+                  ? "border-yellow-500 bg-yellow-500/10 text-yellow-600" 
+                  : "border-border bg-muted/50 hover:bg-muted"
+              }`}
+              data-testid="button-bookmark"
+              title={!isAuthenticated ? "Sign in to save" : undefined}
+            >
+              {bookmarkLoading ? <Loader2 size={16} className="animate-spin" /> : <Bookmark size={16} className={isBookmarked ? "fill-current" : ""} />}
+              {isBookmarked ? "Saved" : "Save"}
+            </button>
+          )}
           
-          {/* Export */}
-          <ExportDialog 
-            tokens={summary.tokens} 
-            styleName={summary.name}
-            trigger={
-              <button 
-                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
-                data-testid="button-export-primary"
-              >
-                <Download size={16} />
-                Export
-                <ChevronDown size={14} />
-              </button>
-            }
-          />
-          
-          {/* PDF Brand Kit */}
-          <button 
-            onClick={async () => {
-              setPdfExporting(true);
-              try {
-                await generateBrandKitPDF({
-                  name: summary.name,
-                  description: summary.description,
-                  tokens: summary.tokens,
-                  metadataTags: summary.metadataTags,
-                });
-                toast.success("Brand Kit PDF downloaded!");
-              } catch (error) {
-                console.error("PDF export error:", error);
-                toast.error("Failed to generate PDF. Please try again.");
-              } finally {
-                setPdfExporting(false);
+          {/* Export - gated by export.tokens */}
+          {isFeatureEnabled('export.tokens') && (
+            <ExportDialog 
+              tokens={summary.tokens} 
+              styleName={summary.name}
+              trigger={
+                <button 
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+                  data-testid="button-export-tokens"
+                >
+                  <Download size={16} />
+                  Export
+                  <ChevronDown size={14} />
+                </button>
               }
-            }}
-            disabled={pdfExporting}
-            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 border border-border bg-muted/50 hover:bg-muted rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-            data-testid="button-pdf-export"
-          >
-            {pdfExporting ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
-            Brand Kit
-          </button>
+            />
+          )}
           
-          {/* Deploy */}
-          <DeployDialog 
-            tokens={summary.tokens} 
-            styleName={summary.name}
-            trigger={
-              <button 
-                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 border border-border bg-muted/50 hover:bg-muted rounded-lg text-sm font-medium transition-colors"
-                data-testid="button-deploy-primary"
-              >
-                <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M8 2L14 8L8 14" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M2 8H13" strokeLinecap="round" />
-                </svg>
-                Deploy
-              </button>
-            }
-          />
+          {/* PDF Brand Kit - gated by export.pdf */}
+          {isFeatureEnabled('export.pdf') && (
+            <button 
+              onClick={async () => {
+                setPdfExporting(true);
+                try {
+                  await generateBrandKitPDF({
+                    name: summary.name,
+                    description: summary.description,
+                    tokens: summary.tokens,
+                    metadataTags: summary.metadataTags,
+                  });
+                  toast.success("Brand Kit PDF downloaded!");
+                } catch (error) {
+                  console.error("PDF export error:", error);
+                  toast.error("Failed to generate PDF. Please try again.");
+                } finally {
+                  setPdfExporting(false);
+                }
+              }}
+              disabled={pdfExporting}
+              className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 border border-border bg-muted/50 hover:bg-muted rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+              data-testid="button-pdf-export"
+            >
+              {pdfExporting ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
+              Brand Kit
+            </button>
+          )}
+          
+          {/* Deploy - gated by deploy.enabled */}
+          {isFeatureEnabled('deploy.enabled') && (
+            <DeployDialog 
+              tokens={summary.tokens} 
+              styleName={summary.name}
+              trigger={
+                <button 
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 border border-border bg-muted/50 hover:bg-muted rounded-lg text-sm font-medium transition-colors"
+                  data-testid="button-deploy-primary"
+                >
+                  <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth="1.5">
+                    <path d="M8 2L14 8L8 14" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M2 8H13" strokeLinecap="round" />
+                  </svg>
+                  Deploy
+                </button>
+              }
+            />
+          )}
 
-          {/* Style Audit */}
-          <StyleAudit
-            styleId={summary.id}
-            styleName={summary.name}
-            tokens={summary.tokens}
-            trigger={
-              <button 
-                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 border border-border bg-muted/50 hover:bg-muted rounded-lg text-sm font-medium transition-colors"
-                data-testid="button-audit-primary"
-              >
-                <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth="1.5">
-                  <circle cx="6" cy="6" r="4.5" />
-                  <path d="M9 9L14 14" strokeLinecap="round" />
-                </svg>
-                Audit
-              </button>
-            }
-          />
+          {/* Style Audit - gated by audit.enabled */}
+          {isFeatureEnabled('audit.enabled') && (
+            <StyleAudit
+              styleId={summary.id}
+              styleName={summary.name}
+              tokens={summary.tokens}
+              trigger={
+                <button 
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 border border-border bg-muted/50 hover:bg-muted rounded-lg text-sm font-medium transition-colors"
+                  data-testid="button-audit-primary"
+                >
+                  <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth="1.5">
+                    <circle cx="6" cy="6" r="4.5" />
+                    <path d="M9 9L14 14" strokeLinecap="round" />
+                  </svg>
+                  Audit
+                </button>
+              }
+            />
+          )}
           
-          {/* Design Tools */}
-          <Dialog>
-            <DialogTrigger asChild>
-              <button 
-                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 border border-border bg-muted/50 hover:bg-muted rounded-lg text-sm font-medium transition-colors"
-                data-testid="button-design-tools"
-              >
-                <Palette size={16} />
-                Figma/XD
-              </button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl p-0 overflow-hidden">
-              <DesignToolSync 
-                styleName={summary.name}
-                tokens={summary.tokens}
-              />
-            </DialogContent>
-          </Dialog>
+          {/* Design Tools - gated by designtools.enabled */}
+          {isFeatureEnabled('designtools.enabled') && (
+            <Dialog>
+              <DialogTrigger asChild>
+                <button 
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 border border-border bg-muted/50 hover:bg-muted rounded-lg text-sm font-medium transition-colors"
+                  data-testid="button-design-tools"
+                >
+                  <Palette size={16} />
+                  Figma/XD
+                </button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl p-0 overflow-hidden">
+                <DesignToolSync 
+                  styleName={summary.name}
+                  tokens={summary.tokens}
+                />
+              </DialogContent>
+            </Dialog>
+          )}
           
-          {/* Remix / Apply */}
-          <Button
-            onClick={() => {
-              setTryItOpen(true);
-              setTryItImage(null);
-              setTryItError(null);
-              setTryItPrompt("");
-            }}
-            variant="outline"
-            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3"
-            data-testid="button-remix-style"
-          >
-            <Sparkles size={16} />
-            Remix
-          </Button>
+          {/* Remix / Apply - gated by tryit.enabled */}
+          {isFeatureEnabled('tryit.enabled') && (
+            <Button
+              onClick={() => {
+                setTryItOpen(true);
+                setTryItImage(null);
+                setTryItError(null);
+                setTryItPrompt("");
+              }}
+              variant="outline"
+              className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3"
+              data-testid="button-remix-style"
+            >
+              <Sparkles size={16} />
+              Remix
+            </Button>
+          )}
         </section>
 
         {/* === COLLAPSED SECTIONS === */}
         <div className="border border-border rounded-lg divide-y divide-border">
           
-          {/* Canonical Previews */}
-          <details className="group">
-            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
-              <span className="text-sm font-medium text-foreground">Canonical Previews</span>
-              <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
-            </summary>
-            <div className="p-4 pt-0">
-              <div className="grid grid-cols-3 gap-2">
-                {['landscape', 'portrait', 'stillLife'].map((type) => {
-                  const key = type === 'stillLife' ? 'preview_still_life' : `preview_${type}`;
-                  const imageIdSrc = summary.imageIds?.[key] 
-                    ? `/api/images/${summary.imageIds[key]}?size=medium`
-                    : undefined;
-                  const base64Fallback = (previews as any)[type];
-                  const imgSrc = getSafeImageSrc(imageIdSrc, base64Fallback);
-                  // Use ?size=full for downloads - high quality original
-                  const fullSrc = summary.imageIds?.[key]
-                    ? `/api/images/${summary.imageIds[key]}?size=full`
-                    : (isSafeBase64(base64Fallback) ? base64Fallback : null);
-                  return (
-                    <div key={type} className="aspect-square bg-muted rounded-lg overflow-hidden border border-border relative group/preview">
-                      {imgSrc ? (
-                        <>
-                          <img src={imgSrc} alt={type} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
-                          <button
-                            onClick={() => {
-                              if (!fullSrc) return;
-                              const link = document.createElement("a");
-                              link.href = fullSrc;
-                              link.download = `${summary.name}-${type}.png`;
-                              document.body.appendChild(link);
-                              link.click();
-                              document.body.removeChild(link);
-                            }}
-                            className="absolute top-1 right-1 p-1.5 rounded-md bg-black/50 text-white opacity-0 group-hover/preview:opacity-100 transition-opacity hover:bg-black/70"
-                            title={`Download ${type}`}
-                            data-testid={`button-download-preview-${type}`}
-                          >
-                            <Download size={12} />
-                          </button>
-                        </>
-                      ) : (
-                        <div className="flex items-center justify-center h-full text-muted-foreground text-xs capitalize">
-                          {base64Fallback && !isSafeBase64(base64Fallback) ? 'Preview too large' : type}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </details>
-
-
-          {/* Create / Prompt Details */}
-          <details className="group">
-            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
-              <span className="text-sm font-medium text-foreground">Style Guide</span>
-              <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
-            </summary>
-            <div className="p-4 pt-0 space-y-4">
-              {summary.promptScaffolding?.base && (
-                <div>
-                  <h4 className="text-xs font-medium text-muted-foreground mb-1">Description</h4>
-                  <p className="text-sm text-foreground">{summary.promptScaffolding.base}</p>
+          {/* Canonical Previews - gated by feature flag */}
+          {isFeatureEnabled('inspect.previews') && (
+            <details className="group" data-testid="section-canonical-previews">
+              <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+                <span className="text-sm font-medium text-foreground">Canonical Previews</span>
+                <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+              </summary>
+              <div className="p-4 pt-0">
+                <div className="grid grid-cols-3 gap-2">
+                  {['landscape', 'portrait', 'stillLife'].map((type) => {
+                    const key = type === 'stillLife' ? 'preview_still_life' : `preview_${type}`;
+                    const imgSrc = getImageUrl(summary.imageIds?.[key], 'medium');
+                    const fullSrc = getImageUrl(summary.imageIds?.[key], 'full');
+                    return (
+                      <div key={type} className="aspect-square bg-muted rounded-lg overflow-hidden border border-border relative group/preview">
+                        {imgSrc ? (
+                          <>
+                            <img src={imgSrc} alt={type} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+                            <button
+                              onClick={() => {
+                                if (!fullSrc) return;
+                                const link = document.createElement("a");
+                                link.href = fullSrc;
+                                link.download = `${summary.name}-${type}.png`;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                              }}
+                              className="absolute top-1 right-1 p-1.5 rounded-md bg-black/50 text-white opacity-0 group-hover/preview:opacity-100 transition-opacity hover:bg-black/70"
+                              title={`Download ${type}`}
+                              data-testid={`button-download-preview-${type}`}
+                            >
+                              <Download size={12} />
+                            </button>
+                          </>
+                        ) : (
+                          <div className="flex items-center justify-center h-full text-muted-foreground text-xs capitalize">
+                            {type}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              )}
-              {summary.promptScaffolding?.modifiers?.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-medium text-muted-foreground mb-1">Characteristics</h4>
-                  <div className="flex flex-wrap gap-1">
-                    {summary.promptScaffolding.modifiers.map((mod: string, i: number) => (
-                      <span key={i} className="px-2 py-0.5 bg-muted text-xs rounded">{mod}</span>
+              </div>
+            </details>
+          )}
+
+
+          {/* Create / Prompt Details - gated by styleguide.enabled */}
+          {isFeatureEnabled('styleguide.enabled') && (
+            <details className="group" data-testid="section-style-guide">
+              <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+                <span className="text-sm font-medium text-foreground">Style Guide</span>
+                <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+              </summary>
+              <div className="p-4 pt-0 space-y-4">
+                {summary.promptScaffolding?.base && (
+                  <div>
+                    <h4 className="text-xs font-medium text-muted-foreground mb-1">Description</h4>
+                    <p className="text-sm text-foreground">{summary.promptScaffolding.base}</p>
+                  </div>
+                )}
+                {summary.promptScaffolding?.modifiers?.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-medium text-muted-foreground mb-1">Characteristics</h4>
+                    <div className="flex flex-wrap gap-1">
+                      {summary.promptScaffolding.modifiers.map((mod: string, i: number) => (
+                        <span key={i} className="px-2 py-0.5 bg-muted text-xs rounded">{mod}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {summary.promptScaffolding?.negative && (
+                  <div>
+                    <h4 className="text-xs font-medium text-muted-foreground mb-1">Avoid</h4>
+                    <p className="text-sm text-muted-foreground">{summary.promptScaffolding.negative}</p>
+                  </div>
+                )}
+              </div>
+            </details>
+          )}
+
+          {/* Usage Notes - gated by usagenotes.enabled */}
+          {isFeatureEnabled('usagenotes.enabled') && (
+            <details className="group" data-testid="section-usage-notes">
+              <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+                <span className="text-sm font-medium text-foreground">Usage Notes</span>
+                <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+              </summary>
+              <div className="p-4 pt-0">
+                <StyleSpecEditor 
+                  styleId={summary.id} 
+                  styleSpec={summary.styleSpec}
+                  createdAt={summary.createdAt}
+                  updatedAt={summary.updatedAt}
+                  onUpdate={handleSpecUpdate}
+                />
+              </div>
+            </details>
+          )}
+
+          {/* Explorations - generated assets showing style possibilities - gated by moodboard.enabled and uiconcepts.enabled */}
+          {(isFeatureEnabled('moodboard.enabled') || isFeatureEnabled('uiconcepts.enabled')) && (
+            <details className="group" data-testid="section-mood-board">
+              <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+                <span className="text-sm font-medium text-foreground">Explorations</span>
+                <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+              </summary>
+              <div className="p-4 pt-0" data-testid="section-ui-concepts">
+                {assetsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                  <AiMoodBoard
+                    styleId={summary.id}
+                    styleName={summary.name}
+                    moodBoard={assets?.moodBoard}
+                    uiConcepts={assets?.uiConcepts}
+                    assetRefs={assetRefs}
+                  />
+                )}
+              </div>
+            </details>
+          )}
+
+          {/* Revisions - gated by versions.enabled */}
+          {isFeatureEnabled('versions.enabled') && (
+            <details 
+              className="group"
+              data-testid="section-revisions"
+              onToggle={(e) => {
+                if ((e.target as HTMLDetailsElement).open && !versionsExpanded) {
+                  setVersionsExpanded(true);
+                }
+              }}
+            >
+              <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+                <span className="text-sm font-medium text-foreground">Revisions</span>
+                <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+              </summary>
+              <div className="p-4 pt-0 space-y-3">
+                {isOwner && (
+                  <Button variant="outline" size="sm" onClick={handleSaveVersion} disabled={savingVersion}>
+                    {savingVersion ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Save size={14} className="mr-2" />}
+                    Save Snapshot
+                  </Button>
+                )}
+                {versionsLoading ? (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Loader2 size={14} className="animate-spin" />
+                    <span className="text-sm">Loading...</span>
+                  </div>
+                ) : versions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No revisions yet</p>
+                ) : (
+                  <div className="space-y-2">
+                    {versions.map((version) => (
+                      <div key={version.id} className="flex items-center justify-between p-2 bg-muted/30 rounded text-sm">
+                        <span>v{version.versionNumber} — {version.changeType}</span>
+                        {isOwner && (
+                          <button
+                            onClick={() => handleRevertToVersion(version.id)}
+                            disabled={revertingVersion === version.id}
+                            className="p-1 hover:bg-muted rounded"
+                          >
+                            {revertingVersion === version.id ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+                          </button>
+                        )}
+                      </div>
                     ))}
                   </div>
-                </div>
-              )}
-              {summary.promptScaffolding?.negative && (
-                <div>
-                  <h4 className="text-xs font-medium text-muted-foreground mb-1">Avoid</h4>
-                  <p className="text-sm text-muted-foreground">{summary.promptScaffolding.negative}</p>
-                </div>
-              )}
-            </div>
-          </details>
+                )}
+              </div>
+            </details>
+          )}
 
-          {/* Usage Notes */}
-          <details className="group">
-            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
-              <span className="text-sm font-medium text-foreground">Usage Notes</span>
-              <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
-            </summary>
-            <div className="p-4 pt-0">
-              <StyleSpecEditor 
-                styleId={summary.id} 
-                styleSpec={summary.styleSpec}
-                createdAt={summary.createdAt}
-                updatedAt={summary.updatedAt}
-                onUpdate={handleSpecUpdate}
-              />
-            </div>
-          </details>
-
-          {/* Explorations - generated assets showing style possibilities */}
-          <details className="group">
-            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
-              <span className="text-sm font-medium text-foreground">Explorations</span>
-              <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
-            </summary>
-            <div className="p-4 pt-0">
-              {assetsLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                </div>
-              ) : (
-                <AiMoodBoard
-                  styleId={summary.id}
-                  styleName={summary.name}
-                  moodBoard={assets?.moodBoard}
-                  uiConcepts={assets?.uiConcepts}
-                />
-              )}
-            </div>
-          </details>
-
-          {/* Revisions */}
-          <details 
-            className="group"
-            onToggle={(e) => {
-              if ((e.target as HTMLDetailsElement).open && !versionsExpanded) {
-                setVersionsExpanded(true);
-              }
-            }}
-          >
-            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
-              <span className="text-sm font-medium text-foreground">Revisions</span>
-              <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
-            </summary>
-            <div className="p-4 pt-0 space-y-3">
-              {isOwner && (
-                <Button variant="outline" size="sm" onClick={handleSaveVersion} disabled={savingVersion}>
-                  {savingVersion ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Save size={14} className="mr-2" />}
-                  Save Snapshot
-                </Button>
-              )}
-              {versionsLoading ? (
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Loader2 size={14} className="animate-spin" />
-                  <span className="text-sm">Loading...</span>
-                </div>
-              ) : versions.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No revisions yet</p>
-              ) : (
-                <div className="space-y-2">
-                  {versions.map((version) => (
-                    <div key={version.id} className="flex items-center justify-between p-2 bg-muted/30 rounded text-sm">
-                      <span>v{version.versionNumber} — {version.changeType}</span>
-                      {isOwner && (
-                        <button
-                          onClick={() => handleRevertToVersion(version.id)}
-                          disabled={revertingVersion === version.id}
-                          className="p-1 hover:bg-muted rounded"
-                        >
-                          {revertingVersion === version.id ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </details>
-
-          {/* Share & Rate */}
-          <details className="group">
-            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
-              <span className="text-sm font-medium text-foreground">Share & Rate</span>
-              <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
-            </summary>
+          {/* Share & Rate - gated by sharing.enabled */}
+          {isFeatureEnabled('sharing.enabled') && (
+            <details className="group" data-testid="section-share-rate">
+              <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+                <span className="text-sm font-medium text-foreground">Share & Rate</span>
+                <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+              </summary>
             <div className="p-4 pt-0 space-y-4">
               {/* Share */}
               <div className="flex items-center gap-2">
@@ -1616,26 +1720,29 @@ export default ${safeName};`;
                 )}
               </div>
               
-              {/* Rating */}
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Your rating:</span>
-                <div className="flex items-center gap-0.5">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      onClick={() => isAuthenticated && handleSubmitRating(star)}
-                      onMouseEnter={() => isAuthenticated && setHoveredStar(star)}
-                      onMouseLeave={() => setHoveredStar(0)}
-                      disabled={ratingLoading || !isAuthenticated}
-                      className="p-0.5 disabled:cursor-default"
-                      title={isAuthenticated ? `Rate ${star}` : "Sign in to rate"}
-                    >
-                      <Star size={16} className={star <= (hoveredStar || userRating) ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/40"} />
-                    </button>
-                  ))}
+              {/* Rating - gated by rating.enabled */}
+              {isFeatureEnabled('rating.enabled') && (
+                <div className="flex items-center gap-2" data-testid="section-rating">
+                  <span className="text-sm text-muted-foreground">Your rating:</span>
+                  <div className="flex items-center gap-0.5">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        onClick={() => isAuthenticated && handleSubmitRating(star)}
+                        onMouseEnter={() => isAuthenticated && setHoveredStar(star)}
+                        onMouseLeave={() => setHoveredStar(0)}
+                        disabled={ratingLoading || !isAuthenticated}
+                        className="p-0.5 disabled:cursor-default"
+                        title={isAuthenticated ? `Rate ${star}` : "Sign in to rate"}
+                        data-testid={`button-star-${star}`}
+                      >
+                        <Star size={16} className={star <= (hoveredStar || userRating) ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/40"} />
+                      </button>
+                    ))}
+                  </div>
+                  {ratingLoading && <Loader2 size={14} className="animate-spin" />}
                 </div>
-                {ratingLoading && <Loader2 size={14} className="animate-spin" />}
-              </div>
+              )}
 
               {/* Collections */}
               {isAuthenticated && (
@@ -1666,43 +1773,39 @@ export default ${safeName};`;
                 </div>
               )}
             </div>
-          </details>
+            </details>
+          )}
 
-          {/* Design DNA - Tokens & Material Intelligence section, collapsed by default */}
-          <details className="group" onToggle={(e) => { if ((e.target as HTMLDetailsElement).open) setTokensExpanded(true); }}>
+          {/* Design DNA - Tokens & Material Intelligence section - gated by inspect.tokens */}
+          {isFeatureEnabled('inspect.tokens') && (
+            <details className="group" data-testid="section-design-dna">
             <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
               <span className="text-sm font-medium text-foreground">Design DNA</span>
               <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
             </summary>
             <div className="p-4 pt-0 space-y-6">
-              {tokensExpanded && (
-                <>
-                  <div>
-                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Color Palette</h4>
-                    <ColorPaletteSwatches tokens={summary.tokens} />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">All Tokens</h4>
-                    <TokenViewer tokens={summary.tokens} />
-                  </div>
-                  
-                  {/* Material Intelligence - inside Design DNA */}
-                  <div>
-                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Material Intelligence</h4>
-                    <MaterialIntelligencePanel
-                      styleId={summary.id}
-                      referenceImage={getSafeImageSrc(
-                        summary.imageIds?.reference
-                          ? `/api/images/${summary.imageIds.reference}?size=large`
-                          : undefined,
-                        isSafeBase64(summary.referenceImages?.[0]) ? summary.referenceImages?.[0] : undefined
-                      ) || undefined}
-                    />
-                  </div>
-                </>
+              <div>
+                <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Color Details</h4>
+                <ColorDetails colors={enhancedColors.length > 0 ? enhancedColors : undefined} tokens={summary.tokens} />
+              </div>
+              <div>
+                <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">All Tokens</h4>
+                <TokenViewer tokens={summary.tokens} />
+              </div>
+              
+              {/* Material Intelligence - inside Design DNA - gated by materials.enabled */}
+              {isFeatureEnabled('materials.enabled') && (
+                <div data-testid="section-materials">
+                  <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Material Intelligence</h4>
+                  <MaterialIntelligencePanel
+                    styleId={summary.id}
+                    referenceImage={getImageUrl(summary.imageIds?.reference, 'full') || undefined}
+                  />
+                </div>
               )}
             </div>
           </details>
+          )}
         </div>
 
         {/* Try It Now Dialog */}
