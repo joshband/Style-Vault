@@ -1089,38 +1089,6 @@ export default ${safeName};`;
     );
   }
 
-  // DEBUG: Minimal render to test if basic structure works
-  return (
-    <Layout>
-      <div className="max-w-4xl mx-auto p-6 space-y-4">
-        <Link href="/" className="inline-flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
-          <ArrowLeft size={12} /> Back
-        </Link>
-        <h1 className="text-2xl font-serif" data-testid="style-name">{summary.name}</h1>
-        <p className="text-muted-foreground">{summary.description}</p>
-        <div className="grid grid-cols-2 gap-4">
-          {summary.imageIds?.reference && (
-            <img 
-              src={`/api/images/${summary.imageIds.reference}?size=medium`}
-              alt="Reference"
-              className="rounded-lg border"
-              data-testid="img-source-reference"
-            />
-          )}
-          {summary.imageIds?.ui_software_app && (
-            <img 
-              src={`/api/images/${summary.imageIds.ui_software_app}?size=medium`}
-              alt="Applied UI"
-              className="rounded-lg border"
-              data-testid="img-applied-ui"
-            />
-          )}
-        </div>
-        <p className="text-xs text-muted-foreground mt-4">Debug: Minimal render active. Primary colors: {primaryColors.length}, Human traits: {humanTraits.contrast}</p>
-      </div>
-    </Layout>
-  );
-
   const previews = assets?.previews || {};
 
   return (
