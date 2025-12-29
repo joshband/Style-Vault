@@ -137,14 +137,14 @@ export const defaultFeatureFlags: FeatureFlags = {
   'delete.enabled': false,
   'refresh.enabled': false,
   
-  // Inspect page features - DISABLED
+  // Inspect page features - Stage 4B enabled
   'inspect.summary': true,
   'inspect.previews': true,
   'inspect.tokens': true,
   'inspect.palette': true,
-  'moodboard.enabled': false,
-  'uiconcepts.enabled': false,
-  'materials.enabled': false,
+  'moodboard.enabled': true,
+  'uiconcepts.enabled': true,
+  'materials.enabled': true,
   
   // Actions - Stage 4A enabled
   'export.tokens': true,

@@ -1524,27 +1524,29 @@ export default ${safeName};`;
             </div>
           </details>
 
-          {/* Explorations - generated assets showing style possibilities */}
-          <details className="group">
-            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
-              <span className="text-sm font-medium text-foreground">Explorations</span>
-              <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
-            </summary>
-            <div className="p-4 pt-0">
-              {assetsLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                </div>
-              ) : (
-                <AiMoodBoard
-                  styleId={summary.id}
-                  styleName={summary.name}
-                  moodBoard={assets?.moodBoard}
-                  uiConcepts={assets?.uiConcepts}
-                />
-              )}
-            </div>
-          </details>
+          {/* Explorations - generated assets showing style possibilities - gated by moodboard.enabled and uiconcepts.enabled */}
+          {(isFeatureEnabled('moodboard.enabled') || isFeatureEnabled('uiconcepts.enabled')) && (
+            <details className="group" data-testid="section-mood-board">
+              <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+                <span className="text-sm font-medium text-foreground">Explorations</span>
+                <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+              </summary>
+              <div className="p-4 pt-0" data-testid="section-ui-concepts">
+                {assetsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                  <AiMoodBoard
+                    styleId={summary.id}
+                    styleName={summary.name}
+                    moodBoard={assets?.moodBoard}
+                    uiConcepts={assets?.uiConcepts}
+                  />
+                )}
+              </div>
+            </details>
+          )}
 
           {/* Revisions */}
           <details 
@@ -1696,19 +1698,21 @@ export default ${safeName};`;
                     <TokenViewer tokens={summary.tokens} />
                   </div>
                   
-                  {/* Material Intelligence - inside Design DNA */}
-                  <div>
-                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Material Intelligence</h4>
-                    <MaterialIntelligencePanel
-                      styleId={summary.id}
-                      referenceImage={getSafeImageSrc(
-                        summary.imageIds?.reference
-                          ? `/api/images/${summary.imageIds.reference}?size=large`
-                          : undefined,
-                        isSafeBase64(summary.referenceImages?.[0]) ? summary.referenceImages?.[0] : undefined
-                      ) || undefined}
-                    />
-                  </div>
+                  {/* Material Intelligence - inside Design DNA - gated by materials.enabled */}
+                  {isFeatureEnabled('materials.enabled') && (
+                    <div data-testid="section-materials">
+                      <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Material Intelligence</h4>
+                      <MaterialIntelligencePanel
+                        styleId={summary.id}
+                        referenceImage={getSafeImageSrc(
+                          summary.imageIds?.reference
+                            ? `/api/images/${summary.imageIds.reference}?size=large`
+                            : undefined,
+                          isSafeBase64(summary.referenceImages?.[0]) ? summary.referenceImages?.[0] : undefined
+                        ) || undefined}
+                      />
+                    </div>
+                  )}
                 </>
               )}
             </div>

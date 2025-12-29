@@ -87,8 +87,8 @@ describe('Feature Flags System', () => {
       });
     });
 
-    it('should have exactly the Stage 4A flags enabled', () => {
-      const stage4aEnabledFlags: (keyof FeatureFlags)[] = [
+    it('should have exactly the Stage 4B flags enabled', () => {
+      const stage4bEnabledFlags: (keyof FeatureFlags)[] = [
         'vault.enabled',
         'auth.enabled',
         'nav.basic',
@@ -105,15 +105,18 @@ describe('Feature Flags System', () => {
         'export.tokens',
         'api.bookmark',
         'api.rate',
+        'moodboard.enabled',
+        'uiconcepts.enabled',
+        'materials.enabled',
       ];
 
-      stage4aEnabledFlags.forEach(key => {
+      stage4bEnabledFlags.forEach(key => {
         expect(defaultFeatureFlags[key]).toBe(true);
       });
     });
 
-    it('should have all non-Stage 4A features disabled', () => {
-      const stage4aEnabledFlags = new Set([
+    it('should have all non-Stage 4B features disabled', () => {
+      const stage4bEnabledFlags = new Set([
         'vault.enabled',
         'auth.enabled',
         'nav.basic',
@@ -130,10 +133,13 @@ describe('Feature Flags System', () => {
         'export.tokens',
         'api.bookmark',
         'api.rate',
+        'moodboard.enabled',
+        'uiconcepts.enabled',
+        'materials.enabled',
       ]);
 
       Object.entries(defaultFeatureFlags).forEach(([key, value]) => {
-        if (!stage4aEnabledFlags.has(key)) {
+        if (!stage4bEnabledFlags.has(key)) {
           expect(value).toBe(false);
         }
       });
@@ -188,7 +194,7 @@ describe('Feature Flags System', () => {
   });
 
   describe('getEnabledFeatures', () => {
-    it('should return all Stage 4A enabled features', () => {
+    it('should return all Stage 4B enabled features', () => {
       const enabled = getEnabledFeatures();
       expect(enabled).toContain('vault.enabled');
       expect(enabled).toContain('auth.enabled');
@@ -206,7 +212,10 @@ describe('Feature Flags System', () => {
       expect(enabled).toContain('export.tokens');
       expect(enabled).toContain('api.bookmark');
       expect(enabled).toContain('api.rate');
-      expect(enabled.length).toBe(16);
+      expect(enabled).toContain('moodboard.enabled');
+      expect(enabled).toContain('uiconcepts.enabled');
+      expect(enabled).toContain('materials.enabled');
+      expect(enabled.length).toBe(19);
     });
 
     it('should not include any disabled features', () => {
