@@ -1485,54 +1485,58 @@ export default ${safeName};`;
           )}
 
 
-          {/* Create / Prompt Details */}
-          <details className="group">
-            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
-              <span className="text-sm font-medium text-foreground">Style Guide</span>
-              <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
-            </summary>
-            <div className="p-4 pt-0 space-y-4">
-              {summary.promptScaffolding?.base && (
-                <div>
-                  <h4 className="text-xs font-medium text-muted-foreground mb-1">Description</h4>
-                  <p className="text-sm text-foreground">{summary.promptScaffolding.base}</p>
-                </div>
-              )}
-              {summary.promptScaffolding?.modifiers?.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-medium text-muted-foreground mb-1">Characteristics</h4>
-                  <div className="flex flex-wrap gap-1">
-                    {summary.promptScaffolding.modifiers.map((mod: string, i: number) => (
-                      <span key={i} className="px-2 py-0.5 bg-muted text-xs rounded">{mod}</span>
-                    ))}
+          {/* Create / Prompt Details - gated by styleguide.enabled */}
+          {isFeatureEnabled('styleguide.enabled') && (
+            <details className="group" data-testid="section-style-guide">
+              <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+                <span className="text-sm font-medium text-foreground">Style Guide</span>
+                <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+              </summary>
+              <div className="p-4 pt-0 space-y-4">
+                {summary.promptScaffolding?.base && (
+                  <div>
+                    <h4 className="text-xs font-medium text-muted-foreground mb-1">Description</h4>
+                    <p className="text-sm text-foreground">{summary.promptScaffolding.base}</p>
                   </div>
-                </div>
-              )}
-              {summary.promptScaffolding?.negative && (
-                <div>
-                  <h4 className="text-xs font-medium text-muted-foreground mb-1">Avoid</h4>
-                  <p className="text-sm text-muted-foreground">{summary.promptScaffolding.negative}</p>
-                </div>
-              )}
-            </div>
-          </details>
+                )}
+                {summary.promptScaffolding?.modifiers?.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-medium text-muted-foreground mb-1">Characteristics</h4>
+                    <div className="flex flex-wrap gap-1">
+                      {summary.promptScaffolding.modifiers.map((mod: string, i: number) => (
+                        <span key={i} className="px-2 py-0.5 bg-muted text-xs rounded">{mod}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {summary.promptScaffolding?.negative && (
+                  <div>
+                    <h4 className="text-xs font-medium text-muted-foreground mb-1">Avoid</h4>
+                    <p className="text-sm text-muted-foreground">{summary.promptScaffolding.negative}</p>
+                  </div>
+                )}
+              </div>
+            </details>
+          )}
 
-          {/* Usage Notes */}
-          <details className="group">
-            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
-              <span className="text-sm font-medium text-foreground">Usage Notes</span>
-              <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
-            </summary>
-            <div className="p-4 pt-0">
-              <StyleSpecEditor 
-                styleId={summary.id} 
-                styleSpec={summary.styleSpec}
-                createdAt={summary.createdAt}
-                updatedAt={summary.updatedAt}
-                onUpdate={handleSpecUpdate}
-              />
-            </div>
-          </details>
+          {/* Usage Notes - gated by usagenotes.enabled */}
+          {isFeatureEnabled('usagenotes.enabled') && (
+            <details className="group" data-testid="section-usage-notes">
+              <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+                <span className="text-sm font-medium text-foreground">Usage Notes</span>
+                <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+              </summary>
+              <div className="p-4 pt-0">
+                <StyleSpecEditor 
+                  styleId={summary.id} 
+                  styleSpec={summary.styleSpec}
+                  createdAt={summary.createdAt}
+                  updatedAt={summary.updatedAt}
+                  onUpdate={handleSpecUpdate}
+                />
+              </div>
+            </details>
+          )}
 
           {/* Explorations - generated assets showing style possibilities - gated by moodboard.enabled and uiconcepts.enabled */}
           {(isFeatureEnabled('moodboard.enabled') || isFeatureEnabled('uiconcepts.enabled')) && (
@@ -1558,60 +1562,64 @@ export default ${safeName};`;
             </details>
           )}
 
-          {/* Revisions */}
-          <details 
-            className="group"
-            onToggle={(e) => {
-              if ((e.target as HTMLDetailsElement).open && !versionsExpanded) {
-                setVersionsExpanded(true);
-              }
-            }}
-          >
-            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
-              <span className="text-sm font-medium text-foreground">Revisions</span>
-              <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
-            </summary>
-            <div className="p-4 pt-0 space-y-3">
-              {isOwner && (
-                <Button variant="outline" size="sm" onClick={handleSaveVersion} disabled={savingVersion}>
-                  {savingVersion ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Save size={14} className="mr-2" />}
-                  Save Snapshot
-                </Button>
-              )}
-              {versionsLoading ? (
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Loader2 size={14} className="animate-spin" />
-                  <span className="text-sm">Loading...</span>
-                </div>
-              ) : versions.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No revisions yet</p>
-              ) : (
-                <div className="space-y-2">
-                  {versions.map((version) => (
-                    <div key={version.id} className="flex items-center justify-between p-2 bg-muted/30 rounded text-sm">
-                      <span>v{version.versionNumber} — {version.changeType}</span>
-                      {isOwner && (
-                        <button
-                          onClick={() => handleRevertToVersion(version.id)}
-                          disabled={revertingVersion === version.id}
-                          className="p-1 hover:bg-muted rounded"
-                        >
-                          {revertingVersion === version.id ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </details>
+          {/* Revisions - gated by versions.enabled */}
+          {isFeatureEnabled('versions.enabled') && (
+            <details 
+              className="group"
+              data-testid="section-revisions"
+              onToggle={(e) => {
+                if ((e.target as HTMLDetailsElement).open && !versionsExpanded) {
+                  setVersionsExpanded(true);
+                }
+              }}
+            >
+              <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+                <span className="text-sm font-medium text-foreground">Revisions</span>
+                <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+              </summary>
+              <div className="p-4 pt-0 space-y-3">
+                {isOwner && (
+                  <Button variant="outline" size="sm" onClick={handleSaveVersion} disabled={savingVersion}>
+                    {savingVersion ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Save size={14} className="mr-2" />}
+                    Save Snapshot
+                  </Button>
+                )}
+                {versionsLoading ? (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Loader2 size={14} className="animate-spin" />
+                    <span className="text-sm">Loading...</span>
+                  </div>
+                ) : versions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No revisions yet</p>
+                ) : (
+                  <div className="space-y-2">
+                    {versions.map((version) => (
+                      <div key={version.id} className="flex items-center justify-between p-2 bg-muted/30 rounded text-sm">
+                        <span>v{version.versionNumber} — {version.changeType}</span>
+                        {isOwner && (
+                          <button
+                            onClick={() => handleRevertToVersion(version.id)}
+                            disabled={revertingVersion === version.id}
+                            className="p-1 hover:bg-muted rounded"
+                          >
+                            {revertingVersion === version.id ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </details>
+          )}
 
-          {/* Share & Rate */}
-          <details className="group">
-            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
-              <span className="text-sm font-medium text-foreground">Share & Rate</span>
-              <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
-            </summary>
+          {/* Share & Rate - gated by sharing.enabled */}
+          {isFeatureEnabled('sharing.enabled') && (
+            <details className="group" data-testid="section-share-rate">
+              <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+                <span className="text-sm font-medium text-foreground">Share & Rate</span>
+                <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
+              </summary>
             <div className="p-4 pt-0 space-y-4">
               {/* Share */}
               <div className="flex items-center gap-2">
@@ -1688,10 +1696,12 @@ export default ${safeName};`;
                 </div>
               )}
             </div>
-          </details>
+            </details>
+          )}
 
-          {/* Design DNA - Tokens & Material Intelligence section, collapsed by default */}
-          <details className="group" onToggle={(e) => { if ((e.target as HTMLDetailsElement).open) setTokensExpanded(true); }}>
+          {/* Design DNA - Tokens & Material Intelligence section - gated by inspect.tokens */}
+          {isFeatureEnabled('inspect.tokens') && (
+            <details className="group" data-testid="section-design-dna" onToggle={(e) => { if ((e.target as HTMLDetailsElement).open) setTokensExpanded(true); }}>
             <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
               <span className="text-sm font-medium text-foreground">Design DNA</span>
               <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
@@ -1727,6 +1737,7 @@ export default ${safeName};`;
               )}
             </div>
           </details>
+          )}
         </div>
 
         {/* Try It Now Dialog */}

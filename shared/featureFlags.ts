@@ -49,6 +49,8 @@ export interface FeatureFlags {
   'inspect.previews': boolean;
   'inspect.tokens': boolean;
   'inspect.palette': boolean;
+  'styleguide.enabled': boolean;
+  'usagenotes.enabled': boolean;
   'moodboard.enabled': boolean;
   'uiconcepts.enabled': boolean;
   'materials.enabled': boolean;
@@ -140,11 +142,13 @@ export const defaultFeatureFlags: FeatureFlags = {
   'delete.enabled': false,
   'refresh.enabled': false,
   
-  // Inspect page features - Stage 3 minimal (display only)
+  // Inspect page features - Stage 3 minimal (display only, only previews visible)
   'inspect.summary': true,
   'inspect.previews': true,
-  'inspect.tokens': true,
-  'inspect.palette': true,
+  'inspect.tokens': false,
+  'inspect.palette': false,
+  'styleguide.enabled': false,
+  'usagenotes.enabled': false,
   'moodboard.enabled': false,
   'uiconcepts.enabled': false,
   'materials.enabled': false,

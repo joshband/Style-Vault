@@ -49,6 +49,8 @@ describe('Feature Flags System', () => {
         'materials.enabled',
         'export.tokens',
         'export.pdf',
+        'styleguide.enabled',
+        'usagenotes.enabled',
         'deploy.enabled',
         'audit.enabled',
         'designtools.enabled',
@@ -90,7 +92,7 @@ describe('Feature Flags System', () => {
       });
     });
 
-    it('should have exactly the Stage 3 minimal flags enabled (read-only display)', () => {
+    it('should have exactly the Stage 3 minimal flags enabled (previews only)', () => {
       const stage3MinimalFlags: (keyof FeatureFlags)[] = [
         'vault.enabled',
         'auth.enabled',
@@ -100,8 +102,6 @@ describe('Feature Flags System', () => {
         'inspect.enabled',
         'api.styles.detail',
         'inspect.summary',
-        'inspect.tokens',
-        'inspect.palette',
         'inspect.previews',
       ];
 
@@ -110,8 +110,14 @@ describe('Feature Flags System', () => {
       });
     });
 
-    it('should have all action features disabled for Stage 3 minimal', () => {
+    it('should have all section and action features disabled for Stage 3 minimal', () => {
       const disabledActionFlags: (keyof FeatureFlags)[] = [
+        'inspect.tokens',
+        'inspect.palette',
+        'styleguide.enabled',
+        'usagenotes.enabled',
+        'versions.enabled',
+        'sharing.enabled',
         'bookmark.enabled',
         'rating.enabled',
         'export.tokens',
@@ -142,8 +148,6 @@ describe('Feature Flags System', () => {
         'inspect.enabled',
         'api.styles.detail',
         'inspect.summary',
-        'inspect.tokens',
-        'inspect.palette',
         'inspect.previews',
       ]);
 
@@ -203,7 +207,7 @@ describe('Feature Flags System', () => {
   });
 
   describe('getEnabledFeatures', () => {
-    it('should return all Stage 3 minimal enabled features', () => {
+    it('should return all Stage 3 minimal enabled features (previews only)', () => {
       const enabled = getEnabledFeatures();
       expect(enabled).toContain('vault.enabled');
       expect(enabled).toContain('auth.enabled');
@@ -213,14 +217,18 @@ describe('Feature Flags System', () => {
       expect(enabled).toContain('inspect.enabled');
       expect(enabled).toContain('api.styles.detail');
       expect(enabled).toContain('inspect.summary');
-      expect(enabled).toContain('inspect.tokens');
-      expect(enabled).toContain('inspect.palette');
       expect(enabled).toContain('inspect.previews');
-      expect(enabled.length).toBe(11);
+      expect(enabled.length).toBe(9);
     });
 
-    it('should not include any disabled action features', () => {
+    it('should not include any disabled section or action features', () => {
       const enabled = getEnabledFeatures();
+      expect(enabled).not.toContain('inspect.tokens');
+      expect(enabled).not.toContain('inspect.palette');
+      expect(enabled).not.toContain('styleguide.enabled');
+      expect(enabled).not.toContain('usagenotes.enabled');
+      expect(enabled).not.toContain('versions.enabled');
+      expect(enabled).not.toContain('sharing.enabled');
       expect(enabled).not.toContain('bookmark.enabled');
       expect(enabled).not.toContain('rating.enabled');
       expect(enabled).not.toContain('export.tokens');
