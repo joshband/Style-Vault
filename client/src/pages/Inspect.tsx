@@ -1,27 +1,32 @@
 import { useRoute, useLocation } from "wouter";
 import { type StyleSpec, type EnhancedColor } from "@/lib/store";
 import { Layout } from "@/components/layout";
-import { TokenViewer } from "@/components/token-viewer";
-import { ColorPaletteSwatches } from "@/components/color-palette-swatches";
-import { ColorDetails } from "@/components/color-details";
-import { StyleSpecEditor } from "@/components/style-spec-editor";
-import { MaterialIntelligencePanel } from "@/components/material-intelligence-panel";
 import { ArrowLeft, ArrowRight, Download, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Share2, Check, Copy, Bookmark, Star, User, FolderPlus, Folder, Plus, FileCode, FileJson, Paintbrush, History, RotateCcw, Save, Sparkles, X, ChevronLeft, ChevronRight, Palette, FileText } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { AiMoodBoard } from "@/components/ai-mood-board";
-import { ExportDialog } from "@/components/export-dialog";
-import { TokenVisualization } from "@/components/token-visualization";
-import { DeployDialog } from "@/components/deploy-dialog";
-import { StyleAudit } from "@/components/style-audit";
-import { DesignToolSync } from "@/components/DesignToolSync";
+import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from "react";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/use-auth";
 import { generateBrandKitPDF } from "@/lib/pdf-export";
 import { toast } from "sonner";
 import { isFeatureEnabled } from "@shared/featureFlags";
+
+const TokenViewer = lazy(() => import("@/components/token-viewer").then(m => ({ default: m.TokenViewer })));
+const ColorPaletteSwatches = lazy(() => import("@/components/color-palette-swatches").then(m => ({ default: m.ColorPaletteSwatches })));
+const ColorDetails = lazy(() => import("@/components/color-details").then(m => ({ default: m.ColorDetails })));
+const StyleSpecEditor = lazy(() => import("@/components/style-spec-editor").then(m => ({ default: m.StyleSpecEditor })));
+const MaterialIntelligencePanel = lazy(() => import("@/components/material-intelligence-panel").then(m => ({ default: m.MaterialIntelligencePanel })));
+const AiMoodBoard = lazy(() => import("@/components/ai-mood-board").then(m => ({ default: m.AiMoodBoard })));
+const ExportDialog = lazy(() => import("@/components/export-dialog").then(m => ({ default: m.ExportDialog })));
+const TokenVisualization = lazy(() => import("@/components/token-visualization").then(m => ({ default: m.TokenVisualization })));
+const DeployDialog = lazy(() => import("@/components/deploy-dialog").then(m => ({ default: m.DeployDialog })));
+const StyleAudit = lazy(() => import("@/components/style-audit").then(m => ({ default: m.StyleAudit })));
+const DesignToolSync = lazy(() => import("@/components/DesignToolSync").then(m => ({ default: m.DesignToolSync })));
+
+function LazyFallback() {
+  return <div className="flex items-center justify-center p-4"><Loader2 className="animate-spin text-muted-foreground" size={16} /></div>;
+}
 
 interface StyleSummary {
   id: string;
@@ -1192,11 +1197,13 @@ export default ${safeName};`;
                 );
               } else if (summary.tokens) {
                 return (
-                  <TokenVisualization 
-                    tokens={summary.tokens} 
-                    compact={true}
-                    className="absolute inset-0"
-                  />
+                  <Suspense fallback={<LazyFallback />}>
+                    <TokenVisualization 
+                      tokens={summary.tokens} 
+                      compact={true}
+                      className="absolute inset-0"
+                    />
+                  </Suspense>
                 );
               } else {
                 return (
@@ -1373,20 +1380,22 @@ export default ${safeName};`;
           
           {/* Export - gated by export.tokens */}
           {isFeatureEnabled('export.tokens') && (
-            <ExportDialog 
-              tokens={summary.tokens} 
-              styleName={summary.name}
-              trigger={
-                <button 
-                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
-                  data-testid="button-export-tokens"
-                >
-                  <Download size={16} />
-                  Export
-                  <ChevronDown size={14} />
-                </button>
-              }
-            />
+            <Suspense fallback={<LazyFallback />}>
+              <ExportDialog 
+                tokens={summary.tokens} 
+                styleName={summary.name}
+                trigger={
+                  <button 
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+                    data-testid="button-export-tokens"
+                  >
+                    <Download size={16} />
+                    Export
+                    <ChevronDown size={14} />
+                  </button>
+                }
+              />
+            </Suspense>
           )}
           
           {/* PDF Brand Kit - gated by export.pdf */}
@@ -1420,43 +1429,47 @@ export default ${safeName};`;
           
           {/* Deploy - gated by deploy.enabled */}
           {isFeatureEnabled('deploy.enabled') && (
-            <DeployDialog 
-              tokens={summary.tokens} 
-              styleName={summary.name}
-              trigger={
-                <button 
-                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 border border-border bg-muted/50 hover:bg-muted rounded-lg text-sm font-medium transition-colors"
-                  data-testid="button-deploy-primary"
-                >
-                  <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth="1.5">
-                    <path d="M8 2L14 8L8 14" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M2 8H13" strokeLinecap="round" />
-                  </svg>
-                  Deploy
-                </button>
-              }
-            />
+            <Suspense fallback={<LazyFallback />}>
+              <DeployDialog 
+                tokens={summary.tokens} 
+                styleName={summary.name}
+                trigger={
+                  <button 
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 border border-border bg-muted/50 hover:bg-muted rounded-lg text-sm font-medium transition-colors"
+                    data-testid="button-deploy-primary"
+                  >
+                    <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth="1.5">
+                      <path d="M8 2L14 8L8 14" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M2 8H13" strokeLinecap="round" />
+                    </svg>
+                    Deploy
+                  </button>
+                }
+              />
+            </Suspense>
           )}
 
           {/* Style Audit - gated by audit.enabled */}
           {isFeatureEnabled('audit.enabled') && (
-            <StyleAudit
-              styleId={summary.id}
-              styleName={summary.name}
-              tokens={summary.tokens}
-              trigger={
-                <button 
-                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 border border-border bg-muted/50 hover:bg-muted rounded-lg text-sm font-medium transition-colors"
-                  data-testid="button-audit-primary"
-                >
-                  <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth="1.5">
-                    <circle cx="6" cy="6" r="4.5" />
-                    <path d="M9 9L14 14" strokeLinecap="round" />
-                  </svg>
-                  Audit
-                </button>
-              }
-            />
+            <Suspense fallback={<LazyFallback />}>
+              <StyleAudit
+                styleId={summary.id}
+                styleName={summary.name}
+                tokens={summary.tokens}
+                trigger={
+                  <button 
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 border border-border bg-muted/50 hover:bg-muted rounded-lg text-sm font-medium transition-colors"
+                    data-testid="button-audit-primary"
+                  >
+                    <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth="1.5">
+                      <circle cx="6" cy="6" r="4.5" />
+                      <path d="M9 9L14 14" strokeLinecap="round" />
+                    </svg>
+                    Audit
+                  </button>
+                }
+              />
+            </Suspense>
           )}
           
           {/* Design Tools - gated by designtools.enabled */}
@@ -1472,10 +1485,12 @@ export default ${safeName};`;
                 </button>
               </DialogTrigger>
               <DialogContent className="max-w-4xl p-0 overflow-hidden">
-                <DesignToolSync 
-                  styleName={summary.name}
-                  tokens={summary.tokens}
-                />
+                <Suspense fallback={<LazyFallback />}>
+                  <DesignToolSync 
+                    styleName={summary.name}
+                    tokens={summary.tokens}
+                  />
+                </Suspense>
               </DialogContent>
             </Dialog>
           )}
@@ -1593,13 +1608,15 @@ export default ${safeName};`;
                 <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
               </summary>
               <div className="p-4 pt-0">
-                <StyleSpecEditor 
-                  styleId={summary.id} 
-                  styleSpec={summary.styleSpec}
-                  createdAt={summary.createdAt}
-                  updatedAt={summary.updatedAt}
-                  onUpdate={handleSpecUpdate}
-                />
+                <Suspense fallback={<LazyFallback />}>
+                  <StyleSpecEditor 
+                    styleId={summary.id} 
+                    styleSpec={summary.styleSpec}
+                    createdAt={summary.createdAt}
+                    updatedAt={summary.updatedAt}
+                    onUpdate={handleSpecUpdate}
+                  />
+                </Suspense>
               </div>
             </details>
           )}
@@ -1617,13 +1634,15 @@ export default ${safeName};`;
                     <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
                   </div>
                 ) : (
-                  <AiMoodBoard
-                    styleId={summary.id}
-                    styleName={summary.name}
-                    moodBoard={assets?.moodBoard}
-                    uiConcepts={assets?.uiConcepts}
-                    assetRefs={assetRefs}
-                  />
+                  <Suspense fallback={<LazyFallback />}>
+                    <AiMoodBoard
+                      styleId={summary.id}
+                      styleName={summary.name}
+                      moodBoard={assets?.moodBoard}
+                      uiConcepts={assets?.uiConcepts}
+                      assetRefs={assetRefs}
+                    />
+                  </Suspense>
                 )}
               </div>
             </details>
@@ -1776,21 +1795,27 @@ export default ${safeName};`;
             <div className="p-4 pt-0 space-y-6">
               <div>
                 <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Color Details</h4>
-                <ColorDetails colors={enhancedColors.length > 0 ? enhancedColors : undefined} tokens={summary.tokens} />
+                <Suspense fallback={<LazyFallback />}>
+                  <ColorDetails colors={enhancedColors.length > 0 ? enhancedColors : undefined} tokens={summary.tokens} />
+                </Suspense>
               </div>
               <div>
                 <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">All Tokens</h4>
-                <TokenViewer tokens={summary.tokens} />
+                <Suspense fallback={<LazyFallback />}>
+                  <TokenViewer tokens={summary.tokens} />
+                </Suspense>
               </div>
               
               {/* Material Intelligence - inside Design DNA - gated by materials.enabled */}
               {isFeatureEnabled('materials.enabled') && (
                 <div data-testid="section-materials">
                   <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Material Intelligence</h4>
-                  <MaterialIntelligencePanel
-                    styleId={summary.id}
-                    referenceImage={getImageUrl(summary.imageIds?.reference, 'full') || undefined}
-                  />
+                  <Suspense fallback={<LazyFallback />}>
+                    <MaterialIntelligencePanel
+                      styleId={summary.id}
+                      referenceImage={getImageUrl(summary.imageIds?.reference, 'full') || undefined}
+                    />
+                  </Suspense>
                 </div>
               )}
             </div>
