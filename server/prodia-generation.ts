@@ -90,6 +90,7 @@ interface MoodBoardRequest {
   styleName: string;
   styleDescription: string;
   tokens: Record<string, unknown>;
+  referenceImageBase64?: string;
   metadataTags?: Record<string, string[]>;
   onProgress?: ProgressCallback;
 }
@@ -99,6 +100,16 @@ interface UiConceptResult {
   audioPlugin?: string;
   dashboard?: string;
   processingTimeMs: number;
+}
+
+interface InternalGenerationRequest {
+  styleName: string;
+  styleDescription: string;
+  tokens: Record<string, unknown>;
+  metadataTags?: Record<string, string[]>;
+  renderingStyle?: RenderingStyle | null;
+  analysis?: ImageAnalysis | null;
+  onProgress?: ProgressCallback;
 }
 
 const CANONICAL_SUBJECTS = {
@@ -239,6 +250,61 @@ function buildStylePromptFragment(
   return `In the style of "${styleName}": ${descFragment}. ${keywordsFragment} ${colorFragment} ${lightingFragment} ${textureFragment} ${moodFragment}`;
 }
 
+function buildRichStylePromptForProdia(
+  subject: string,
+  styleName: string,
+  styleDescription: string,
+  summary: TokenSummary,
+  renderingStyle?: RenderingStyle | null,
+  analysis?: ImageAnalysis | null,
+  metadataTags?: Record<string, string[]>
+): string {
+  const parts: string[] = [];
+  
+  parts.push(subject);
+  
+  if (renderingStyle) {
+    parts.push(`ARTISTIC MEDIUM: ${renderingStyle.medium}.`);
+    parts.push(`TECHNIQUE: ${renderingStyle.technique}.`);
+    parts.push(`COLOR TREATMENT: ${renderingStyle.colorPalette}.`);
+    if (renderingStyle.characteristics.length > 0) {
+      parts.push(`STYLE TRAITS: ${renderingStyle.characteristics.join(", ")}.`);
+    }
+  }
+  
+  if (analysis?.artisticStyle) {
+    parts.push(`Rendered in ${analysis.artisticStyle} style.`);
+  }
+  
+  const colorList = summary.colors.slice(0, 5).map(c => c.hex).join(", ");
+  if (colorList) {
+    parts.push(`Color palette: ${colorList}.`);
+  }
+  
+  parts.push(`${summary.lighting.type} lighting with ${summary.lighting.intensity} intensity.`);
+  parts.push(`${summary.texture.finish} finish, ${summary.texture.grain} grain texture.`);
+  parts.push(`${summary.mood.tone} mood and atmosphere.`);
+  
+  if (metadataTags) {
+    const materials = metadataTags.materials || metadataTags.material || [];
+    const textures = metadataTags.textures || metadataTags.texture || [];
+    const era = metadataTags.era || [];
+    const mood = metadataTags.mood || [];
+    
+    if (materials.length) parts.push(`Materials: ${materials.slice(0, 3).join(", ")}.`);
+    if (textures.length) parts.push(`Textures: ${textures.slice(0, 3).join(", ")}.`);
+    if (era.length) parts.push(`Era: ${era.slice(0, 2).join(", ")}.`);
+    if (mood.length) parts.push(`Mood: ${mood.slice(0, 2).join(", ")}.`);
+  }
+  
+  parts.push(`Style: "${styleName}".`);
+  if (styleDescription && styleDescription.length > 10) {
+    parts.push(styleDescription.slice(0, 200));
+  }
+  
+  return parts.join(" ");
+}
+
 async function generatePreviewImage(
   type: "portrait" | "landscape" | "stillLife",
   styleName: string,
@@ -246,13 +312,10 @@ async function generatePreviewImage(
   summary: TokenSummary,
   analysis?: ImageAnalysis | null,
   metadataTags?: Record<string, string[]>,
-  referenceImageBase64?: string,
+  _referenceImageBase64?: string,
   renderingStyle?: RenderingStyle | null
 ): Promise<MultiProviderResult> {
   let subject: string;
-  
-  // Canonical previews always use general artistic subjects (portraits, landscapes, still life)
-  // UI-specific content is generated separately via generateUiConceptsWithProdia (softwareApp, audioPlugin, dashboard)
   
   if (analysis?.hasSubject && analysis.sceneDescription) {
     const elements = analysis.dominantElements?.slice(0, 3).join(", ") || "";
@@ -265,26 +328,23 @@ async function generatePreviewImage(
     } else if (type === "stillLife" && analysis.subjectType === "still_life") {
       subject = baseScene;
     } else {
-      // Use standard canonical subjects with enrichment from the original scene context
       subject = `${CANONICAL_SUBJECTS[type]}. Key elements: ${elements}. Rendered as a ${type === "stillLife" ? "still life composition" : type} view`;
     }
   } else {
     subject = CANONICAL_SUBJECTS[type];
   }
   
-  // Build enhanced prompt with metadataTags
-  const styleFragment = buildStylePromptFragment(styleName, styleDescription, summary, metadataTags);
-  const artisticHint = analysis?.artisticStyle ? `Rendered in ${analysis.artisticStyle} style.` : "";
+  const richPrompt = buildRichStylePromptForProdia(
+    subject,
+    styleName,
+    styleDescription,
+    summary,
+    renderingStyle,
+    analysis,
+    metadataTags
+  );
   
-  const prompt = `${subject}. ${styleFragment} ${artisticHint} High quality, detailed, professional artwork. Match the exact visual style, materials, textures, and artistic rendering of the reference image.`;
-  
-  // Use style transfer with reference image if available, otherwise fall back to Prodia
-  if (referenceImageBase64) {
-    return generateWithStyleTransfer(prompt, referenceImageBase64, renderingStyle, "gemini");
-  }
-  
-  // Fallback to Prodia if no reference image
-  const prodiaResult = await generateWithFluxSchnell({ prompt });
+  const prodiaResult = await generateWithFluxSchnell({ prompt: richPrompt });
   return {
     success: prodiaResult.success,
     imageBase64: prodiaResult.imageBase64,
@@ -490,6 +550,62 @@ export async function generateCanonicalPreviewsWithProdia(
       stillLife: stillLifeResult.success,
     },
   }).catch(err => logger.error("Failed to record preview metric", err, { module: 'ProdiaGeneration' }));
+  
+  return result;
+}
+
+async function generateCanonicalPreviewsWithProdiaInternal(
+  request: InternalGenerationRequest
+): Promise<PreviewResult> {
+  const startTime = Date.now();
+  
+  if (!isProdiaEnabled()) {
+    throw new Error("Prodia is not configured. Set PRODIA_TOKEN to enable.");
+  }
+  
+  const summary = request.tokens ? extractTokenSummary(request.tokens) : extractTokenSummary({});
+  
+  await request.onProgress?.(5, "Starting style-accurate preview generation...");
+  
+  const [portraitResult, landscapeResult, stillLifeResult] = await Promise.all([
+    (async () => {
+      await request.onProgress?.(15, "Generating portrait preview with style transfer...");
+      return generatePreviewImage(
+        "portrait", request.styleName, request.styleDescription, summary, 
+        request.analysis, request.metadataTags, undefined, request.renderingStyle
+      );
+    })(),
+    (async () => {
+      await request.onProgress?.(30, "Generating landscape preview with style transfer...");
+      return generatePreviewImage(
+        "landscape", request.styleName, request.styleDescription, summary, 
+        request.analysis, request.metadataTags, undefined, request.renderingStyle
+      );
+    })(),
+    (async () => {
+      await request.onProgress?.(45, "Generating still life preview with style transfer...");
+      return generatePreviewImage(
+        "stillLife", request.styleName, request.styleDescription, summary, 
+        request.analysis, request.metadataTags, undefined, request.renderingStyle
+      );
+    })(),
+  ]);
+  
+  await request.onProgress?.(90, "Finalizing previews...");
+  
+  const placeholder = generatePlaceholder(request.styleName);
+  
+  const result: PreviewResult = {
+    portrait: portraitResult.success ? portraitResult.imageBase64! : placeholder,
+    landscape: landscapeResult.success ? landscapeResult.imageBase64! : placeholder,
+    stillLife: stillLifeResult.success ? stillLifeResult.imageBase64! : placeholder,
+    allFailed: !portraitResult.success && !landscapeResult.success && !stillLifeResult.success,
+    processingTimeMs: Date.now() - startTime,
+  };
+  
+  await request.onProgress?.(100, "Preview generation complete");
+  
+  logger.info(`Generated previews in ${result.processingTimeMs}ms`, { module: 'ProdiaGeneration', duration: result.processingTimeMs });
   
   return result;
 }
@@ -836,6 +952,79 @@ export async function generateUiConceptsWithProdia(
   };
 }
 
+async function generateUiConceptsWithProdiaInternal(
+  request: InternalGenerationRequest
+): Promise<UiConceptResult> {
+  const startTime = Date.now();
+  
+  if (!isProdiaEnabled()) {
+    throw new Error("Prodia is not configured. Set PRODIA_TOKEN to enable.");
+  }
+  
+  const summary = extractTokenSummary(request.tokens);
+  
+  await request.onProgress?.(10, "Generating UI concepts...");
+  
+  const uiSubjects = {
+    softwareApp: "A modern desktop software application UI design with clean interface, sidebar, toolbar, and main content area. Professional software mockup.",
+    audioPlugin: "A professional audio plugin VST interface with knobs, sliders, VU meters, and waveform display. Music production plugin UI with skeuomorphic details.",
+    dashboard: "A data analytics dashboard UI with charts, graphs, metrics cards, and navigation. Business dashboard interface.",
+  };
+  
+  const [softwareAppResult, audioPluginResult, dashboardResult] = await Promise.all([
+    (async () => {
+      await request.onProgress?.(25, "Generating software app concept...");
+      const prompt = buildRichStylePromptForProdia(
+        uiSubjects.softwareApp,
+        request.styleName,
+        request.styleDescription,
+        summary,
+        request.renderingStyle,
+        request.analysis,
+        request.metadataTags
+      );
+      return generateWithFluxSchnell({ prompt });
+    })(),
+    (async () => {
+      await request.onProgress?.(50, "Generating audio plugin concept...");
+      const prompt = buildRichStylePromptForProdia(
+        uiSubjects.audioPlugin,
+        request.styleName,
+        request.styleDescription,
+        summary,
+        request.renderingStyle,
+        request.analysis,
+        request.metadataTags
+      );
+      return generateWithFluxSchnell({ prompt });
+    })(),
+    (async () => {
+      await request.onProgress?.(75, "Generating dashboard concept...");
+      const prompt = buildRichStylePromptForProdia(
+        uiSubjects.dashboard,
+        request.styleName,
+        request.styleDescription,
+        summary,
+        request.renderingStyle,
+        request.analysis,
+        request.metadataTags
+      );
+      return generateWithFluxSchnell({ prompt });
+    })(),
+  ]);
+  
+  await request.onProgress?.(100, "UI concepts complete");
+  
+  const processingTimeMs = Date.now() - startTime;
+  
+  return {
+    softwareApp: softwareAppResult.success ? softwareAppResult.imageBase64 : undefined,
+    audioPlugin: audioPluginResult.success ? audioPluginResult.imageBase64 : undefined,
+    dashboard: dashboardResult.success ? dashboardResult.imageBase64 : undefined,
+    processingTimeMs,
+  };
+}
+
 export async function generateStyledImageWithProdia(
   prompt: string,
   styleName: string,
@@ -892,13 +1081,35 @@ export async function generateAllAssetsWithProdia(request: MoodBoardRequest): Pr
   
   await request.onProgress?.(5, "Starting full asset generation with Prodia...");
   
+  let renderingStyle: RenderingStyle | null = null;
+  let analysis: ImageAnalysis | null = null;
+  
+  if (request.referenceImageBase64) {
+    await request.onProgress?.(8, "Analyzing reference image style...");
+    
+    const [rsResult, analysisResult] = await Promise.all([
+      analyzeRenderingStyle(request.referenceImageBase64),
+      analyzeReferenceImage(request.referenceImageBase64),
+    ]);
+    
+    renderingStyle = rsResult;
+    analysis = analysisResult;
+    
+    if (renderingStyle) {
+      logger.info(`Style analyzed: ${renderingStyle.medium} / ${renderingStyle.technique}`, { module: 'ProdiaGeneration' });
+    }
+  }
+  
   const [previews, moodBoard, uiConcepts] = await Promise.all([
-    generateCanonicalPreviewsWithProdia({
+    generateCanonicalPreviewsWithProdiaInternal({
       styleName: request.styleName,
       styleDescription: request.styleDescription,
       tokens: request.tokens,
+      metadataTags: request.metadataTags,
+      renderingStyle,
+      analysis,
       onProgress: async (p, m) => {
-        await request.onProgress?.(5 + p * 0.3, `Previews: ${m}`);
+        await request.onProgress?.(10 + p * 0.3, `Previews: ${m}`);
       },
     }),
     generateMoodBoardWithProdia({
@@ -907,8 +1118,13 @@ export async function generateAllAssetsWithProdia(request: MoodBoardRequest): Pr
         await request.onProgress?.(35 + p * 0.3, `Mood Board: ${m}`);
       },
     }),
-    generateUiConceptsWithProdia({
-      ...request,
+    generateUiConceptsWithProdiaInternal({
+      styleName: request.styleName,
+      styleDescription: request.styleDescription,
+      tokens: request.tokens,
+      metadataTags: request.metadataTags,
+      renderingStyle,
+      analysis,
       onProgress: async (p, m) => {
         await request.onProgress?.(65 + p * 0.3, `UI Concepts: ${m}`);
       },

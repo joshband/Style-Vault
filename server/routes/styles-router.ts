@@ -277,7 +277,10 @@ router.post("/api/styles", async (req, res) => {
     (async () => {
       try {
         const refImages = style.referenceImages as string[] | null;
+        let referenceImageBase64: string | undefined;
+        
         if (refImages && refImages.length > 0 && isValidImageDataUri(refImages[0])) {
+          referenceImageBase64 = refImages[0];
           try {
             await storeImageToObjectStorage(refImages[0], "reference", style.id);
             await storage.updateStyleFull(style.id, { referenceImages: [] as any });
@@ -303,6 +306,7 @@ router.post("/api/styles", async (req, res) => {
             styleName: style.name,
             styleDescription: style.description,
             tokens: style.tokens || {},
+            referenceImageBase64,
             metadataTags: (style.metadataTags || getDefaultMetadataTags()) as unknown as Record<string, string[]>,
           });
           
