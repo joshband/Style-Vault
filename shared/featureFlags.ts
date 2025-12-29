@@ -142,11 +142,11 @@ export const defaultFeatureFlags: FeatureFlags = {
   'delete.enabled': false,
   'refresh.enabled': false,
   
-  // Inspect page features - Stage 3 minimal (display only, only previews visible)
+  // Inspect page features - Stage 4 (previews + Design DNA)
   'inspect.summary': true,
   'inspect.previews': true,
-  'inspect.tokens': false,
-  'inspect.palette': false,
+  'inspect.tokens': true,
+  'inspect.palette': true,
   'styleguide.enabled': false,
   'usagenotes.enabled': false,
   'moodboard.enabled': false,

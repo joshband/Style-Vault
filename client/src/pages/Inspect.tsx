@@ -75,21 +75,9 @@ function SectionHeader({ title, description }: { title: string; description?: st
   );
 }
 
-const MAX_SAFE_BASE64_LENGTH = 100000;
-
-function isSafeBase64(src: string | undefined): boolean {
-  if (!src) return false;
-  if (src.startsWith('/api/')) return true;
-  if (src.startsWith('data:') || src.length > 100) {
-    return src.length < MAX_SAFE_BASE64_LENGTH;
-  }
-  return true;
-}
-
-function getSafeImageSrc(imageIdSrc: string | undefined, base64Fallback: string | undefined): string | null {
-  if (imageIdSrc) return imageIdSrc;
-  if (base64Fallback && isSafeBase64(base64Fallback)) return base64Fallback;
-  return null;
+function getImageUrl(imageId: string | undefined, size: 'thumb' | 'medium' | 'full' = 'medium'): string | null {
+  if (!imageId) return null;
+  return `/api/images/${imageId}?size=${size}`;
 }
 
 function PreviewSkeleton({ aspect }: { aspect: string }) {
@@ -1156,11 +1144,7 @@ export default ${safeName};`;
           {/* Source Image - Trust Signal */}
           <div className="relative aspect-square rounded-lg overflow-hidden border border-border bg-neutral-100 dark:bg-neutral-900">
             {(() => {
-              const refImageIdSrc = summary.imageIds?.reference 
-                ? `/api/images/${summary.imageIds.reference}?size=medium`
-                : undefined;
-              const refBase64Fallback = summary.referenceImages?.[0];
-              const refSrc = getSafeImageSrc(refImageIdSrc, refBase64Fallback);
+              const refSrc = getImageUrl(summary.imageIds?.reference, 'medium');
               
               if (refSrc) {
                 return (
@@ -1178,12 +1162,6 @@ export default ${safeName};`;
                       Source
                     </div>
                   </>
-                );
-              } else if (refBase64Fallback && !isSafeBase64(refBase64Fallback)) {
-                return (
-                  <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
-                    Image too large to display
-                  </div>
                 );
               } else if (summary.tokens) {
                 return (
@@ -1206,11 +1184,7 @@ export default ${safeName};`;
           {/* Software App UI - Style Output */}
           <div className="relative aspect-square rounded-lg overflow-hidden border border-border bg-neutral-100 dark:bg-neutral-900">
             {(() => {
-              const uiImageIdSrc = summary.imageIds?.ui_software_app 
-                ? `/api/images/${summary.imageIds.ui_software_app}?size=medium`
-                : undefined;
-              const uiBase64Fallback = assets?.uiConcepts?.softwareApp;
-              const uiSrc = getSafeImageSrc(uiImageIdSrc, uiBase64Fallback);
+              const uiSrc = getImageUrl(summary.imageIds?.ui_software_app, 'medium');
               
               if (uiSrc) {
                 return (
@@ -1440,15 +1414,8 @@ export default ${safeName};`;
                 <div className="grid grid-cols-3 gap-2">
                   {['landscape', 'portrait', 'stillLife'].map((type) => {
                     const key = type === 'stillLife' ? 'preview_still_life' : `preview_${type}`;
-                    const imageIdSrc = summary.imageIds?.[key] 
-                      ? `/api/images/${summary.imageIds[key]}?size=medium`
-                      : undefined;
-                    const base64Fallback = (previews as any)[type];
-                    const imgSrc = getSafeImageSrc(imageIdSrc, base64Fallback);
-                    // Use ?size=full for downloads - high quality original
-                    const fullSrc = summary.imageIds?.[key]
-                      ? `/api/images/${summary.imageIds[key]}?size=full`
-                      : (isSafeBase64(base64Fallback) ? base64Fallback : null);
+                    const imgSrc = getImageUrl(summary.imageIds?.[key], 'medium');
+                    const fullSrc = getImageUrl(summary.imageIds?.[key], 'full');
                     return (
                       <div key={type} className="aspect-square bg-muted rounded-lg overflow-hidden border border-border relative group/preview">
                         {imgSrc ? (
@@ -1473,7 +1440,7 @@ export default ${safeName};`;
                           </>
                         ) : (
                           <div className="flex items-center justify-center h-full text-muted-foreground text-xs capitalize">
-                            {base64Fallback && !isSafeBase64(base64Fallback) ? 'Preview too large' : type}
+                            {type}
                           </div>
                         )}
                       </div>
@@ -1724,12 +1691,7 @@ export default ${safeName};`;
                       <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Material Intelligence</h4>
                       <MaterialIntelligencePanel
                         styleId={summary.id}
-                        referenceImage={getSafeImageSrc(
-                          summary.imageIds?.reference
-                            ? `/api/images/${summary.imageIds.reference}?size=large`
-                            : undefined,
-                          isSafeBase64(summary.referenceImages?.[0]) ? summary.referenceImages?.[0] : undefined
-                        ) || undefined}
+                        referenceImage={getImageUrl(summary.imageIds?.reference, 'full') || undefined}
                       />
                     </div>
                   )}
