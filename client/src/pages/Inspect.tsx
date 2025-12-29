@@ -92,9 +92,11 @@ function PreviewSkeleton({ aspect }: { aspect: string }) {
 }
 
 export default function Inspect() {
+  console.log("=== Inspect component starting render ===");
   const [, params] = useRoute("/style/:id");
   const [, navigate] = useLocation();
   const id = params?.id;
+  console.log("Inspect id:", id);
   const { user, isAuthenticated } = useAuth();
   const containerRef = useRef<HTMLDivElement>(null);
   const [summary, setSummary] = useState<StyleSummary | null>(null);
@@ -993,7 +995,20 @@ export default ${safeName};`;
     );
   }
 
-  const previews = assets?.previews || {};
+  // DEBUG: Minimal render to isolate crash
+  return (
+    <Layout>
+      <div className="max-w-4xl mx-auto p-6">
+        <h1 className="text-2xl font-serif" data-testid="style-name">{summary.name}</h1>
+        <p className="text-muted-foreground">{summary.description}</p>
+        <p className="text-xs mt-4">Debug mode: Minimal render active</p>
+        <Link href="/" className="text-sm underline mt-4 block">Back to home</Link>
+      </div>
+    </Layout>
+  );
+
+  // ORIGINAL CODE BELOW - DISABLED FOR DEBUGGING
+  const _previews = assets?.previews || {};
 
   // Extract primary colors for Quick Read (first 6) - visual only
   const getPrimaryColors = () => {
