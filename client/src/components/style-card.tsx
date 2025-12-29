@@ -213,7 +213,7 @@ const StyleCardComponent = memo(function StyleCard({ style, className, onDelete 
                   ].slice(0, 4).map((tag: string, i: number) => (
                     <span 
                       key={`${tag}-${i}`}
-                      className="inline-flex px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground"
+                      className="inline-flex px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-500 border border-gray-200"
                       data-testid={`tag-${tag}`}
                     >
                       {tag}
