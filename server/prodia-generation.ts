@@ -74,6 +74,7 @@ interface PreviewGenerationRequest {
   styleDescription: string;
   referenceImageBase64?: string;
   tokens?: Record<string, unknown>;
+  metadataTags?: Record<string, string[]>;
   onProgress?: ProgressCallback;
 }
 
@@ -105,6 +106,38 @@ const CANONICAL_SUBJECTS = {
   landscape: "an elevated stone promenade with ornate railings overlooking a layered cityscape at golden hour, with rooftops, spires, and distant mountains visible on the horizon",
   stillLife: "a curated arrangement on a wooden studio desk featuring an open leather-bound sketchbook, glass jars of colorful pigments, a small sculpted bust, dried flowers in a ceramic vase, and natural light from a nearby window",
 };
+
+// UI-specific canonical subjects for audio/software/dashboard styles
+const UI_CANONICAL_SUBJECTS = {
+  portrait: "a vintage audio equipment panel with analog VU meters, rotary knobs with brass bezels, toggle switches, and colorful LED indicators arranged in a symmetrical layout",
+  landscape: "a control room console with channel strips, faders, vintage patch bay, rack-mounted gear with illuminated displays, and industrial metal housing with ventilation grilles",
+  stillLife: "a close-up arrangement of audio equipment components including potentiometers, vintage toggle switches, colorful enamel buttons, analog gauges, and brass fittings on a textured metal surface",
+};
+
+// Detect if a style is UI-related based on metadata tags
+function isUiStyleFromMetadata(metadataTags?: Record<string, string[]>): boolean {
+  if (!metadataTags) return false;
+  
+  // Check usageExamples for UI-related terms
+  const usageExamples = metadataTags.usageExamples || [];
+  const uiUsagePatterns = ['plugin', 'software', 'app', 'dashboard', 'ui', 'interface', 'game'];
+  if (usageExamples.some(usage => 
+    uiUsagePatterns.some(pattern => usage.toLowerCase().includes(pattern))
+  )) {
+    return true;
+  }
+  
+  // Check subjects for equipment/technical terms
+  const subjects = metadataTags.subjects || [];
+  const uiSubjectPatterns = ['audio', 'equipment', 'gauge', 'dial', 'switch', 'knob', 'meter', 'control', 'panel'];
+  if (subjects.some(subject => 
+    uiSubjectPatterns.some(pattern => subject.toLowerCase().includes(pattern))
+  )) {
+    return true;
+  }
+  
+  return false;
+}
 
 function extractTokenSummary(tokens: Record<string, unknown>): TokenSummary {
   const color = (tokens.color || {}) as Record<string, unknown>;
@@ -152,13 +185,58 @@ function buildColorPromptFragment(summary: TokenSummary): string {
   return `Color palette: ${colorList}.`;
 }
 
-function buildStylePromptFragment(styleName: string, styleDescription: string, summary: TokenSummary): string {
+function buildStylePromptFragment(
+  styleName: string, 
+  styleDescription: string, 
+  summary: TokenSummary,
+  metadataTags?: Record<string, string[]>
+): string {
   const colorFragment = buildColorPromptFragment(summary);
   const lightingFragment = `${summary.lighting.type} lighting, ${summary.lighting.intensity} intensity.`;
   const textureFragment = `${summary.texture.finish} finish with ${summary.texture.grain} grain.`;
   const moodFragment = `${summary.mood.tone} mood.`;
   
-  return `In the style of "${styleName}": ${styleDescription.slice(0, 150)}. ${colorFragment} ${lightingFragment} ${textureFragment} ${moodFragment}`;
+  // Build rich style keywords from metadataTags (handle both singular and plural key variants)
+  const styleKeywords: string[] = [];
+  if (metadataTags) {
+    // Material and texture characteristics (support both material/materials, texture/textures)
+    const materials = metadataTags.materials || metadataTags.material || [];
+    const textures = metadataTags.textures || metadataTags.texture || [];
+    if (materials.length) {
+      styleKeywords.push(`Materials: ${materials.slice(0, 3).join(", ")}`);
+    }
+    if (textures.length) {
+      styleKeywords.push(`Textures: ${textures.slice(0, 3).join(", ")}`);
+    }
+    // Era and artistic style (support stylisticPrinciples as fallback)
+    if (metadataTags.era?.length) {
+      styleKeywords.push(`Era: ${metadataTags.era.slice(0, 2).join(", ")}`);
+    }
+    const artStyle = metadataTags.artisticStyle || metadataTags.stylisticPrinciples || metadataTags.medium || [];
+    if (artStyle.length) {
+      styleKeywords.push(`Style: ${artStyle.slice(0, 2).join(", ")}`);
+    }
+    // Mood and atmosphere
+    if (metadataTags.mood?.length) {
+      styleKeywords.push(`Mood: ${metadataTags.mood.slice(0, 2).join(", ")}`);
+    }
+    // Visual characteristics (support depth, shadow as fallbacks)
+    const visuals = metadataTags.visualAttributes || metadataTags.depth || metadataTags.shadow || [];
+    if (visuals.length) {
+      styleKeywords.push(`Visual: ${visuals.slice(0, 3).join(", ")}`);
+    }
+    // Signature motifs for additional context
+    if (metadataTags.signatureMotifs?.length) {
+      styleKeywords.push(`Key motifs: ${metadataTags.signatureMotifs.slice(0, 3).join(", ")}`);
+    }
+  }
+  
+  const keywordsFragment = styleKeywords.length > 0 ? styleKeywords.join(". ") + "." : "";
+  
+  // Use full description (up to 400 chars) instead of truncated 150
+  const descFragment = styleDescription.slice(0, 400);
+  
+  return `In the style of "${styleName}": ${descFragment}. ${keywordsFragment} ${colorFragment} ${lightingFragment} ${textureFragment} ${moodFragment}`;
 }
 
 async function generatePreviewImage(
@@ -166,9 +244,17 @@ async function generatePreviewImage(
   styleName: string,
   styleDescription: string,
   summary: TokenSummary,
-  analysis?: ImageAnalysis | null
-): Promise<ProdiaGenerationResult> {
+  analysis?: ImageAnalysis | null,
+  metadataTags?: Record<string, string[]>,
+  referenceImageBase64?: string,
+  renderingStyle?: RenderingStyle | null
+): Promise<MultiProviderResult> {
   let subject: string;
+  
+  // For UI-type styles (audio plugins, dashboards, etc.), use UI-specific canonical subjects
+  // Check both image analysis AND metadata tags for UI detection
+  const isUiStyle = analysis?.subjectType === "ui" || isUiStyleFromMetadata(metadataTags);
+  const subjectSource = isUiStyle ? UI_CANONICAL_SUBJECTS : CANONICAL_SUBJECTS;
   
   if (analysis?.hasSubject && analysis.sceneDescription) {
     const elements = analysis.dominantElements?.slice(0, 3).join(", ") || "";
@@ -180,19 +266,35 @@ async function generatePreviewImage(
       subject = baseScene;
     } else if (type === "stillLife" && analysis.subjectType === "still_life") {
       subject = baseScene;
+    } else if (isUiStyle) {
+      // For UI styles, use UI-specific subjects enriched with the original scene context
+      subject = `${subjectSource[type]}. Original context: ${baseScene}`;
     } else {
       subject = `${baseScene}. Key elements: ${elements}. Rendered as a ${type === "stillLife" ? "still life composition" : type} view`;
     }
   } else {
-    subject = CANONICAL_SUBJECTS[type];
+    subject = subjectSource[type];
   }
   
-  const styleFragment = buildStylePromptFragment(styleName, styleDescription, summary);
-  const artisticHint = analysis?.artisticStyle ? `In ${analysis.artisticStyle} style.` : "";
+  // Build enhanced prompt with metadataTags
+  const styleFragment = buildStylePromptFragment(styleName, styleDescription, summary, metadataTags);
+  const artisticHint = analysis?.artisticStyle ? `Rendered in ${analysis.artisticStyle} style.` : "";
   
-  const prompt = `${subject}. ${styleFragment} ${artisticHint} High quality, detailed, professional artwork.`;
+  const prompt = `${subject}. ${styleFragment} ${artisticHint} High quality, detailed, professional artwork. Match the exact visual style, materials, textures, and artistic rendering of the reference image.`;
   
-  return generateWithFluxSchnell({ prompt });
+  // Use style transfer with reference image if available, otherwise fall back to Prodia
+  if (referenceImageBase64) {
+    return generateWithStyleTransfer(prompt, referenceImageBase64, renderingStyle, "gemini");
+  }
+  
+  // Fallback to Prodia if no reference image
+  const prodiaResult = await generateWithFluxSchnell({ prompt });
+  return {
+    success: prodiaResult.success,
+    imageBase64: prodiaResult.imageBase64,
+    provider: "prodia" as ImageProvider,
+    error: prodiaResult.error,
+  };
 }
 
 interface MultiProviderResult {
@@ -315,29 +417,52 @@ export async function generateCanonicalPreviewsWithProdia(
   
   const summary = request.tokens ? extractTokenSummary(request.tokens) : extractTokenSummary({});
   
-  await request.onProgress?.(5, "Starting Prodia preview generation...");
+  await request.onProgress?.(5, "Starting style-accurate preview generation...");
   
+  // Analyze both reference image structure and rendering style
   let analysis: ImageAnalysis | null = null;
+  let renderingStyle: RenderingStyle | null = null;
+  
   if (request.referenceImageBase64) {
-    await request.onProgress?.(8, "Analyzing reference image...");
-    analysis = await analyzeReferenceImage(request.referenceImageBase64);
+    await request.onProgress?.(8, "Analyzing reference image style and structure...");
+    
+    const [rsResult, analysisResult] = await Promise.all([
+      analyzeRenderingStyle(request.referenceImageBase64),
+      analyzeReferenceImage(request.referenceImageBase64),
+    ]);
+    
+    renderingStyle = rsResult;
+    analysis = analysisResult;
+    
     if (analysis) {
-      logger.info(`Reference image analyzed: ${analysis.subjectType} - ${analysis.sceneDescription?.slice(0, 50)}...`, { module: 'ProdiaGeneration' });
+      logger.info(`Reference analyzed: ${analysis.subjectType} - ${analysis.artisticStyle}`, { module: 'ProdiaGeneration' });
+    }
+    if (renderingStyle) {
+      logger.info(`Rendering style: ${renderingStyle.medium} / ${renderingStyle.technique}`, { module: 'ProdiaGeneration' });
     }
   }
   
   const [portraitResult, landscapeResult, stillLifeResult] = await Promise.all([
     (async () => {
-      await request.onProgress?.(15, "Generating portrait preview...");
-      return generatePreviewImage("portrait", request.styleName, request.styleDescription, summary, analysis);
+      await request.onProgress?.(15, "Generating portrait preview with style transfer...");
+      return generatePreviewImage(
+        "portrait", request.styleName, request.styleDescription, summary, 
+        analysis, request.metadataTags, request.referenceImageBase64, renderingStyle
+      );
     })(),
     (async () => {
-      await request.onProgress?.(30, "Generating landscape preview...");
-      return generatePreviewImage("landscape", request.styleName, request.styleDescription, summary, analysis);
+      await request.onProgress?.(30, "Generating landscape preview with style transfer...");
+      return generatePreviewImage(
+        "landscape", request.styleName, request.styleDescription, summary, 
+        analysis, request.metadataTags, request.referenceImageBase64, renderingStyle
+      );
     })(),
     (async () => {
-      await request.onProgress?.(45, "Generating still life preview...");
-      return generatePreviewImage("stillLife", request.styleName, request.styleDescription, summary, analysis);
+      await request.onProgress?.(45, "Generating still life preview with style transfer...");
+      return generatePreviewImage(
+        "stillLife", request.styleName, request.styleDescription, summary, 
+        analysis, request.metadataTags, request.referenceImageBase64, renderingStyle
+      );
     })(),
   ]);
   

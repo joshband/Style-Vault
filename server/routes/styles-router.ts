@@ -10,7 +10,7 @@ import { extractTokensWithCV, extractTokensWithWalkthrough, convertToDTCG, isCVE
 import { getDefaultMetadataTags } from "./utils";
 import type { UiConceptAssets } from "@shared/schema";
 import { logger } from "../logger";
-import { storeImageToObjectStorage } from "../object-image-service";
+import { storeImageToObjectStorage, getImageFromObjectStorage } from "../object-image-service";
 import { isValidImageDataUri } from "../preview-generation";
 
 const router = Router();
@@ -1342,6 +1342,86 @@ router.post("/api/styles/generate-random", async (req, res) => {
     logger.error("Error generating random style", error, { module: 'Styles' });
     res.status(500).json({
       error: "Failed to generate random style",
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+});
+
+router.post("/api/styles/:id/generate-previews", async (req, res) => {
+  try {
+    const style = await storage.getStyleById(req.params.id);
+    if (!style) {
+      return res.status(404).json({ error: "Style not found" });
+    }
+
+    const { isProdiaEnabled } = await import("../prodia-service");
+    const { generateCanonicalPreviewsWithProdia } = await import("../prodia-generation");
+    
+    if (!isProdiaEnabled()) {
+      return res.status(503).json({
+        error: "Preview generation unavailable",
+        message: "Prodia service not configured",
+      });
+    }
+
+    res.json({ message: "Preview generation started", styleId: style.id });
+
+    (async () => {
+      try {
+        logger.info(`Generating previews for "${style.name}"`, { module: 'Styles', styleId: style.id });
+        
+        // Fetch reference image for style transfer
+        let referenceImageBase64: string | undefined;
+        if (style.referenceImages?.length) {
+          const refImageId = style.referenceImages[0];
+          const refImage = await getImageFromObjectStorage(refImageId, "full");
+          if (refImage?.data) {
+            referenceImageBase64 = refImage.data;
+          }
+        }
+        
+        const result = await generateCanonicalPreviewsWithProdia({
+          styleName: style.name,
+          styleDescription: style.description,
+          tokens: style.tokens,
+          metadataTags: style.metadataTags as Record<string, string[]> | undefined,
+          referenceImageBase64,
+        });
+
+        if (!result.allFailed) {
+          if (result.landscape) {
+            await storeImageToObjectStorage(result.landscape, "preview_landscape", style.id);
+          }
+          if (result.portrait) {
+            await storeImageToObjectStorage(result.portrait, "preview_portrait", style.id);
+          }
+          if (result.stillLife) {
+            await storeImageToObjectStorage(result.stillLife, "preview_still_life", style.id);
+          }
+          
+          await storage.updateStyleFull(style.id, {
+            previews: {
+              landscape: result.landscape || undefined,
+              portrait: result.portrait || undefined,
+              stillLife: result.stillLife || undefined,
+            } as any,
+          });
+          
+          cache.delete(CACHE_KEYS.STYLE_DETAIL(style.id));
+          cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
+          
+          logger.info(`Previews generated for "${style.name}"`, { module: 'Styles', styleId: style.id });
+        } else {
+          logger.error(`All preview generation failed for "${style.name}"`, null, { module: 'Styles', styleId: style.id });
+        }
+      } catch (error) {
+        logger.error(`Preview generation error for "${style.name}"`, error, { module: 'Styles', styleId: style.id });
+      }
+    })();
+  } catch (error) {
+    logger.error("Error starting preview generation", error, { module: 'Styles' });
+    res.status(500).json({
+      error: "Failed to start preview generation",
       message: error instanceof Error ? error.message : "Unknown error",
     });
   }
