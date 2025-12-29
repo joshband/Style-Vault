@@ -10,7 +10,7 @@ import { extractTokensWithCV, extractTokensWithWalkthrough, convertToDTCG, isCVE
 import { getDefaultMetadataTags } from "./utils";
 import type { UiConceptAssets } from "@shared/schema";
 import { logger } from "../logger";
-import { storeImageToObjectStorage, getImageFromObjectStorage } from "../object-image-service";
+import { storeImageToObjectStorage, getImageFromObjectStorage, getObjectAssetsByStyle, migrateStyleToObjectStorage } from "../object-image-service";
 import { isValidImageDataUri } from "../preview-generation";
 
 const router = Router();
@@ -222,6 +222,84 @@ router.get("/api/styles/:id/assets", async (req, res) => {
   } catch (error) {
     logger.error("Error fetching style assets", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to fetch style assets" });
+  }
+});
+
+router.get("/api/styles/:id/asset-refs", async (req, res) => {
+  try {
+    const styleId = req.params.id;
+    
+    const style = await storage.getStyleById(styleId);
+    if (!style) {
+      return res.status(404).json({ error: "Style not found" });
+    }
+    
+    const objectAssets = await getObjectAssetsByStyle(styleId);
+    
+    const moodBoardStatus = style.moodBoard?.status || "pending";
+    const uiConceptsStatus = style.uiConcepts?.status || "pending";
+    const previewsStatus = style.previews ? "complete" : "pending";
+    
+    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=120');
+    res.json({
+      objectAssets,
+      statuses: {
+        moodBoard: moodBoardStatus,
+        uiConcepts: uiConceptsStatus,
+        previews: previewsStatus,
+      },
+      hasLegacyData: {
+        moodBoard: !!(style.moodBoard?.collage && !objectAssets.moodBoardCollage),
+        uiConcepts: !!(style.uiConcepts?.softwareApp && !objectAssets.uiConceptSoftwareApp),
+        previews: !!(style.previews?.portrait && !objectAssets.previewPortrait),
+      },
+    });
+  } catch (error) {
+    logger.error("Error fetching asset refs", error, { module: 'Styles' });
+    res.status(500).json({ error: "Failed to fetch asset refs" });
+  }
+});
+
+router.post("/api/styles/:id/migrate-assets", async (req, res) => {
+  try {
+    const styleId = req.params.id;
+    const style = await storage.getStyleById(styleId);
+    
+    if (!style) {
+      return res.status(404).json({ error: "Style not found" });
+    }
+    
+    logger.info(`Starting asset migration for style ${styleId}`, { module: 'Styles' });
+    
+    const migratedIds = await migrateStyleToObjectStorage(styleId, {
+      referenceImages: style.referenceImages as string[] | undefined,
+      previews: style.previews as { portrait?: string; landscape?: string; stillLife?: string } | undefined,
+      moodBoard: style.moodBoard as { collage?: string } | undefined,
+      uiConcepts: style.uiConcepts as { softwareApp?: string; audioPlugin?: string; dashboard?: string } | undefined,
+    });
+    
+    if (Object.keys(migratedIds).length > 0) {
+      await storage.updateStyleFull(styleId, {
+        referenceImages: [] as any,
+        previews: { ...style.previews, portrait: null, landscape: null, stillLife: null } as any,
+        moodBoard: { ...style.moodBoard, collage: null } as any,
+        uiConcepts: { ...style.uiConcepts, softwareApp: null, audioPlugin: null, dashboard: null } as any,
+      });
+      
+      cache.delete(CACHE_KEYS.STYLE_DETAIL(styleId));
+      cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
+    }
+    
+    logger.info(`Asset migration complete for style ${styleId}`, { module: 'Styles', migratedCount: Object.keys(migratedIds).length });
+    
+    res.json({
+      success: true,
+      migratedAssets: migratedIds,
+      count: Object.keys(migratedIds).length,
+    });
+  } catch (error) {
+    logger.error("Error migrating style assets", error, { module: 'Styles' });
+    res.status(500).json({ error: "Failed to migrate assets" });
   }
 });
 

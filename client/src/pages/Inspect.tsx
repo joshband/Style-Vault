@@ -98,6 +98,7 @@ export default function Inspect() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [summary, setSummary] = useState<StyleSummary | null>(null);
   const [assets, setAssets] = useState<StyleAssets | null>(null);
+  const [assetRefs, setAssetRefs] = useState<Record<string, string> | null>(null);
   const [loading, setLoading] = useState(true);
   const [assetsLoading, setAssetsLoading] = useState(true);
   const [tokensExpanded, setTokensExpanded] = useState(false);
@@ -428,20 +429,40 @@ export default function Inspect() {
       })
       .finally(() => setLoading(false));
     
-    fetch(`/api/styles/${id}/assets`)
+    fetch(`/api/styles/${id}/asset-refs`)
       .then(res => res.ok ? res.json() : null)
-      .then((data: StyleAssets | null) => {
-        setAssets(data);
+      .then((data: { objectAssets?: Record<string, string>; statuses?: Record<string, string> } | null) => {
+        if (data?.objectAssets) {
+          setAssetRefs(data.objectAssets);
+        }
+        if (data?.statuses) {
+          setAssets(prev => ({
+            ...prev,
+            moodBoard: { status: data.statuses?.moodBoard || 'pending' },
+            uiConcepts: { status: data.statuses?.uiConcepts || 'pending' },
+            previews: prev?.previews || {},
+          }));
+        }
       })
       .finally(() => setAssetsLoading(false));
   }, [id]);
 
   const refetchAssets = useCallback(() => {
     if (!id) return;
-    fetch(`/api/styles/${id}/assets`)
+    fetch(`/api/styles/${id}/asset-refs`)
       .then(res => res.ok ? res.json() : null)
-      .then((data: StyleAssets | null) => {
-        if (data) setAssets(data);
+      .then((data: { objectAssets?: Record<string, string>; statuses?: Record<string, string> } | null) => {
+        if (data?.objectAssets) {
+          setAssetRefs(data.objectAssets);
+        }
+        if (data?.statuses) {
+          setAssets(prev => ({
+            ...prev,
+            moodBoard: { status: data.statuses?.moodBoard || 'pending' },
+            uiConcepts: { status: data.statuses?.uiConcepts || 'pending' },
+            previews: prev?.previews || {},
+          }));
+        }
       });
   }, [id]);
 
@@ -1523,6 +1544,7 @@ export default ${safeName};`;
                     styleName={summary.name}
                     moodBoard={assets?.moodBoard}
                     uiConcepts={assets?.uiConcepts}
+                    assetRefs={assetRefs}
                   />
                 )}
               </div>
