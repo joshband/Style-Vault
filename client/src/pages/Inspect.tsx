@@ -102,7 +102,6 @@ export default function Inspect() {
   const [assetRefs, setAssetRefs] = useState<Record<string, string> | null>(null);
   const [loading, setLoading] = useState(true);
   const [assetsLoading, setAssetsLoading] = useState(true);
-  const [tokensExpanded, setTokensExpanded] = useState(false);
   const [shareCode, setShareCode] = useState<string | null>(null);
   const [shareLoading, setShareLoading] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -1779,34 +1778,30 @@ export default ${safeName};`;
 
           {/* Design DNA - Tokens & Material Intelligence section - gated by inspect.tokens */}
           {isFeatureEnabled('inspect.tokens') && (
-            <details className="group" data-testid="section-design-dna" onToggle={(e) => { if ((e.target as HTMLDetailsElement).open) setTokensExpanded(true); }}>
+            <details className="group" data-testid="section-design-dna">
             <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors list-none">
               <span className="text-sm font-medium text-foreground">Design DNA</span>
               <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
             </summary>
             <div className="p-4 pt-0 space-y-6">
-              {tokensExpanded && (
-                <>
-                  <div>
-                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Color Details</h4>
-                    <ColorDetails colors={enhancedColors.length > 0 ? enhancedColors : undefined} tokens={summary.tokens} />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">All Tokens</h4>
-                    <TokenViewer tokens={summary.tokens} />
-                  </div>
-                  
-                  {/* Material Intelligence - inside Design DNA - gated by materials.enabled */}
-                  {isFeatureEnabled('materials.enabled') && (
-                    <div data-testid="section-materials">
-                      <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Material Intelligence</h4>
-                      <MaterialIntelligencePanel
-                        styleId={summary.id}
-                        referenceImage={getImageUrl(summary.imageIds?.reference, 'full') || undefined}
-                      />
-                    </div>
-                  )}
-                </>
+              <div>
+                <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Color Details</h4>
+                <ColorDetails colors={enhancedColors.length > 0 ? enhancedColors : undefined} tokens={summary.tokens} />
+              </div>
+              <div>
+                <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">All Tokens</h4>
+                <TokenViewer tokens={summary.tokens} />
+              </div>
+              
+              {/* Material Intelligence - inside Design DNA - gated by materials.enabled */}
+              {isFeatureEnabled('materials.enabled') && (
+                <div data-testid="section-materials">
+                  <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Material Intelligence</h4>
+                  <MaterialIntelligencePanel
+                    styleId={summary.id}
+                    referenceImage={getImageUrl(summary.imageIds?.reference, 'full') || undefined}
+                  />
+                </div>
               )}
             </div>
           </details>
