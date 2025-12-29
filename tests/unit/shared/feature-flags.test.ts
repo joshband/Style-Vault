@@ -49,6 +49,9 @@ describe('Feature Flags System', () => {
         'materials.enabled',
         'export.tokens',
         'export.pdf',
+        'deploy.enabled',
+        'audit.enabled',
+        'designtools.enabled',
         'bookmark.enabled',
         'rating.enabled',
         'versions.enabled',
@@ -87,8 +90,8 @@ describe('Feature Flags System', () => {
       });
     });
 
-    it('should have exactly the Stage 4B flags enabled', () => {
-      const stage4bEnabledFlags: (keyof FeatureFlags)[] = [
+    it('should have exactly the Stage 3 minimal flags enabled (read-only display)', () => {
+      const stage3MinimalFlags: (keyof FeatureFlags)[] = [
         'vault.enabled',
         'auth.enabled',
         'nav.basic',
@@ -100,23 +103,37 @@ describe('Feature Flags System', () => {
         'inspect.tokens',
         'inspect.palette',
         'inspect.previews',
-        'bookmark.enabled',
-        'rating.enabled',
-        'export.tokens',
-        'api.bookmark',
-        'api.rate',
-        'moodboard.enabled',
-        'uiconcepts.enabled',
-        'materials.enabled',
       ];
 
-      stage4bEnabledFlags.forEach(key => {
+      stage3MinimalFlags.forEach(key => {
         expect(defaultFeatureFlags[key]).toBe(true);
       });
     });
 
-    it('should have all non-Stage 4B features disabled', () => {
-      const stage4bEnabledFlags = new Set([
+    it('should have all action features disabled for Stage 3 minimal', () => {
+      const disabledActionFlags: (keyof FeatureFlags)[] = [
+        'bookmark.enabled',
+        'rating.enabled',
+        'export.tokens',
+        'export.pdf',
+        'deploy.enabled',
+        'audit.enabled',
+        'designtools.enabled',
+        'tryit.enabled',
+        'moodboard.enabled',
+        'uiconcepts.enabled',
+        'materials.enabled',
+        'api.bookmark',
+        'api.rate',
+      ];
+
+      disabledActionFlags.forEach(key => {
+        expect(defaultFeatureFlags[key]).toBe(false);
+      });
+    });
+
+    it('should have all non-Stage 3 features disabled', () => {
+      const stage3EnabledFlags = new Set([
         'vault.enabled',
         'auth.enabled',
         'nav.basic',
@@ -128,18 +145,10 @@ describe('Feature Flags System', () => {
         'inspect.tokens',
         'inspect.palette',
         'inspect.previews',
-        'bookmark.enabled',
-        'rating.enabled',
-        'export.tokens',
-        'api.bookmark',
-        'api.rate',
-        'moodboard.enabled',
-        'uiconcepts.enabled',
-        'materials.enabled',
       ]);
 
       Object.entries(defaultFeatureFlags).forEach(([key, value]) => {
-        if (!stage4bEnabledFlags.has(key)) {
+        if (!stage3EnabledFlags.has(key)) {
           expect(value).toBe(false);
         }
       });
@@ -194,7 +203,7 @@ describe('Feature Flags System', () => {
   });
 
   describe('getEnabledFeatures', () => {
-    it('should return all Stage 4B enabled features', () => {
+    it('should return all Stage 3 minimal enabled features', () => {
       const enabled = getEnabledFeatures();
       expect(enabled).toContain('vault.enabled');
       expect(enabled).toContain('auth.enabled');
@@ -207,21 +216,18 @@ describe('Feature Flags System', () => {
       expect(enabled).toContain('inspect.tokens');
       expect(enabled).toContain('inspect.palette');
       expect(enabled).toContain('inspect.previews');
-      expect(enabled).toContain('bookmark.enabled');
-      expect(enabled).toContain('rating.enabled');
-      expect(enabled).toContain('export.tokens');
-      expect(enabled).toContain('api.bookmark');
-      expect(enabled).toContain('api.rate');
-      expect(enabled).toContain('moodboard.enabled');
-      expect(enabled).toContain('uiconcepts.enabled');
-      expect(enabled).toContain('materials.enabled');
-      expect(enabled.length).toBe(19);
+      expect(enabled.length).toBe(11);
     });
 
-    it('should not include any disabled features', () => {
+    it('should not include any disabled action features', () => {
       const enabled = getEnabledFeatures();
-      expect(enabled).not.toContain('create.enabled');
-      expect(enabled).not.toContain('compare.enabled');
+      expect(enabled).not.toContain('bookmark.enabled');
+      expect(enabled).not.toContain('rating.enabled');
+      expect(enabled).not.toContain('export.tokens');
+      expect(enabled).not.toContain('deploy.enabled');
+      expect(enabled).not.toContain('audit.enabled');
+      expect(enabled).not.toContain('designtools.enabled');
+      expect(enabled).not.toContain('tryit.enabled');
     });
   });
 

@@ -1124,8 +1124,8 @@ export default ${safeName};`;
           
           {/* Title + Vibe */}
           <div className="space-y-1">
-            <h1 className="text-2xl md:text-3xl font-serif font-medium text-foreground leading-tight">{summary.name}</h1>
-            <p className="text-muted-foreground text-base font-light leading-relaxed">{summary.description}</p>
+            <h1 className="text-2xl md:text-3xl font-serif font-medium text-foreground leading-tight" data-testid="style-name">{summary.name}</h1>
+            <p className="text-muted-foreground text-base font-light leading-relaxed" data-testid="style-description">{summary.description}</p>
           </div>
           
           {/* Subtle metadata row: creator + rating */}
@@ -1316,104 +1316,114 @@ export default ${safeName};`;
             />
           )}
           
-          {/* PDF Brand Kit */}
-          <button 
-            onClick={async () => {
-              setPdfExporting(true);
-              try {
-                await generateBrandKitPDF({
-                  name: summary.name,
-                  description: summary.description,
-                  tokens: summary.tokens,
-                  metadataTags: summary.metadataTags,
-                });
-                toast.success("Brand Kit PDF downloaded!");
-              } catch (error) {
-                console.error("PDF export error:", error);
-                toast.error("Failed to generate PDF. Please try again.");
-              } finally {
-                setPdfExporting(false);
+          {/* PDF Brand Kit - gated by export.pdf */}
+          {isFeatureEnabled('export.pdf') && (
+            <button 
+              onClick={async () => {
+                setPdfExporting(true);
+                try {
+                  await generateBrandKitPDF({
+                    name: summary.name,
+                    description: summary.description,
+                    tokens: summary.tokens,
+                    metadataTags: summary.metadataTags,
+                  });
+                  toast.success("Brand Kit PDF downloaded!");
+                } catch (error) {
+                  console.error("PDF export error:", error);
+                  toast.error("Failed to generate PDF. Please try again.");
+                } finally {
+                  setPdfExporting(false);
+                }
+              }}
+              disabled={pdfExporting}
+              className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 border border-border bg-muted/50 hover:bg-muted rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+              data-testid="button-pdf-export"
+            >
+              {pdfExporting ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
+              Brand Kit
+            </button>
+          )}
+          
+          {/* Deploy - gated by deploy.enabled */}
+          {isFeatureEnabled('deploy.enabled') && (
+            <DeployDialog 
+              tokens={summary.tokens} 
+              styleName={summary.name}
+              trigger={
+                <button 
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 border border-border bg-muted/50 hover:bg-muted rounded-lg text-sm font-medium transition-colors"
+                  data-testid="button-deploy-primary"
+                >
+                  <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth="1.5">
+                    <path d="M8 2L14 8L8 14" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M2 8H13" strokeLinecap="round" />
+                  </svg>
+                  Deploy
+                </button>
               }
-            }}
-            disabled={pdfExporting}
-            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 border border-border bg-muted/50 hover:bg-muted rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-            data-testid="button-pdf-export"
-          >
-            {pdfExporting ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
-            Brand Kit
-          </button>
-          
-          {/* Deploy */}
-          <DeployDialog 
-            tokens={summary.tokens} 
-            styleName={summary.name}
-            trigger={
-              <button 
-                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 border border-border bg-muted/50 hover:bg-muted rounded-lg text-sm font-medium transition-colors"
-                data-testid="button-deploy-primary"
-              >
-                <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M8 2L14 8L8 14" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M2 8H13" strokeLinecap="round" />
-                </svg>
-                Deploy
-              </button>
-            }
-          />
+            />
+          )}
 
-          {/* Style Audit */}
-          <StyleAudit
-            styleId={summary.id}
-            styleName={summary.name}
-            tokens={summary.tokens}
-            trigger={
-              <button 
-                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 border border-border bg-muted/50 hover:bg-muted rounded-lg text-sm font-medium transition-colors"
-                data-testid="button-audit-primary"
-              >
-                <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth="1.5">
-                  <circle cx="6" cy="6" r="4.5" />
-                  <path d="M9 9L14 14" strokeLinecap="round" />
-                </svg>
-                Audit
-              </button>
-            }
-          />
+          {/* Style Audit - gated by audit.enabled */}
+          {isFeatureEnabled('audit.enabled') && (
+            <StyleAudit
+              styleId={summary.id}
+              styleName={summary.name}
+              tokens={summary.tokens}
+              trigger={
+                <button 
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 border border-border bg-muted/50 hover:bg-muted rounded-lg text-sm font-medium transition-colors"
+                  data-testid="button-audit-primary"
+                >
+                  <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth="1.5">
+                    <circle cx="6" cy="6" r="4.5" />
+                    <path d="M9 9L14 14" strokeLinecap="round" />
+                  </svg>
+                  Audit
+                </button>
+              }
+            />
+          )}
           
-          {/* Design Tools */}
-          <Dialog>
-            <DialogTrigger asChild>
-              <button 
-                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 border border-border bg-muted/50 hover:bg-muted rounded-lg text-sm font-medium transition-colors"
-                data-testid="button-design-tools"
-              >
-                <Palette size={16} />
-                Figma/XD
-              </button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl p-0 overflow-hidden">
-              <DesignToolSync 
-                styleName={summary.name}
-                tokens={summary.tokens}
-              />
-            </DialogContent>
-          </Dialog>
+          {/* Design Tools - gated by designtools.enabled */}
+          {isFeatureEnabled('designtools.enabled') && (
+            <Dialog>
+              <DialogTrigger asChild>
+                <button 
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 border border-border bg-muted/50 hover:bg-muted rounded-lg text-sm font-medium transition-colors"
+                  data-testid="button-design-tools"
+                >
+                  <Palette size={16} />
+                  Figma/XD
+                </button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl p-0 overflow-hidden">
+                <DesignToolSync 
+                  styleName={summary.name}
+                  tokens={summary.tokens}
+                />
+              </DialogContent>
+            </Dialog>
+          )}
           
-          {/* Remix / Apply */}
-          <Button
-            onClick={() => {
-              setTryItOpen(true);
-              setTryItImage(null);
-              setTryItError(null);
-              setTryItPrompt("");
-            }}
-            variant="outline"
-            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3"
-            data-testid="button-remix-style"
-          >
-            <Sparkles size={16} />
-            Remix
-          </Button>
+          {/* Remix / Apply - gated by tryit.enabled */}
+          {isFeatureEnabled('tryit.enabled') && (
+            <Button
+              onClick={() => {
+                setTryItOpen(true);
+                setTryItImage(null);
+                setTryItError(null);
+                setTryItPrompt("");
+              }}
+              variant="outline"
+              className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3"
+              data-testid="button-remix-style"
+            >
+              <Sparkles size={16} />
+              Remix
+            </Button>
+          )}
         </section>
 
         {/* === COLLAPSED SECTIONS === */}

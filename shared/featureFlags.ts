@@ -56,6 +56,9 @@ export interface FeatureFlags {
   // Actions
   'export.tokens': boolean;
   'export.pdf': boolean;
+  'deploy.enabled': boolean;
+  'audit.enabled': boolean;
+  'designtools.enabled': boolean;
   'bookmark.enabled': boolean;
   'rating.enabled': boolean;
   'versions.enabled': boolean;
@@ -137,20 +140,23 @@ export const defaultFeatureFlags: FeatureFlags = {
   'delete.enabled': false,
   'refresh.enabled': false,
   
-  // Inspect page features - Stage 4B enabled
+  // Inspect page features - Stage 3 minimal (display only)
   'inspect.summary': true,
   'inspect.previews': true,
   'inspect.tokens': true,
   'inspect.palette': true,
-  'moodboard.enabled': true,
-  'uiconcepts.enabled': true,
-  'materials.enabled': true,
+  'moodboard.enabled': false,
+  'uiconcepts.enabled': false,
+  'materials.enabled': false,
   
-  // Actions - Stage 4A enabled
-  'export.tokens': true,
+  // Actions - ALL DISABLED for Stage 3 minimal
+  'export.tokens': false,
   'export.pdf': false,
-  'bookmark.enabled': true,
-  'rating.enabled': true,
+  'deploy.enabled': false,
+  'audit.enabled': false,
+  'designtools.enabled': false,
+  'bookmark.enabled': false,
+  'rating.enabled': false,
   'versions.enabled': false,
   'tryit.enabled': false,
   'regenerate.enabled': false,
@@ -170,15 +176,15 @@ export const defaultFeatureFlags: FeatureFlags = {
   'ai.enrichment': false,
   'jobs.enabled': false,
   
-  // API endpoints - Only list enabled
+  // API endpoints - Stage 3 minimal (read-only)
   'api.styles.list': true,
   'api.styles.detail': true,
   'api.styles.create': false,
   'api.styles.delete': false,
   'api.regenerate': false,
   'api.share': false,
-  'api.bookmark': true,
-  'api.rate': true,
+  'api.bookmark': false,
+  'api.rate': false,
   'api.generate': false,
   'api.remix': false,
   'api.analytics': false,
