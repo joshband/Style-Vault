@@ -251,10 +251,8 @@ async function generatePreviewImage(
 ): Promise<MultiProviderResult> {
   let subject: string;
   
-  // For UI-type styles (audio plugins, dashboards, etc.), use UI-specific canonical subjects
-  // Check both image analysis AND metadata tags for UI detection
-  const isUiStyle = analysis?.subjectType === "ui" || isUiStyleFromMetadata(metadataTags);
-  const subjectSource = isUiStyle ? UI_CANONICAL_SUBJECTS : CANONICAL_SUBJECTS;
+  // Canonical previews always use general artistic subjects (portraits, landscapes, still life)
+  // UI-specific content is generated separately via generateUiConceptsWithProdia (softwareApp, audioPlugin, dashboard)
   
   if (analysis?.hasSubject && analysis.sceneDescription) {
     const elements = analysis.dominantElements?.slice(0, 3).join(", ") || "";
@@ -266,14 +264,12 @@ async function generatePreviewImage(
       subject = baseScene;
     } else if (type === "stillLife" && analysis.subjectType === "still_life") {
       subject = baseScene;
-    } else if (isUiStyle) {
-      // For UI styles, use UI-specific subjects enriched with the original scene context
-      subject = `${subjectSource[type]}. Original context: ${baseScene}`;
     } else {
-      subject = `${baseScene}. Key elements: ${elements}. Rendered as a ${type === "stillLife" ? "still life composition" : type} view`;
+      // Use standard canonical subjects with enrichment from the original scene context
+      subject = `${CANONICAL_SUBJECTS[type]}. Key elements: ${elements}. Rendered as a ${type === "stillLife" ? "still life composition" : type} view`;
     }
   } else {
-    subject = subjectSource[type];
+    subject = CANONICAL_SUBJECTS[type];
   }
   
   // Build enhanced prompt with metadataTags
