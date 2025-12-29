@@ -10,7 +10,7 @@ import { ArrowLeft, ArrowRight, Download, Loader2, ChevronDown, ChevronUp, Eye, 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { AiMoodBoard } from "@/components/ai-mood-board";
 import { ExportDialog } from "@/components/export-dialog";
 import { TokenVisualization } from "@/components/token-visualization";
@@ -92,11 +92,9 @@ function PreviewSkeleton({ aspect }: { aspect: string }) {
 }
 
 export default function Inspect() {
-  console.log("=== Inspect component starting render ===");
   const [, params] = useRoute("/style/:id");
   const [, navigate] = useLocation();
   const id = params?.id;
-  console.log("Inspect id:", id);
   const { user, isAuthenticated } = useAuth();
   const containerRef = useRef<HTMLDivElement>(null);
   const [summary, setSummary] = useState<StyleSummary | null>(null);
@@ -974,44 +972,8 @@ export default ${safeName};`;
     }
   }, [summary]);
 
-  if (loading) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="animate-spin text-muted-foreground" size={32} />
-        </div>
-      </Layout>
-    );
-  }
-
-  if (!summary) {
-    return (
-      <Layout>
-        <div className="flex flex-col items-center justify-center h-[50vh]">
-          <h1 className="text-2xl font-serif text-muted-foreground">Style Not Found</h1>
-          <Link href="/" className="mt-4 text-sm underline">Return to Explorer</Link>
-        </div>
-      </Layout>
-    );
-  }
-
-  // DEBUG: Minimal render to isolate crash
-  return (
-    <Layout>
-      <div className="max-w-4xl mx-auto p-6">
-        <h1 className="text-2xl font-serif" data-testid="style-name">{summary.name}</h1>
-        <p className="text-muted-foreground">{summary.description}</p>
-        <p className="text-xs mt-4">Debug mode: Minimal render active</p>
-        <Link href="/" className="text-sm underline mt-4 block">Back to home</Link>
-      </div>
-    </Layout>
-  );
-
-  // ORIGINAL CODE BELOW - DISABLED FOR DEBUGGING
-  const _previews = assets?.previews || {};
-
-  // Extract primary colors for Quick Read (first 6) - visual only
-  const getPrimaryColors = () => {
+  // MEMOIZED: Extract primary colors for Quick Read (first 6) - must be before early returns
+  const primaryColors = useMemo(() => {
     if (!summary?.tokens?.color) return [];
     const colors: string[] = [];
     const colorTokens = summary.tokens.color;
@@ -1029,22 +991,18 @@ export default ${safeName};`;
     };
     extractColors(colorTokens);
     return colors;
-  };
+  }, [summary?.tokens?.color]);
   
-  const primaryColors = getPrimaryColors();
-  
-  // Derive human-readable traits from tokens
-  const getHumanTraits = () => {
+  // MEMOIZED: Derive human-readable traits from tokens - must be before early returns
+  const humanTraits = useMemo(() => {
     const traits: { contrast: string; density: string; vibe: string } = {
       contrast: 'Medium',
       density: 'Balanced',
       vibe: ''
     };
     
-    // Derive Contrast from color luminance range
     if (primaryColors.length >= 2) {
       const getLuminance = (color: string): number => {
-        // Simple luminance estimation from hex/rgb
         let r = 0, g = 0, b = 0;
         if (color.startsWith('#')) {
           const hex = color.slice(1);
@@ -1059,7 +1017,6 @@ export default ${safeName};`;
             b = parseInt(match[2]) / 255;
           }
         } else if (color.startsWith('oklch')) {
-          // Extract lightness from oklch
           const match = color.match(/oklch\(\s*([\d.]+)/);
           if (match) return parseFloat(match[1]);
         }
@@ -1074,7 +1031,6 @@ export default ${safeName};`;
       else traits.contrast = 'Medium';
     }
     
-    // Derive Density from spacing tokens
     if (summary?.tokens?.spacing) {
       const spacingTokens = summary.tokens.spacing;
       const spacingValues: number[] = [];
@@ -1100,21 +1056,72 @@ export default ${safeName};`;
       }
     }
     
-    // Derive Vibe from metadata
     const vibeTags = summary?.metadataTags?.subjective?.emotionalImpact || 
                      summary?.metadataTags?.objective?.visualMood || 
                      [];
     if (vibeTags.length > 0) {
       traits.vibe = vibeTags[0];
     } else if (summary?.description) {
-      // Fallback: use first few words of description
       traits.vibe = summary.description.split(/[,.]/).at(0)?.trim() || '';
     }
     
     return traits;
-  };
-  
-  const humanTraits = getHumanTraits();
+  }, [primaryColors, summary?.tokens?.spacing, summary?.metadataTags, summary?.description]);
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="animate-spin text-muted-foreground" size={32} />
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!summary) {
+    return (
+      <Layout>
+        <div className="flex flex-col items-center justify-center h-[50vh]">
+          <h1 className="text-2xl font-serif text-muted-foreground">Style Not Found</h1>
+          <Link href="/" className="mt-4 text-sm underline">Return to Explorer</Link>
+        </div>
+      </Layout>
+    );
+  }
+
+  // DEBUG: Minimal render to test if basic structure works
+  return (
+    <Layout>
+      <div className="max-w-4xl mx-auto p-6 space-y-4">
+        <Link href="/" className="inline-flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+          <ArrowLeft size={12} /> Back
+        </Link>
+        <h1 className="text-2xl font-serif" data-testid="style-name">{summary.name}</h1>
+        <p className="text-muted-foreground">{summary.description}</p>
+        <div className="grid grid-cols-2 gap-4">
+          {summary.imageIds?.reference && (
+            <img 
+              src={`/api/images/${summary.imageIds.reference}?size=medium`}
+              alt="Reference"
+              className="rounded-lg border"
+              data-testid="img-source-reference"
+            />
+          )}
+          {summary.imageIds?.ui_software_app && (
+            <img 
+              src={`/api/images/${summary.imageIds.ui_software_app}?size=medium`}
+              alt="Applied UI"
+              className="rounded-lg border"
+              data-testid="img-applied-ui"
+            />
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground mt-4">Debug: Minimal render active. Primary colors: {primaryColors.length}, Human traits: {humanTraits.contrast}</p>
+      </div>
+    </Layout>
+  );
+
+  const previews = assets?.previews || {};
 
   return (
     <Layout>
