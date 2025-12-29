@@ -146,11 +146,11 @@ export const defaultFeatureFlags: FeatureFlags = {
   'uiconcepts.enabled': false,
   'materials.enabled': false,
   
-  // Actions - DISABLED
-  'export.tokens': false,
+  // Actions - Stage 4A enabled
+  'export.tokens': true,
   'export.pdf': false,
-  'bookmark.enabled': false,
-  'rating.enabled': false,
+  'bookmark.enabled': true,
+  'rating.enabled': true,
   'versions.enabled': false,
   'tryit.enabled': false,
   'regenerate.enabled': false,
@@ -177,8 +177,8 @@ export const defaultFeatureFlags: FeatureFlags = {
   'api.styles.delete': false,
   'api.regenerate': false,
   'api.share': false,
-  'api.bookmark': false,
-  'api.rate': false,
+  'api.bookmark': true,
+  'api.rate': true,
   'api.generate': false,
   'api.remix': false,
   'api.analytics': false,

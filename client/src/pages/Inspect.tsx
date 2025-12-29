@@ -1280,37 +1280,41 @@ export default ${safeName};`;
 
         {/* === SECTION 4: PRIMARY ACTIONS CTA === */}
         <section className="flex flex-col sm:flex-row gap-2">
-          {/* Save */}
-          <button
-            onClick={isAuthenticated ? handleToggleBookmark : undefined}
-            disabled={bookmarkLoading || !isAuthenticated}
-            className={`flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium rounded-lg border transition-colors disabled:opacity-50 ${
-              isBookmarked 
-                ? "border-yellow-500 bg-yellow-500/10 text-yellow-600" 
-                : "border-border bg-muted/50 hover:bg-muted"
-            }`}
-            data-testid="button-save-style"
-            title={!isAuthenticated ? "Sign in to save" : undefined}
-          >
-            {bookmarkLoading ? <Loader2 size={16} className="animate-spin" /> : <Bookmark size={16} className={isBookmarked ? "fill-current" : ""} />}
-            {isBookmarked ? "Saved" : "Save"}
-          </button>
+          {/* Save - gated by bookmark.enabled */}
+          {isFeatureEnabled('bookmark.enabled') && (
+            <button
+              onClick={isAuthenticated ? handleToggleBookmark : undefined}
+              disabled={bookmarkLoading || !isAuthenticated}
+              className={`flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium rounded-lg border transition-colors disabled:opacity-50 ${
+                isBookmarked 
+                  ? "border-yellow-500 bg-yellow-500/10 text-yellow-600" 
+                  : "border-border bg-muted/50 hover:bg-muted"
+              }`}
+              data-testid="button-bookmark"
+              title={!isAuthenticated ? "Sign in to save" : undefined}
+            >
+              {bookmarkLoading ? <Loader2 size={16} className="animate-spin" /> : <Bookmark size={16} className={isBookmarked ? "fill-current" : ""} />}
+              {isBookmarked ? "Saved" : "Save"}
+            </button>
+          )}
           
-          {/* Export */}
-          <ExportDialog 
-            tokens={summary.tokens} 
-            styleName={summary.name}
-            trigger={
-              <button 
-                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
-                data-testid="button-export-primary"
-              >
-                <Download size={16} />
-                Export
-                <ChevronDown size={14} />
-              </button>
-            }
-          />
+          {/* Export - gated by export.tokens */}
+          {isFeatureEnabled('export.tokens') && (
+            <ExportDialog 
+              tokens={summary.tokens} 
+              styleName={summary.name}
+              trigger={
+                <button 
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+                  data-testid="button-export-tokens"
+                >
+                  <Download size={16} />
+                  Export
+                  <ChevronDown size={14} />
+                </button>
+              }
+            />
+          )}
           
           {/* PDF Brand Kit */}
           <button 
@@ -1619,26 +1623,29 @@ export default ${safeName};`;
                 )}
               </div>
               
-              {/* Rating */}
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Your rating:</span>
-                <div className="flex items-center gap-0.5">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      onClick={() => isAuthenticated && handleSubmitRating(star)}
-                      onMouseEnter={() => isAuthenticated && setHoveredStar(star)}
-                      onMouseLeave={() => setHoveredStar(0)}
-                      disabled={ratingLoading || !isAuthenticated}
-                      className="p-0.5 disabled:cursor-default"
-                      title={isAuthenticated ? `Rate ${star}` : "Sign in to rate"}
-                    >
-                      <Star size={16} className={star <= (hoveredStar || userRating) ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/40"} />
-                    </button>
-                  ))}
+              {/* Rating - gated by rating.enabled */}
+              {isFeatureEnabled('rating.enabled') && (
+                <div className="flex items-center gap-2" data-testid="section-rating">
+                  <span className="text-sm text-muted-foreground">Your rating:</span>
+                  <div className="flex items-center gap-0.5">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        onClick={() => isAuthenticated && handleSubmitRating(star)}
+                        onMouseEnter={() => isAuthenticated && setHoveredStar(star)}
+                        onMouseLeave={() => setHoveredStar(0)}
+                        disabled={ratingLoading || !isAuthenticated}
+                        className="p-0.5 disabled:cursor-default"
+                        title={isAuthenticated ? `Rate ${star}` : "Sign in to rate"}
+                        data-testid={`button-star-${star}`}
+                      >
+                        <Star size={16} className={star <= (hoveredStar || userRating) ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/40"} />
+                      </button>
+                    ))}
+                  </div>
+                  {ratingLoading && <Loader2 size={14} className="animate-spin" />}
                 </div>
-                {ratingLoading && <Loader2 size={14} className="animate-spin" />}
-              </div>
+              )}
 
               {/* Collections */}
               {isAuthenticated && (
