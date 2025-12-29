@@ -6,8 +6,8 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Register all domain-specific routers
-  registerDomainRouters(app);
+  // Register all domain-specific routers (includes auth setup)
+  await registerDomainRouters(app);
 
   return httpServer;
 }
