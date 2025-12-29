@@ -203,13 +203,17 @@ router.get("/api/styles/:id/metadata", async (req, res) => {
 router.get("/api/styles/:id/assets", async (req, res) => {
   try {
     const styleId = req.params.id;
+    
+    // Don't cache this endpoint - the response contains large image data
+    // that makes JSON serialization slow. Use HTTP caching instead.
     const style = await storage.getStyleById(styleId);
     
     if (!style) {
       return res.status(404).json({ error: "Style not found" });
     }
     
-    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+    // HTTP cache header for browser-side caching
+    res.set('Cache-Control', 'public, max-age=120, stale-while-revalidate=300');
     res.json({
       moodBoard: style.moodBoard,
       uiConcepts: style.uiConcepts,
