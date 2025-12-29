@@ -142,15 +142,15 @@ export const defaultFeatureFlags: FeatureFlags = {
   'delete.enabled': false,
   'refresh.enabled': false,
   
-  // Inspect page features - Stage 4 (previews + Design DNA)
+  // Inspect page features - Stage 5 (+ Mood Board + UI Concepts)
   'inspect.summary': true,
   'inspect.previews': true,
   'inspect.tokens': true,
   'inspect.palette': true,
   'styleguide.enabled': false,
   'usagenotes.enabled': false,
-  'moodboard.enabled': false,
-  'uiconcepts.enabled': false,
+  'moodboard.enabled': true,
+  'uiconcepts.enabled': true,
   'materials.enabled': false,
   
   // Actions - ALL DISABLED for Stage 3 minimal
