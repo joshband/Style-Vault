@@ -694,9 +694,11 @@ def find_best_contrast_partner(color_data, all_colors):
             best_partner = other
     
     if best_partner:
-        partner_col = best_partner['color'].convert("srgb")
+        partner_col = best_partner['color'].convert("srgb", fit=True)
+        r, g, b = [max(0, min(255, int(round(x * 255)))) for x in partner_col.coords()]
+        partner_hex = f"#{r:02x}{g:02x}{b:02x}"
         return {
-            "hex": partner_col.to_string(format="hex"),
+            "hex": partner_hex,
             "ratio": round(best_ratio, 2),
             "wcagAA": best_ratio >= 4.5,
             "wcagAAA": best_ratio >= 7
@@ -831,8 +833,9 @@ def extract_colors(img, k=15):
         if hue is None or (isinstance(hue, float) and np.isnan(hue)):
             hue = 0
         
-        rgb_col = c.convert("srgb")
-        hex_color = rgb_col.to_string(format="hex")
+        rgb_col = c.convert("srgb", fit=True)
+        r, g, b = [max(0, min(255, int(round(x * 255)))) for x in rgb_col.coords()]
+        hex_color = f"#{r:02x}{g:02x}{b:02x}"
         
         role = infer_color_role(
             cd['luminance'], 

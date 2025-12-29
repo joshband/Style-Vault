@@ -1,5 +1,5 @@
 import { useRoute, useLocation } from "wouter";
-import { type StyleSpec } from "@/lib/store";
+import { type StyleSpec, type EnhancedColor } from "@/lib/store";
 import { Layout } from "@/components/layout";
 import { TokenViewer } from "@/components/token-viewer";
 import { ColorPaletteSwatches } from "@/components/color-palette-swatches";
@@ -148,6 +148,10 @@ export default function Inspect() {
   const [tryItGenerating, setTryItGenerating] = useState(false);
   const [tryItImage, setTryItImage] = useState<string | null>(null);
   const [tryItError, setTryItError] = useState<string | null>(null);
+  
+  // Enhanced Colors from Python CV
+  const [enhancedColors, setEnhancedColors] = useState<EnhancedColor[]>([]);
+  const [enhancedColorsLoading, setEnhancedColorsLoading] = useState(false);
   
   // Check if current user is the creator
   const isOwner = isAuthenticated && user?.id === summary?.creatorId;
@@ -446,6 +450,18 @@ export default function Inspect() {
         }
       })
       .finally(() => setAssetsLoading(false));
+    
+    // Fetch enhanced colors from Python CV
+    setEnhancedColorsLoading(true);
+    fetch(`/api/styles/${id}/enhanced-colors`)
+      .then(res => res.ok ? res.json() : null)
+      .then((data: { colors?: EnhancedColor[] } | null) => {
+        if (data?.colors) {
+          setEnhancedColors(data.colors);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setEnhancedColorsLoading(false));
   }, [id]);
 
   const refetchAssets = useCallback(() => {
@@ -1246,8 +1262,80 @@ export default ${safeName};`;
 
         {/* === SECTION 3: QUICK READ === */}
         <section className="space-y-4">
-          {/* Palette Strip - Visual only */}
-          {primaryColors.length > 0 && (
+          {/* Enhanced Palette Strip - Colors with roles and coverage */}
+          {enhancedColors.length > 0 ? (
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-start gap-2">
+                {enhancedColors.slice(0, 10).map((color, i) => {
+                  const roleColors: Record<string, string> = {
+                    primary: "bg-blue-500/20 text-blue-700 dark:text-blue-300",
+                    secondary: "bg-purple-500/20 text-purple-700 dark:text-purple-300",
+                    tertiary: "bg-teal-500/20 text-teal-700 dark:text-teal-300",
+                    accent: "bg-orange-500/20 text-orange-700 dark:text-orange-300",
+                    background: "bg-gray-500/20 text-gray-700 dark:text-gray-300",
+                    text: "bg-slate-500/20 text-slate-700 dark:text-slate-300",
+                    panel: "bg-indigo-500/20 text-indigo-700 dark:text-indigo-300",
+                    button: "bg-pink-500/20 text-pink-700 dark:text-pink-300",
+                    slider: "bg-amber-500/20 text-amber-700 dark:text-amber-300",
+                    shadow: "bg-neutral-500/20 text-neutral-700 dark:text-neutral-300",
+                    highlight: "bg-yellow-500/20 text-yellow-700 dark:text-yellow-300",
+                    border: "bg-stone-500/20 text-stone-700 dark:text-stone-300",
+                    muted: "bg-zinc-500/20 text-zinc-700 dark:text-zinc-300",
+                    neutral: "bg-gray-400/20 text-gray-600 dark:text-gray-400",
+                  };
+                  const roleClass = roleColors[color.role] || roleColors.neutral;
+                  const warmthLabel = color.warmth > 60 ? "Warm" : color.warmth < 40 ? "Cool" : "Neutral";
+                  const wcagStatus = color.contrastPartner?.wcagAAA ? "AAA" : color.contrastPartner?.wcagAA ? "AA" : "";
+                  
+                  return (
+                    <div key={i} className="group relative" data-testid={`color-swatch-enhanced-${i}`}>
+                      {/* Color swatch with coverage indicator */}
+                      <div className="flex flex-col items-center gap-1">
+                        <div 
+                          className="w-12 h-12 rounded-lg shadow-sm border border-border/50 cursor-pointer transition-transform hover:scale-110"
+                          style={{ backgroundColor: color.hex }}
+                          title={`${color.hex} • ${color.role} • ${color.coverage.toFixed(1)}% coverage`}
+                        />
+                        {/* Role badge */}
+                        <span className={`px-1.5 py-0.5 text-[9px] font-medium rounded-full ${roleClass}`}>
+                          {color.role}
+                        </span>
+                      </div>
+                      
+                      {/* Hover tooltip with details */}
+                      <div className="absolute z-50 left-1/2 -translate-x-1/2 bottom-full mb-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150">
+                        <div className="bg-popover border border-border rounded-lg shadow-lg p-2 min-w-[140px] text-xs">
+                          <div className="font-mono text-foreground mb-1">{color.hex}</div>
+                          <div className="space-y-0.5 text-muted-foreground">
+                            <div className="flex justify-between">
+                              <span>Coverage</span>
+                              <span className="font-medium text-foreground">{color.coverage.toFixed(1)}%</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Warmth</span>
+                              <span className="font-medium text-foreground">{warmthLabel}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Saturation</span>
+                              <span className="font-medium text-foreground capitalize">{color.saturation}</span>
+                            </div>
+                            {wcagStatus && (
+                              <div className="flex justify-between">
+                                <span>Contrast</span>
+                                <span className={`font-medium ${wcagStatus === "AAA" ? "text-green-600" : "text-yellow-600"}`}>
+                                  WCAG {wcagStatus}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : primaryColors.length > 0 ? (
             <div className="flex items-center gap-1.5">
               {primaryColors.map((color, i) => (
                 <div
@@ -1258,7 +1346,7 @@ export default ${safeName};`;
                 />
               ))}
             </div>
-          )}
+          ) : null}
           
           {/* Human Traits - No technical language, no numbers */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
@@ -1701,7 +1789,7 @@ export default ${safeName};`;
                 <>
                   <div>
                     <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Color Details</h4>
-                    <ColorDetails tokens={summary.tokens} />
+                    <ColorDetails colors={enhancedColors.length > 0 ? enhancedColors : undefined} tokens={summary.tokens} />
                   </div>
                   <div>
                     <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">All Tokens</h4>

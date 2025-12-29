@@ -1574,7 +1574,7 @@ router.get("/api/styles/:id/enhanced-colors", async (req, res) => {
       return res.status(404).json({ error: "No reference image found for this style" });
     }
 
-    const result = await extractTokensWithCV(imageBase64);
+    const result = await extractTokensWithCV(imageBase64, false);
 
     if (!result.success) {
       return res.status(500).json({
