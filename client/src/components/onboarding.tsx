@@ -106,7 +106,7 @@ export function OnboardingModal({ isOpen, onClose }: OnboardingModalProps) {
             exit={{ scale: 0.95, opacity: 0 }}
             transition={{ type: "spring" as const, stiffness: 300, damping: 25 }}
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-lg bg-card border border-border rounded-xl shadow-2xl overflow-hidden"
+            className="relative w-full max-w-lg bg-background border border-border rounded-xl shadow-2xl overflow-hidden"
           >
             <button
               onClick={handleSkip}
