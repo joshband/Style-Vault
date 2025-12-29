@@ -87,8 +87,8 @@ describe('Feature Flags System', () => {
       });
     });
 
-    it('should have exactly the Stage 3 flags enabled', () => {
-      const stage3EnabledFlags: (keyof FeatureFlags)[] = [
+    it('should have exactly the Stage 4A flags enabled', () => {
+      const stage4aEnabledFlags: (keyof FeatureFlags)[] = [
         'vault.enabled',
         'auth.enabled',
         'nav.basic',
@@ -100,15 +100,20 @@ describe('Feature Flags System', () => {
         'inspect.tokens',
         'inspect.palette',
         'inspect.previews',
+        'bookmark.enabled',
+        'rating.enabled',
+        'export.tokens',
+        'api.bookmark',
+        'api.rate',
       ];
 
-      stage3EnabledFlags.forEach(key => {
+      stage4aEnabledFlags.forEach(key => {
         expect(defaultFeatureFlags[key]).toBe(true);
       });
     });
 
-    it('should have all non-Stage 3 features disabled', () => {
-      const stage3EnabledFlags = new Set([
+    it('should have all non-Stage 4A features disabled', () => {
+      const stage4aEnabledFlags = new Set([
         'vault.enabled',
         'auth.enabled',
         'nav.basic',
@@ -120,10 +125,15 @@ describe('Feature Flags System', () => {
         'inspect.tokens',
         'inspect.palette',
         'inspect.previews',
+        'bookmark.enabled',
+        'rating.enabled',
+        'export.tokens',
+        'api.bookmark',
+        'api.rate',
       ]);
 
       Object.entries(defaultFeatureFlags).forEach(([key, value]) => {
-        if (!stage3EnabledFlags.has(key)) {
+        if (!stage4aEnabledFlags.has(key)) {
           expect(value).toBe(false);
         }
       });
@@ -178,7 +188,7 @@ describe('Feature Flags System', () => {
   });
 
   describe('getEnabledFeatures', () => {
-    it('should return all Stage 3 enabled features', () => {
+    it('should return all Stage 4A enabled features', () => {
       const enabled = getEnabledFeatures();
       expect(enabled).toContain('vault.enabled');
       expect(enabled).toContain('auth.enabled');
@@ -191,7 +201,12 @@ describe('Feature Flags System', () => {
       expect(enabled).toContain('inspect.tokens');
       expect(enabled).toContain('inspect.palette');
       expect(enabled).toContain('inspect.previews');
-      expect(enabled.length).toBe(11);
+      expect(enabled).toContain('bookmark.enabled');
+      expect(enabled).toContain('rating.enabled');
+      expect(enabled).toContain('export.tokens');
+      expect(enabled).toContain('api.bookmark');
+      expect(enabled).toContain('api.rate');
+      expect(enabled.length).toBe(16);
     });
 
     it('should not include any disabled features', () => {
