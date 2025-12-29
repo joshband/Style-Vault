@@ -6,6 +6,23 @@ import { createServer } from "http";
 const app = express();
 const httpServer = createServer(app);
 
+process.on('uncaughtException', (err: any) => {
+  if (err.code === 'EPIPE' || err.code === 'ECONNRESET') {
+    console.log('Client disconnected abruptly (EPIPE/ECONNRESET) - ignoring');
+    return;
+  }
+  console.error('Uncaught exception:', err);
+  process.exit(1);
+});
+
+httpServer.on('clientError', (err: any, socket: any) => {
+  if (err.code === 'EPIPE' || err.code === 'ECONNRESET') {
+    return;
+  }
+  console.error('HTTP client error:', err);
+  socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
+});
+
 declare module "http" {
   interface IncomingMessage {
     rawBody: unknown;

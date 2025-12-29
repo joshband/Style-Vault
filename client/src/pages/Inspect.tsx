@@ -3,6 +3,7 @@ import { type StyleSpec } from "@/lib/store";
 import { Layout } from "@/components/layout";
 import { TokenViewer } from "@/components/token-viewer";
 import { ColorPaletteSwatches } from "@/components/color-palette-swatches";
+import { ColorDetails } from "@/components/color-details";
 import { StyleSpecEditor } from "@/components/style-spec-editor";
 import { MaterialIntelligencePanel } from "@/components/material-intelligence-panel";
 import { ArrowLeft, ArrowRight, Download, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Share2, Check, Copy, Bookmark, Star, User, FolderPlus, Folder, Plus, FileCode, FileJson, Paintbrush, History, RotateCcw, Save, Sparkles, X, ChevronLeft, ChevronRight, Palette, FileText } from "lucide-react";
@@ -1699,8 +1700,8 @@ export default ${safeName};`;
               {tokensExpanded && (
                 <>
                   <div>
-                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Color Palette</h4>
-                    <ColorPaletteSwatches tokens={summary.tokens} />
+                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Color Details</h4>
+                    <ColorDetails tokens={summary.tokens} />
                   </div>
                   <div>
                     <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">All Tokens</h4>

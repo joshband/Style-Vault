@@ -1560,4 +1560,54 @@ router.post("/api/styles/:id/cv-tokens", async (req, res) => {
   }
 });
 
+router.get("/api/styles/:id/enhanced-colors", async (req, res) => {
+  try {
+    const style = await storage.getStyleById(req.params.id);
+    if (!style) {
+      return res.status(404).json({ error: "Style not found" });
+    }
+
+    const { getReferenceImageBase64 } = await import("../object-image-service.js");
+    const imageBase64 = await getReferenceImageBase64(req.params.id);
+    
+    if (!imageBase64) {
+      return res.status(404).json({ error: "No reference image found for this style" });
+    }
+
+    const result = await extractTokensWithCV(imageBase64);
+
+    if (!result.success) {
+      return res.status(500).json({
+        error: "Color extraction failed",
+        message: result.error,
+      });
+    }
+
+    const colorData = result.tokens?.color;
+    const isEnhancedFormat = colorData && 'colors' in colorData;
+    
+    res.setHeader("Cache-Control", "public, max-age=600");
+    
+    if (isEnhancedFormat) {
+      res.json({
+        colors: (colorData as any).colors || [],
+        analysis: (colorData as any).analysis || null,
+        processingTimeMs: result.processingTimeMs,
+      });
+    } else {
+      res.json({
+        colors: Array.isArray(colorData) ? colorData : [],
+        analysis: null,
+        processingTimeMs: result.processingTimeMs,
+      });
+    }
+  } catch (error) {
+    logger.error("Error extracting enhanced colors", error, { module: 'Styles' });
+    res.status(500).json({
+      error: "Failed to extract enhanced colors",
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+});
+
 export default router;

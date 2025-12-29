@@ -28,11 +28,26 @@ const getModuleDir = (): string => {
 };
 const __dirname = getModuleDir();
 
+export interface CVContrastPartner {
+  hex: string;
+  ratio: number;
+  wcagAA: boolean;
+  wcagAAA: boolean;
+}
+
 export interface CVColorToken {
   space: string;
   l: number;
   c: number;
   h: number;
+  hex?: string;
+  rgb?: [number, number, number];
+  coverage?: number;
+  confidence?: number;
+  role?: string;
+  warmth?: number;
+  saturation?: string;
+  contrastPartner?: CVContrastPartner | null;
 }
 
 export interface CVGridToken {
@@ -61,8 +76,34 @@ export interface CVElevationToken {
   } | null;
 }
 
+export interface CVColorAnalysis {
+  harmony?: {
+    type: string;
+    score: number;
+    relationships: Array<{ colors: number[]; type: string }>;
+  };
+  contrast?: Array<{
+    color1Index: number;
+    color2Index: number;
+    ratio: number;
+    wcagAA: boolean;
+    wcagAAA: boolean;
+  }>;
+  temperature?: {
+    overall: string;
+    warmColors: number;
+    coolColors: number;
+    neutralColors: number;
+  };
+}
+
+export interface CVColorData {
+  colors: CVColorToken[];
+  analysis?: CVColorAnalysis;
+}
+
 export interface CVExtractedTokens {
-  color: CVColorToken[];
+  color: CVColorToken[] | CVColorData;
   spacing: number[];
   borderRadius: number[];
   grid: CVGridToken;
