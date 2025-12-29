@@ -156,7 +156,7 @@ const StyleCardComponent = memo(function StyleCard({ style, className, onDelete 
         >
           <motion.div 
             className={cn(
-              "relative flex flex-col bg-card border border-border rounded-lg overflow-hidden",
+              "relative flex flex-col bg-card border border-gray-200 rounded-lg overflow-hidden",
               "transition-shadow duration-200",
               isDragging && "cursor-grabbing"
             )}
