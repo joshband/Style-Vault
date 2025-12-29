@@ -14,19 +14,27 @@ test.describe('Stage 4A: User Actions (Bookmark, Rating, Export)', () => {
       await expect(bookmarkButton).toBeVisible();
     });
 
-    test('bookmark button should be clickable', async ({ page }) => {
+    test('bookmark button should be disabled when not authenticated', async ({ page }) => {
       const bookmarkButton = page.locator('[data-testid="button-bookmark"]');
-      await expect(bookmarkButton).toBeEnabled();
+      await expect(bookmarkButton).toBeDisabled();
     });
   });
 
   test.describe('Rating Feature (gated by rating.enabled flag)', () => {
-    test('should show rating component when flag is enabled', async ({ page }) => {
+    test('should show rating section when Share & Rate is expanded', async ({ page }) => {
+      const shareRateSection = page.locator('details summary').filter({ hasText: 'Share & Rate' });
+      await shareRateSection.click();
+      await page.waitForTimeout(300);
+      
       const ratingSection = page.locator('[data-testid="section-rating"]');
       await expect(ratingSection).toBeVisible();
     });
 
     test('should have 5 star rating buttons', async ({ page }) => {
+      const shareRateSection = page.locator('details summary').filter({ hasText: 'Share & Rate' });
+      await shareRateSection.click();
+      await page.waitForTimeout(300);
+      
       const starButtons = page.locator('[data-testid^="button-star-"]');
       await expect(starButtons).toHaveCount(5);
     });
