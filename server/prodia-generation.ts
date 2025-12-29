@@ -315,9 +315,16 @@ async function generatePreviewImage(
   _referenceImageBase64?: string,
   renderingStyle?: RenderingStyle | null
 ): Promise<MultiProviderResult> {
+  // Detect if reference image is a UI or abstract - these should NOT influence subject choice
+  const isUiReference = analysis?.subjectType === 'ui' || analysis?.subjectType === 'abstract';
+  
   let subject: string;
   
-  if (analysis?.hasSubject && analysis.sceneDescription) {
+  // For canonical previews, ALWAYS use standard subjects when reference is UI/abstract
+  // This ensures portraits/landscapes/still lifes look like actual scenes, not UIs
+  if (isUiReference) {
+    subject = CANONICAL_SUBJECTS[type];
+  } else if (analysis?.hasSubject && analysis.sceneDescription) {
     const elements = analysis.dominantElements?.slice(0, 3).join(", ") || "";
     const baseScene = analysis.sceneDescription;
     
@@ -435,9 +442,17 @@ async function generatePreviewWithGemini(
   renderingStyle?: RenderingStyle | null,
   analysis?: ImageAnalysis | null
 ): Promise<MultiProviderResult> {
+  // Detect if reference image is a UI or abstract - these should NOT influence subject choice
+  const isUiReference = analysis?.subjectType === 'ui' || analysis?.subjectType === 'abstract';
+  
   let subject: string;
   
-  if (analysis?.hasSubject && analysis.sceneDescription) {
+  // For canonical previews, ALWAYS use standard subjects when reference is UI/abstract
+  // This ensures portraits/landscapes/still lifes look like actual scenes, not UIs
+  if (isUiReference) {
+    // UI references: use standard canonical subjects, don't transfer UI elements
+    subject = CANONICAL_SUBJECTS[type];
+  } else if (analysis?.hasSubject && analysis.sceneDescription) {
     const elements = analysis.dominantElements?.slice(0, 3).join(", ") || "";
     const baseScene = analysis.sceneDescription;
     
@@ -448,7 +463,7 @@ async function generatePreviewWithGemini(
     } else if (type === "stillLife" && analysis.subjectType === "still_life") {
       subject = baseScene;
     } else {
-      subject = `${baseScene}. Key elements: ${elements}. Rendered as a ${type === "stillLife" ? "still life composition" : type} view`;
+      subject = `${CANONICAL_SUBJECTS[type]}. Key elements: ${elements}. Rendered as a ${type === "stillLife" ? "still life composition" : type} view`;
     }
   } else {
     subject = CANONICAL_SUBJECTS[type];
@@ -459,7 +474,11 @@ async function generatePreviewWithGemini(
   
   const prompt = `${subject}. ${colorFragment} ${artisticHint} Style: "${styleName}".`;
   
-  return generateWithStyleTransfer(prompt, referenceImageBase64, renderingStyle, "gemini");
+  // For UI references, don't pass the reference image directly to avoid literal style transfer
+  // Only use the extracted renderingStyle (colors, textures) to guide generation
+  const effectiveReferenceImage = isUiReference ? undefined : referenceImageBase64;
+  
+  return generateWithStyleTransfer(prompt, effectiveReferenceImage, renderingStyle, "gemini");
 }
 
 export async function generateCanonicalPreviewsWithProdia(
