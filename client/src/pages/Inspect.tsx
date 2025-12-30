@@ -100,7 +100,7 @@ export default function Inspect() {
   const [, params] = useRoute("/style/:id");
   const [, navigate] = useLocation();
   const id = params?.id;
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const containerRef = useRef<HTMLDivElement>(null);
   const [summary, setSummary] = useState<StyleSummary | null>(null);
   const [assets, setAssets] = useState<StyleAssets | null>(null);
@@ -1516,34 +1516,46 @@ export default ${safeName};`;
             </Button>
           )}
           
-          {/* Regenerate - gated by regenerate.enabled */}
-          {isFeatureEnabled('regenerate.enabled') && isAuthenticated && (
+          {/* Regenerate - gated by regenerate.enabled, visible when auth loading */}
+          {isFeatureEnabled('regenerate.enabled') && (
             <Button
               onClick={async () => {
-                if (!summary?.id || regenerating) return;
+                console.log('[Regenerate] Button clicked, summary.id:', summary?.id, 'regenerating:', regenerating, 'isAuthenticated:', isAuthenticated);
+                if (!isAuthenticated) {
+                  toast.error('Please sign in to regenerate styles');
+                  return;
+                }
+                if (!summary?.id || regenerating) {
+                  console.log('[Regenerate] Early return - missing id or already regenerating');
+                  return;
+                }
                 setRegenerating(true);
                 try {
+                  console.log('[Regenerate] Starting fetch to:', `/api/styles/${summary.id}/regenerate`);
                   const res = await fetch(`/api/styles/${summary.id}/regenerate`, {
                     method: 'POST',
                     credentials: 'include',
                   });
+                  console.log('[Regenerate] Fetch response status:', res.status);
                   if (!res.ok) {
                     const data = await res.json();
                     throw new Error(data.error || 'Failed to start regeneration');
                   }
                   toast.success('Regeneration started! Previews will update in about a minute.');
                 } catch (error) {
+                  console.error('[Regenerate] Error:', error);
                   toast.error(error instanceof Error ? error.message : 'Failed to regenerate');
                 } finally {
                   setRegenerating(false);
                 }
               }}
-              disabled={regenerating || !summary?.id}
+              disabled={regenerating || !summary?.id || !isAuthenticated || authLoading}
               variant="outline"
               className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3"
               data-testid="button-regenerate-style"
+              title={!isAuthenticated && !authLoading ? "Sign in to regenerate" : undefined}
             >
-              {regenerating ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+              {regenerating || authLoading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
               Regenerate
             </Button>
           )}
