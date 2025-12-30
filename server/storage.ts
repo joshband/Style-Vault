@@ -368,6 +368,57 @@ export class DatabaseStorage implements IStorage {
     return style;
   }
 
+  async getStyleHero(id: string): Promise<{
+    id: string;
+    name: string;
+    description: string;
+    createdAt: Date;
+    updatedAt: Date | null;
+    shareCode: string | null;
+    moodBoardStatus: string;
+    uiConceptsStatus: string;
+    creatorId: string | null;
+    creatorName: string | null;
+    isPublic: boolean;
+  } | undefined> {
+    const [result] = await db
+      .select({
+        id: styles.id,
+        name: styles.name,
+        description: styles.description,
+        createdAt: styles.createdAt,
+        updatedAt: styles.updatedAt,
+        shareCode: styles.shareCode,
+        moodBoard: styles.moodBoard,
+        uiConcepts: styles.uiConcepts,
+        creatorId: styles.creatorId,
+        isPublic: styles.isPublic,
+        creatorFirstName: users.firstName,
+        creatorLastName: users.lastName,
+      })
+      .from(styles)
+      .leftJoin(users, eq(styles.creatorId, users.id))
+      .where(eq(styles.id, id));
+    
+    if (!result) return undefined;
+    
+    return {
+      id: result.id,
+      name: result.name,
+      description: result.description,
+      createdAt: result.createdAt,
+      updatedAt: result.updatedAt,
+      shareCode: result.shareCode,
+      moodBoardStatus: (result.moodBoard as any)?.status || "pending",
+      uiConceptsStatus: (result.uiConcepts as any)?.status || "pending",
+      creatorId: result.creatorId,
+      creatorName: result.creatorFirstName && result.creatorLastName 
+        ? `${result.creatorFirstName} ${result.creatorLastName}` 
+        : result.creatorFirstName || null,
+      isPublic: result.isPublic,
+    };
+  }
+
   async getStyleCoreSummary(id: string): Promise<{
     id: string;
     name: string;

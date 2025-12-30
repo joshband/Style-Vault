@@ -142,6 +142,23 @@ router.get("/api/styles/:id", async (req, res) => {
   }
 });
 
+router.get("/api/styles/:id/hero", async (req, res) => {
+  try {
+    const styleId = req.params.id;
+    const hero = await storage.getStyleHero(styleId);
+    
+    if (!hero) {
+      return res.status(404).json({ error: "Style not found" });
+    }
+    
+    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+    res.json(hero);
+  } catch (error) {
+    logger.error("Error fetching style hero", error, { module: 'Styles' });
+    res.status(500).json({ error: "Failed to fetch style hero" });
+  }
+});
+
 router.get("/api/styles/:id/summary", async (req, res) => {
   try {
     const styleId = req.params.id;
