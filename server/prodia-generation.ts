@@ -7,6 +7,91 @@ import { logger } from "./logger";
 type ProgressCallback = (progress: number, message: string) => Promise<void>;
 type ImageProvider = "gemini" | "openai" | "prodia";
 
+/**
+ * Convert any color format (oklch, rgb, hsl, hex) to a hex string
+ * AI image generators work best with hex colors
+ */
+function toHexColor(colorValue: string): string {
+  if (!colorValue) return "#888888";
+  
+  // Already hex
+  if (colorValue.startsWith("#")) {
+    return colorValue;
+  }
+  
+  // oklch(L C H) or oklch(L C H / A)
+  const oklchMatch = colorValue.match(/oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)/i);
+  if (oklchMatch) {
+    const L = parseFloat(oklchMatch[1]);
+    const C = parseFloat(oklchMatch[2]);
+    const H = parseFloat(oklchMatch[3]);
+    
+    // Convert oklch to sRGB via oklab
+    const hRad = (H * Math.PI) / 180;
+    const a = C * Math.cos(hRad);
+    const b = C * Math.sin(hRad);
+    
+    // oklab to linear sRGB
+    const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
+    const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
+    const s_ = L - 0.0894841775 * a - 1.2914855480 * b;
+    
+    const l = l_ * l_ * l_;
+    const m = m_ * m_ * m_;
+    const s = s_ * s_ * s_;
+    
+    const r = +4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s;
+    const g = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s;
+    const bv = -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s;
+    
+    // Gamma correction and clamp
+    const toSrgb = (x: number) => Math.max(0, Math.min(255, Math.round((x > 0.0031308 ? 1.055 * Math.pow(x, 1/2.4) - 0.055 : 12.92 * x) * 255)));
+    
+    return `#${toSrgb(r).toString(16).padStart(2, '0')}${toSrgb(g).toString(16).padStart(2, '0')}${toSrgb(bv).toString(16).padStart(2, '0')}`;
+  }
+  
+  // rgb(R, G, B) or rgba(R, G, B, A)
+  const rgbMatch = colorValue.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+  if (rgbMatch) {
+    const r = parseInt(rgbMatch[1]);
+    const g = parseInt(rgbMatch[2]);
+    const b = parseInt(rgbMatch[3]);
+    return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+  }
+  
+  // hsl(H, S%, L%) or hsla
+  const hslMatch = colorValue.match(/hsla?\(\s*([\d.]+)\s*,\s*([\d.]+)%\s*,\s*([\d.]+)%/i);
+  if (hslMatch) {
+    const h = parseFloat(hslMatch[1]) / 360;
+    const s = parseFloat(hslMatch[2]) / 100;
+    const l = parseFloat(hslMatch[3]) / 100;
+    
+    let r, g, b;
+    if (s === 0) {
+      r = g = b = l;
+    } else {
+      const hue2rgb = (p: number, q: number, t: number) => {
+        if (t < 0) t += 1;
+        if (t > 1) t -= 1;
+        if (t < 1/6) return p + (q - p) * 6 * t;
+        if (t < 1/2) return q;
+        if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+        return p;
+      };
+      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+      const p = 2 * l - q;
+      r = hue2rgb(p, q, h + 1/3);
+      g = hue2rgb(p, q, h);
+      b = hue2rgb(p, q, h - 1/3);
+    }
+    
+    return `#${Math.round(r * 255).toString(16).padStart(2, '0')}${Math.round(g * 255).toString(16).padStart(2, '0')}${Math.round(b * 255).toString(16).padStart(2, '0')}`;
+  }
+  
+  // Fallback for unrecognized formats
+  return colorValue.startsWith("#") ? colorValue : "#888888";
+}
+
 interface ImageAnalysis {
   hasSubject: boolean;
   subjectType: "portrait" | "landscape" | "still_life" | "abstract" | "ui" | "other";
@@ -160,7 +245,9 @@ function extractTokenSummary(tokens: Record<string, unknown>): TokenSummary {
   const colors: { name: string; hex: string }[] = [];
   for (const [name, token] of Object.entries(color)) {
     if (token && typeof token === "object" && "$value" in token) {
-      colors.push({ name, hex: String((token as Record<string, unknown>).$value) });
+      const rawValue = String((token as Record<string, unknown>).$value);
+      const hexValue = toHexColor(rawValue);
+      colors.push({ name, hex: hexValue });
     }
   }
 
