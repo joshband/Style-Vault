@@ -167,7 +167,7 @@ function extractTokenSummary(tokens: Record<string, unknown>): TokenSummary {
   const fontFamily = (typography.fontFamily || {}) as Record<string, Record<string, unknown>>;
 
   return {
-    colors: colors.slice(0, 6),
+    colors: colors.slice(0, 10),
     typography: {
       serif: String(fontFamily.serif?.$value ?? "Georgia"),
       sans: String(fontFamily.sans?.$value ?? "Arial"),
@@ -192,8 +192,8 @@ function extractTokenSummary(tokens: Record<string, unknown>): TokenSummary {
 
 function buildColorPromptFragment(summary: TokenSummary): string {
   if (summary.colors.length === 0) return "";
-  const colorList = summary.colors.slice(0, 4).map(c => c.hex).join(", ");
-  return `Color palette: ${colorList}.`;
+  const namedColors = summary.colors.map(c => `${c.name} (${c.hex})`).join(", ");
+  return `REQUIRED COLOR PALETTE: ${namedColors}. Use these exact colors prominently.`;
 }
 
 function buildStylePromptFragment(
@@ -263,22 +263,27 @@ function buildRichStylePromptForProdia(
   
   parts.push(subject);
   
+  // CRITICAL: Color palette is the most important directive - place it prominently
+  // List each color with its role name and hex for maximum enforcement
+  if (summary.colors.length > 0) {
+    const namedColors = summary.colors.map(c => `${c.name}: ${c.hex}`).join(", ");
+    parts.push(`MANDATORY COLOR PALETTE - You MUST use these exact colors prominently throughout the image: ${namedColors}.`);
+    // Reinforce with just the hex values for simpler parsing
+    const hexList = summary.colors.map(c => c.hex).join(", ");
+    parts.push(`Primary colors to feature: ${hexList}.`);
+  }
+  
   if (renderingStyle) {
-    parts.push(`ARTISTIC MEDIUM: ${renderingStyle.medium}.`);
-    parts.push(`TECHNIQUE: ${renderingStyle.technique}.`);
-    parts.push(`COLOR TREATMENT: ${renderingStyle.colorPalette}.`);
+    // Strong rendering style enforcement for Prodia
+    parts.push(`CRITICAL ARTISTIC STYLE - Follow exactly: ${renderingStyle.medium} rendered with ${renderingStyle.technique} technique.`);
     if (renderingStyle.characteristics.length > 0) {
-      parts.push(`STYLE TRAITS: ${renderingStyle.characteristics.join(", ")}.`);
+      parts.push(`STYLE TRAITS that MUST be visible: ${renderingStyle.characteristics.join(", ")}.`);
     }
+    parts.push(`DO NOT render photorealistically. Use the ${renderingStyle.medium} artistic style.`);
   }
   
   if (analysis?.artisticStyle) {
     parts.push(`Rendered in ${analysis.artisticStyle} style.`);
-  }
-  
-  const colorList = summary.colors.slice(0, 5).map(c => c.hex).join(", ");
-  if (colorList) {
-    parts.push(`Color palette: ${colorList}.`);
   }
   
   parts.push(`${summary.lighting.type} lighting with ${summary.lighting.intensity} intensity.`);
@@ -300,6 +305,11 @@ function buildRichStylePromptForProdia(
   parts.push(`Style: "${styleName}".`);
   if (styleDescription && styleDescription.length > 10) {
     parts.push(styleDescription.slice(0, 200));
+  }
+  
+  // Final reinforcement of color requirement
+  if (summary.colors.length > 0) {
+    parts.push(`IMPORTANT: The generated image MUST prominently feature the specified color palette.`);
   }
   
   return parts.join(" ");
