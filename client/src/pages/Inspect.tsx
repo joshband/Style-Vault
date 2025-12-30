@@ -1,7 +1,7 @@
 import { useRoute, useLocation } from "wouter";
 import { type StyleSpec, type EnhancedColor } from "@/lib/store";
 import { Layout } from "@/components/layout";
-import { ArrowLeft, ArrowRight, Download, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Share2, Check, Copy, Bookmark, Star, User, FolderPlus, Folder, Plus, FileCode, FileJson, Paintbrush, History, RotateCcw, Save, Sparkles, X, ChevronLeft, ChevronRight, Palette, FileText } from "lucide-react";
+import { ArrowLeft, ArrowRight, Download, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Share2, Check, Copy, Bookmark, Star, User, FolderPlus, Folder, Plus, FileCode, FileJson, Paintbrush, History, RotateCcw, Save, Sparkles, X, ChevronLeft, ChevronRight, Palette, FileText, RefreshCw } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
@@ -145,6 +145,9 @@ export default function Inspect() {
   
   // PDF Export
   const [pdfExporting, setPdfExporting] = useState(false);
+  
+  // Regeneration
+  const [regenerating, setRegenerating] = useState(false);
   
   // Try It Now - Image Generation
   const [tryItOpen, setTryItOpen] = useState(false);
@@ -1510,6 +1513,38 @@ export default ${safeName};`;
             >
               <Sparkles size={16} />
               Remix
+            </Button>
+          )}
+          
+          {/* Regenerate - gated by regenerate.enabled */}
+          {isFeatureEnabled('regenerate.enabled') && isAuthenticated && (
+            <Button
+              onClick={async () => {
+                if (!summary?.id || regenerating) return;
+                setRegenerating(true);
+                try {
+                  const res = await fetch(`/api/styles/${summary.id}/regenerate`, {
+                    method: 'POST',
+                    credentials: 'include',
+                  });
+                  if (!res.ok) {
+                    const data = await res.json();
+                    throw new Error(data.error || 'Failed to start regeneration');
+                  }
+                  toast.success('Regeneration started! Previews will update in about a minute.');
+                } catch (error) {
+                  toast.error(error instanceof Error ? error.message : 'Failed to regenerate');
+                } finally {
+                  setRegenerating(false);
+                }
+              }}
+              disabled={regenerating || !summary?.id}
+              variant="outline"
+              className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3"
+              data-testid="button-regenerate-style"
+            >
+              {regenerating ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+              Regenerate
             </Button>
           )}
         </section>

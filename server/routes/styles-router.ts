@@ -12,6 +12,7 @@ import type { UiConceptAssets } from "@shared/schema";
 import { logger } from "../logger";
 import { storeImageToObjectStorage, getImageFromObjectStorage, getObjectAssetsByStyle, migrateStyleToObjectStorage } from "../object-image-service";
 import { isValidImageDataUri } from "../preview-generation";
+import { regenerateStyle } from "../style-regeneration";
 
 const router = Router();
 
@@ -1605,6 +1606,49 @@ router.get("/api/styles/:id/enhanced-colors", async (req, res) => {
     logger.error("Error extracting enhanced colors", error, { module: 'Styles' });
     res.status(500).json({
       error: "Failed to extract enhanced colors",
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+});
+
+router.post("/api/styles/:id/regenerate", isAuthenticated, async (req, res) => {
+  try {
+    const styleId = req.params.id;
+    const userId = (req.user as any)?.claims?.sub;
+    
+    const style = await storage.getStyleById(styleId);
+    if (!style) {
+      return res.status(404).json({ error: "Style not found" });
+    }
+    
+    if (style.creatorId && style.creatorId !== userId) {
+      return res.status(403).json({ error: "You can only regenerate your own styles" });
+    }
+    
+    logger.info(`Starting regeneration for style ${styleId}`, { module: 'Styles', userId, styleId });
+    
+    res.json({ 
+      success: true, 
+      message: "Regeneration started. This may take a minute.",
+      styleId 
+    });
+    
+    regenerateStyle(style as any).then(result => {
+      logger.info(`Regeneration completed for style ${styleId}`, { 
+        module: 'Styles', 
+        styleId, 
+        success: result.success,
+        stages: result.stages.length 
+      });
+      cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
+    }).catch(error => {
+      logger.error(`Regeneration failed for style ${styleId}`, error, { module: 'Styles', styleId });
+    });
+    
+  } catch (error) {
+    logger.error("Error starting regeneration", error, { module: 'Styles' });
+    res.status(500).json({
+      error: "Failed to start regeneration",
       message: error instanceof Error ? error.message : "Unknown error",
     });
   }

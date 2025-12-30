@@ -374,6 +374,7 @@ async function regenerateStyle(style: Style): Promise<RegenerationResult> {
         styleDescription: style.description || style.name,
         tokens: tokensForGeneration,
         referenceImageBase64: refImage || undefined,
+        metadataTags: style.metadataTags as Record<string, string[]> | undefined,
       });
       
       const previews: Record<string, string> = {};

@@ -440,7 +440,8 @@ async function generatePreviewWithGemini(
   summary: TokenSummary,
   referenceImageBase64?: string,
   renderingStyle?: RenderingStyle | null,
-  analysis?: ImageAnalysis | null
+  analysis?: ImageAnalysis | null,
+  metadataTags?: Record<string, string[]>
 ): Promise<MultiProviderResult> {
   // Detect if reference image is a UI or abstract - these should NOT influence subject choice
   const isUiReference = analysis?.subjectType === 'ui' || analysis?.subjectType === 'abstract';
@@ -469,10 +470,55 @@ async function generatePreviewWithGemini(
     subject = CANONICAL_SUBJECTS[type];
   }
   
-  const colorFragment = buildColorPromptFragment(summary);
-  const artisticHint = analysis?.artisticStyle ? `In ${analysis.artisticStyle} rendering style.` : "";
+  // Build a rich, token-driven prompt that emphasizes design DNA
+  const promptParts: string[] = [subject];
   
-  const prompt = `${subject}. ${colorFragment} ${artisticHint} Style: "${styleName}".`;
+  // DTCG Color tokens - prominent placement
+  if (summary.colors.length > 0) {
+    const colorNames = summary.colors.slice(0, 5).map(c => `${c.name} (${c.hex})`).join(", ");
+    promptParts.push(`COLOR PALETTE FROM DESIGN TOKENS: ${colorNames}. Use these exact colors as the dominant palette.`);
+  }
+  
+  // DTCG Lighting tokens
+  promptParts.push(`LIGHTING: ${summary.lighting.type} lighting with ${summary.lighting.intensity} intensity, ${summary.lighting.direction} direction.`);
+  
+  // DTCG Texture tokens
+  promptParts.push(`SURFACE TREATMENT: ${summary.texture.finish} finish with ${summary.texture.grain} grain texture.`);
+  
+  // DTCG Mood tokens
+  promptParts.push(`ATMOSPHERE: ${summary.mood.tone} mood with ${summary.mood.saturation} saturation and ${summary.mood.contrast} contrast.`);
+  
+  // Rendering style from analysis
+  if (renderingStyle) {
+    promptParts.push(`ARTISTIC MEDIUM: ${renderingStyle.medium}, ${renderingStyle.technique}. ${renderingStyle.characteristics.join(", ")}.`);
+  } else if (analysis?.artisticStyle) {
+    promptParts.push(`Rendered in ${analysis.artisticStyle} style.`);
+  }
+  
+  // Metadata tags for additional context
+  if (metadataTags) {
+    const materials = metadataTags.materials || metadataTags.material || [];
+    const era = metadataTags.era || [];
+    const mood = metadataTags.mood || [];
+    
+    if (materials.length > 0) {
+      promptParts.push(`MATERIALS: ${materials.slice(0, 3).join(", ")}.`);
+    }
+    if (era.length > 0) {
+      promptParts.push(`ERA/PERIOD: ${era.slice(0, 2).join(", ")}.`);
+    }
+    if (mood.length > 0) {
+      promptParts.push(`EMOTIONAL TONE: ${mood.slice(0, 2).join(", ")}.`);
+    }
+  }
+  
+  // Style name and description
+  promptParts.push(`Style name: "${styleName}".`);
+  if (styleDescription && styleDescription.length > 20) {
+    promptParts.push(styleDescription.slice(0, 200));
+  }
+  
+  const prompt = promptParts.join(" ");
   
   // For UI references, don't pass the reference image directly to avoid literal style transfer
   // Only use the extracted renderingStyle (colors, textures) to guide generation
@@ -681,7 +727,8 @@ export async function generateCanonicalPreviewsWithGemini(
         summary,
         request.referenceImageBase64,
         renderingStyle,
-        analysis
+        analysis,
+        request.metadataTags
       );
     })(),
     (async () => {
@@ -693,7 +740,8 @@ export async function generateCanonicalPreviewsWithGemini(
         summary,
         request.referenceImageBase64,
         renderingStyle,
-        analysis
+        analysis,
+        request.metadataTags
       );
     })(),
     (async () => {
@@ -705,7 +753,8 @@ export async function generateCanonicalPreviewsWithGemini(
         summary,
         request.referenceImageBase64,
         renderingStyle,
-        analysis
+        analysis,
+        request.metadataTags
       );
     })(),
   ]);
