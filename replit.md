@@ -13,6 +13,7 @@ Preferred communication style: Simple, everyday language.
 - **Styling**: Tailwind CSS v4 with shadcn/ui (New York style) for a modern, consistent look.
 - **Animations**: Framer Motion for smooth page transitions, hover effects, and micro-interactions.
 - **Loading States**: Skeleton loaders with shimmer animations for cards and lists, blur-up lazy image loading with IntersectionObserver.
+- **Staged Page Loading**: Style Inspector (`/style/:id`) uses progressive mounting to prevent main-thread stalls. Stage 0 shows minimal view (style name, description, Regenerate button), Stage 1 adds images after 500ms, Stage 2 adds collapsed sections after 1000ms.
 - **Empty States**: Illustrated empty state components (NoStylesEmpty, NoBookmarksEmpty, NoSearchResultsEmpty, NoCollectionsEmpty, etc.) with animated icons and helpful CTAs.
 - **Notifications**: Sonner toast system with specialized notifications for styles, collections, exports, and errors.
 - **Onboarding**: First-time user welcome modal with feature highlights (stored in localStorage).

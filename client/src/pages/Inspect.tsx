@@ -160,6 +160,27 @@ export default function Inspect() {
   const [enhancedColors, setEnhancedColors] = useState<EnhancedColor[]>([]);
   const [enhancedColorsLoading, setEnhancedColorsLoading] = useState(false);
   
+  // STAGED LOADING: Progressive mounting to prevent main thread stall
+  // Stage 0: Hero + Action bar (immediate)
+  // Stage 1: Image sections (500ms)
+  // Stage 2: Collapsed sections (1000ms)
+  const [mountStage, setMountStage] = useState(0);
+  
+  // Progressive mount after summary loads
+  useEffect(() => {
+    if (!summary) return;
+    
+    // Stage 1: Mount image sections after 500ms
+    const stage1 = setTimeout(() => setMountStage(1), 500);
+    // Stage 2: Mount collapsed sections after 1000ms
+    const stage2 = setTimeout(() => setMountStage(2), 1000);
+    
+    return () => {
+      clearTimeout(stage1);
+      clearTimeout(stage2);
+    };
+  }, [summary?.id]);
+  
   // Check if current user is the creator
   const isOwner = isAuthenticated && user?.id === summary?.creatorId;
 
@@ -1009,79 +1030,90 @@ export default ${safeName};`;
     return colors;
   }, [summary?.tokens?.color]);
   
-  // MEMOIZED: Derive human-readable traits from tokens - must be before early returns
-  const humanTraits = useMemo(() => {
-    const traits: { contrast: string; density: string; vibe: string } = {
-      contrast: 'Medium',
-      density: 'Balanced',
-      vibe: ''
-    };
-    
-    if (primaryColors.length >= 2) {
-      const getLuminance = (color: string): number => {
-        let r = 0, g = 0, b = 0;
-        if (color.startsWith('#')) {
-          const hex = color.slice(1);
-          r = parseInt(hex.slice(0, 2), 16) / 255;
-          g = parseInt(hex.slice(2, 4), 16) / 255;
-          b = parseInt(hex.slice(4, 6), 16) / 255;
-        } else if (color.startsWith('rgb')) {
-          const match = color.match(/\d+/g);
-          if (match) {
-            r = parseInt(match[0]) / 255;
-            g = parseInt(match[1]) / 255;
-            b = parseInt(match[2]) / 255;
-          }
-        } else if (color.startsWith('oklch')) {
-          const match = color.match(/oklch\(\s*([\d.]+)/);
-          if (match) return parseFloat(match[1]);
-        }
-        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  // DEFERRED: Human-readable traits - calculated after initial render for better performance
+  const [humanTraits, setHumanTraits] = useState<{ contrast: string; density: string; vibe: string }>({
+    contrast: 'Medium',
+    density: 'Balanced',
+    vibe: ''
+  });
+  
+  useEffect(() => {
+    // Defer trait calculation to not block initial render
+    const timer = setTimeout(() => {
+      const traits: { contrast: string; density: string; vibe: string } = {
+        contrast: 'Medium',
+        density: 'Balanced',
+        vibe: ''
       };
       
-      const luminances = primaryColors.map(getLuminance);
-      const range = Math.max(...luminances) - Math.min(...luminances);
-      
-      if (range < 0.3) traits.contrast = 'Low';
-      else if (range > 0.6) traits.contrast = 'High';
-      else traits.contrast = 'Medium';
-    }
-    
-    if (summary?.tokens?.spacing) {
-      const spacingTokens = summary.tokens.spacing;
-      const spacingValues: number[] = [];
-      
-      const extractSpacing = (obj: any) => {
-        for (const key in obj) {
-          const val = obj[key];
-          if (val?.$value) {
-            const numMatch = String(val.$value).match(/[\d.]+/);
-            if (numMatch) spacingValues.push(parseFloat(numMatch[0]));
-          } else if (typeof val === 'object') {
-            extractSpacing(val);
+      if (primaryColors.length >= 2) {
+        const getLuminance = (color: string): number => {
+          let r = 0, g = 0, b = 0;
+          if (color.startsWith('#')) {
+            const hex = color.slice(1);
+            r = parseInt(hex.slice(0, 2), 16) / 255;
+            g = parseInt(hex.slice(2, 4), 16) / 255;
+            b = parseInt(hex.slice(4, 6), 16) / 255;
+          } else if (color.startsWith('rgb')) {
+            const match = color.match(/\d+/g);
+            if (match) {
+              r = parseInt(match[0]) / 255;
+              g = parseInt(match[1]) / 255;
+              b = parseInt(match[2]) / 255;
+            }
+          } else if (color.startsWith('oklch')) {
+            const match = color.match(/oklch\(\s*([\d.]+)/);
+            if (match) return parseFloat(match[1]);
           }
-        }
-      };
-      extractSpacing(spacingTokens);
-      
-      if (spacingValues.length > 0) {
-        const avgSpacing = spacingValues.reduce((a, b) => a + b, 0) / spacingValues.length;
-        if (avgSpacing < 8) traits.density = 'Tight';
-        else if (avgSpacing > 20) traits.density = 'Airy';
-        else traits.density = 'Balanced';
+          return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        };
+        
+        const luminances = primaryColors.map(getLuminance);
+        const range = Math.max(...luminances) - Math.min(...luminances);
+        
+        if (range < 0.3) traits.contrast = 'Low';
+        else if (range > 0.6) traits.contrast = 'High';
+        else traits.contrast = 'Medium';
       }
-    }
+      
+      if (summary?.tokens?.spacing) {
+        const spacingTokens = summary.tokens.spacing;
+        const spacingValues: number[] = [];
+        
+        const extractSpacing = (obj: any) => {
+          for (const key in obj) {
+            const val = obj[key];
+            if (val?.$value) {
+              const numMatch = String(val.$value).match(/[\d.]+/);
+              if (numMatch) spacingValues.push(parseFloat(numMatch[0]));
+            } else if (typeof val === 'object') {
+              extractSpacing(val);
+            }
+          }
+        };
+        extractSpacing(spacingTokens);
+        
+        if (spacingValues.length > 0) {
+          const avgSpacing = spacingValues.reduce((a, b) => a + b, 0) / spacingValues.length;
+          if (avgSpacing < 8) traits.density = 'Tight';
+          else if (avgSpacing > 20) traits.density = 'Airy';
+          else traits.density = 'Balanced';
+        }
+      }
+      
+      const vibeTags = summary?.metadataTags?.subjective?.emotionalImpact || 
+                       summary?.metadataTags?.objective?.visualMood || 
+                       [];
+      if (vibeTags.length > 0) {
+        traits.vibe = vibeTags[0];
+      } else if (summary?.description) {
+        traits.vibe = summary.description.split(/[,.]/).at(0)?.trim() || '';
+      }
+      
+      setHumanTraits(traits);
+    }, 100); // Small delay to allow UI to paint first
     
-    const vibeTags = summary?.metadataTags?.subjective?.emotionalImpact || 
-                     summary?.metadataTags?.objective?.visualMood || 
-                     [];
-    if (vibeTags.length > 0) {
-      traits.vibe = vibeTags[0];
-    } else if (summary?.description) {
-      traits.vibe = summary.description.split(/[,.]/).at(0)?.trim() || '';
-    }
-    
-    return traits;
+    return () => clearTimeout(timer);
   }, [primaryColors, summary?.tokens?.spacing, summary?.metadataTags, summary?.description]);
 
   if (loading) {
@@ -1106,10 +1138,77 @@ export default ${safeName};`;
   }
 
   const previews = assets?.previews || {};
+  
+  // ULTRA-MINIMAL PHASE: Show only essential info immediately before full render
+  // This helps prevent main thread stalls by yielding after the basic layout paints
+  if (mountStage === 0) {
+    return (
+      <Layout>
+        <div className="max-w-4xl mx-auto space-y-6">
+          <header className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Link href="/" className="inline-flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                <ArrowLeft size={12} /> Back
+              </Link>
+            </div>
+            <div className="space-y-1.5">
+              <h1 className="text-2xl md:text-3xl font-serif font-medium text-foreground leading-tight" data-testid="style-name">{summary.name}</h1>
+              <p className="text-muted-foreground text-base font-light leading-relaxed" data-testid="style-description">{summary.description}</p>
+            </div>
+          </header>
+          
+          {/* Minimal action bar with Regenerate button - always accessible */}
+          <section className="flex flex-wrap gap-2">
+            {isFeatureEnabled('regenerate.enabled') && (
+              <Button
+                onClick={async () => {
+                  // If not authenticated, show a message
+                  if (!isAuthenticated && !authLoading) {
+                    toast.info('Please sign in to regenerate style previews');
+                    return;
+                  }
+                  if (!summary?.id || regenerating) return;
+                  setRegenerating(true);
+                  try {
+                    const res = await fetch(`/api/styles/${summary.id}/regenerate`, {
+                      method: 'POST',
+                      credentials: 'include',
+                    });
+                    if (!res.ok) {
+                      const data = await res.json();
+                      throw new Error(data.error || 'Failed to start regeneration');
+                    }
+                    toast.success('Regeneration started! Previews will update in about a minute.');
+                  } catch (error) {
+                    toast.error(error instanceof Error ? error.message : 'Failed to regenerate');
+                  } finally {
+                    setRegenerating(false);
+                  }
+                }}
+                disabled={regenerating || !summary?.id || authLoading}
+                variant="outline"
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3"
+                data-testid="button-regenerate-style"
+              >
+                {regenerating || authLoading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+                Regenerate
+              </Button>
+            )}
+          </section>
+          
+          {/* Loading indicator for remaining content */}
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="animate-spin text-muted-foreground" size={24} />
+            <span className="ml-2 text-sm text-muted-foreground">Loading style details...</span>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
-      <div ref={containerRef} className="max-w-4xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div ref={containerRef} className="max-w-4xl mx-auto space-y-6">
         
         {/* === SECTION 1: HERO === */}
         <header className="space-y-3">
@@ -1182,7 +1281,8 @@ export default ${safeName};`;
           </div>
         </header>
 
-        {/* === SECTION 2: VISUAL TRUST STRIP === */}
+        {/* === SECTION 2: VISUAL TRUST STRIP === (Mounted in Stage 1) */}
+        {mountStage >= 1 ? (
         <section className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Source Image - Trust Signal */}
           <div className="relative aspect-square rounded-lg overflow-hidden border border-border bg-neutral-100 dark:bg-neutral-900">
@@ -1197,7 +1297,8 @@ export default ${safeName};`;
                         src={refSrc} 
                         alt="Source reference"
                         className="max-w-full max-h-full object-contain rounded"
-                        loading="eager"
+                        loading="lazy"
+                        decoding="async"
                         data-testid="img-source-reference"
                       />
                     </div>
@@ -1239,7 +1340,8 @@ export default ${safeName};`;
                         src={uiSrc}
                         alt="Applied UI"
                         className="max-w-full max-h-full object-contain rounded"
-                        loading="eager"
+                        loading="lazy"
+                        decoding="async"
                         data-testid="img-applied-ui"
                       />
                     </div>
@@ -1266,8 +1368,15 @@ export default ${safeName};`;
             })()}
           </div>
         </section>
+        ) : (
+          /* Stage 1 loading placeholder for images */
+          <section className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="aspect-square bg-muted rounded-lg animate-pulse" />
+            <div className="aspect-square bg-muted rounded-lg animate-pulse" />
+          </section>
+        )}
 
-        {/* === SECTION 3: QUICK READ === */}
+        {/* === SECTION 3: QUICK READ === (Always visible) */}
         <section className="space-y-4">
           {/* Enhanced Palette Strip - Colors with roles and coverage */}
           {enhancedColors.length > 0 ? (
@@ -1567,7 +1676,8 @@ export default ${safeName};`;
           )}
         </section>
 
-        {/* === COLLAPSED SECTIONS === */}
+        {/* === COLLAPSED SECTIONS === (Mounted in Stage 2) */}
+        {mountStage >= 2 ? (
         <div className="border border-border rounded-lg divide-y divide-border">
           
           {/* Canonical Previews - gated by feature flag */}
@@ -1875,6 +1985,15 @@ export default ${safeName};`;
           </details>
           )}
         </div>
+        ) : (
+          /* Stage 2 loading placeholder */
+          <div className="border border-border rounded-lg p-6">
+            <div className="animate-pulse space-y-4">
+              <div className="h-4 bg-muted rounded w-1/3" />
+              <div className="h-20 bg-muted rounded" />
+            </div>
+          </div>
+        )}
 
         {/* Try It Now Dialog */}
         {tryItOpen && (
