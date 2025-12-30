@@ -163,7 +163,7 @@ export const defaultFeatureFlags: FeatureFlags = {
   'rating.enabled': false,
   'versions.enabled': false,
   'tryit.enabled': false,
-  'regenerate.enabled': false,
+  'regenerate.enabled': true,
   
   // Create features - DISABLED
   'create.upload': false,
@@ -185,7 +185,7 @@ export const defaultFeatureFlags: FeatureFlags = {
   'api.styles.detail': true,
   'api.styles.create': false,
   'api.styles.delete': false,
-  'api.regenerate': false,
+  'api.regenerate': true,
   'api.share': false,
   'api.bookmark': false,
   'api.rate': false,

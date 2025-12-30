@@ -15,7 +15,7 @@ import FeatureDisabled from "@/pages/FeatureDisabled";
 initializeExporters();
 
 const Explore = lazy(() => import("@/pages/Explore"));
-const Inspect = lazy(() => import("@/pages/Inspect"));
+const Inspect = lazy(() => import("@/features/style-inspector/StyleInspectPage"));
 const Author = lazy(() => import("@/pages/Author"));
 const Generate = lazy(() => import("@/pages/Generate"));
 const BatchUpload = lazy(() => import("@/pages/BatchUpload"));

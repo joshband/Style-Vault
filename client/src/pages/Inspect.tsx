@@ -1,27 +1,32 @@
 import { useRoute, useLocation } from "wouter";
 import { type StyleSpec, type EnhancedColor } from "@/lib/store";
 import { Layout } from "@/components/layout";
-import { TokenViewer } from "@/components/token-viewer";
-import { ColorPaletteSwatches } from "@/components/color-palette-swatches";
-import { ColorDetails } from "@/components/color-details";
-import { StyleSpecEditor } from "@/components/style-spec-editor";
-import { MaterialIntelligencePanel } from "@/components/material-intelligence-panel";
-import { ArrowLeft, ArrowRight, Download, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Share2, Check, Copy, Bookmark, Star, User, FolderPlus, Folder, Plus, FileCode, FileJson, Paintbrush, History, RotateCcw, Save, Sparkles, X, ChevronLeft, ChevronRight, Palette, FileText } from "lucide-react";
+import { ArrowLeft, ArrowRight, Download, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Share2, Check, Copy, Bookmark, Star, User, FolderPlus, Folder, Plus, FileCode, FileJson, Paintbrush, History, RotateCcw, Save, Sparkles, X, ChevronLeft, ChevronRight, Palette, FileText, RefreshCw } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { useState, useEffect, useCallback, useRef } from "react";
-import { AiMoodBoard } from "@/components/ai-mood-board";
-import { ExportDialog } from "@/components/export-dialog";
-import { TokenVisualization } from "@/components/token-visualization";
-import { DeployDialog } from "@/components/deploy-dialog";
-import { StyleAudit } from "@/components/style-audit";
-import { DesignToolSync } from "@/components/DesignToolSync";
+import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from "react";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/use-auth";
 import { generateBrandKitPDF } from "@/lib/pdf-export";
 import { toast } from "sonner";
 import { isFeatureEnabled } from "@shared/featureFlags";
+
+const TokenViewer = lazy(() => import("@/components/token-viewer").then(m => ({ default: m.TokenViewer })));
+const ColorPaletteSwatches = lazy(() => import("@/components/color-palette-swatches").then(m => ({ default: m.ColorPaletteSwatches })));
+const ColorDetails = lazy(() => import("@/components/color-details").then(m => ({ default: m.ColorDetails })));
+const StyleSpecEditor = lazy(() => import("@/components/style-spec-editor").then(m => ({ default: m.StyleSpecEditor })));
+const MaterialIntelligencePanel = lazy(() => import("@/components/material-intelligence-panel").then(m => ({ default: m.MaterialIntelligencePanel })));
+const AiMoodBoard = lazy(() => import("@/components/ai-mood-board").then(m => ({ default: m.AiMoodBoard })));
+const ExportDialog = lazy(() => import("@/components/export-dialog").then(m => ({ default: m.ExportDialog })));
+const TokenVisualization = lazy(() => import("@/components/token-visualization").then(m => ({ default: m.TokenVisualization })));
+const DeployDialog = lazy(() => import("@/components/deploy-dialog").then(m => ({ default: m.DeployDialog })));
+const StyleAudit = lazy(() => import("@/components/style-audit").then(m => ({ default: m.StyleAudit })));
+const DesignToolSync = lazy(() => import("@/components/DesignToolSync").then(m => ({ default: m.DesignToolSync })));
+
+function LazyFallback() {
+  return <div className="flex items-center justify-center p-4"><Loader2 className="animate-spin text-muted-foreground" size={16} /></div>;
+}
 
 interface StyleSummary {
   id: string;
@@ -95,7 +100,7 @@ export default function Inspect() {
   const [, params] = useRoute("/style/:id");
   const [, navigate] = useLocation();
   const id = params?.id;
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const containerRef = useRef<HTMLDivElement>(null);
   const [summary, setSummary] = useState<StyleSummary | null>(null);
   const [assets, setAssets] = useState<StyleAssets | null>(null);
@@ -141,6 +146,9 @@ export default function Inspect() {
   // PDF Export
   const [pdfExporting, setPdfExporting] = useState(false);
   
+  // Regeneration
+  const [regenerating, setRegenerating] = useState(false);
+  
   // Try It Now - Image Generation
   const [tryItOpen, setTryItOpen] = useState(false);
   const [tryItPrompt, setTryItPrompt] = useState("");
@@ -151,6 +159,27 @@ export default function Inspect() {
   // Enhanced Colors from Python CV
   const [enhancedColors, setEnhancedColors] = useState<EnhancedColor[]>([]);
   const [enhancedColorsLoading, setEnhancedColorsLoading] = useState(false);
+  
+  // STAGED LOADING: Progressive mounting to prevent main thread stall
+  // Stage 0: Hero + Action bar (immediate)
+  // Stage 1: Image sections (500ms)
+  // Stage 2: Collapsed sections (1000ms)
+  const [mountStage, setMountStage] = useState(0);
+  
+  // Progressive mount after summary loads
+  useEffect(() => {
+    if (!summary) return;
+    
+    // Stage 1: Mount image sections after 500ms
+    const stage1 = setTimeout(() => setMountStage(1), 500);
+    // Stage 2: Mount collapsed sections after 1000ms
+    const stage2 = setTimeout(() => setMountStage(2), 1000);
+    
+    return () => {
+      clearTimeout(stage1);
+      clearTimeout(stage2);
+    };
+  }, [summary?.id]);
   
   // Check if current user is the creator
   const isOwner = isAuthenticated && user?.id === summary?.creatorId;
@@ -330,7 +359,7 @@ export default function Inspect() {
     }
   }, [versionsExpanded, fetchVersions, versions.length]);
 
-  // Load bookmark, rating, and collection status
+  // Load bookmark, rating, and collection status - DEFERRED to reduce initial load
   useEffect(() => {
     if (!id || !isAuthenticated) return;
     
@@ -372,7 +401,9 @@ export default function Inspect() {
       }
     };
     
-    loadUserData();
+    // Defer user data loading to not block initial render
+    const timer = setTimeout(loadUserData, 1000);
+    return () => clearTimeout(timer);
   }, [id, isAuthenticated]);
   
   const handleToggleCollection = useCallback(async (collectionId: string) => {
@@ -398,7 +429,7 @@ export default function Inspect() {
     }
   }, [id, isAuthenticated, styleCollections]);
 
-  // Load average rating (public)
+  // Load average rating (public) - DEFERRED to reduce initial load
   useEffect(() => {
     if (!id) return;
     
@@ -414,7 +445,9 @@ export default function Inspect() {
       }
     };
     
-    loadRatings();
+    // Defer ratings loading to not block initial render
+    const timer = setTimeout(loadRatings, 1500);
+    return () => clearTimeout(timer);
   }, [id]);
 
   useEffect(() => {
@@ -450,17 +483,21 @@ export default function Inspect() {
       })
       .finally(() => setAssetsLoading(false));
     
-    // Fetch enhanced colors from Python CV
+    // Fetch enhanced colors from Python CV - defer to not block initial render
     setEnhancedColorsLoading(true);
-    fetch(`/api/styles/${id}/enhanced-colors`)
-      .then(res => res.ok ? res.json() : null)
-      .then((data: { colors?: EnhancedColor[] } | null) => {
-        if (data?.colors) {
-          setEnhancedColors(data.colors);
-        }
-      })
-      .catch(() => {})
-      .finally(() => setEnhancedColorsLoading(false));
+    const enhancedColorsTimer = setTimeout(() => {
+      fetch(`/api/styles/${id}/enhanced-colors`)
+        .then(res => res.ok ? res.json() : null)
+        .then((data: { colors?: EnhancedColor[] } | null) => {
+          if (data?.colors) {
+            setEnhancedColors(data.colors);
+          }
+        })
+        .catch(() => {})
+        .finally(() => setEnhancedColorsLoading(false));
+    }, 1200); // Defer by 1.2s to allow main UI to render first
+    
+    return () => clearTimeout(enhancedColorsTimer);
   }, [id]);
 
   const refetchAssets = useCallback(() => {
@@ -972,6 +1009,113 @@ export default ${safeName};`;
     }
   }, [summary]);
 
+  // MEMOIZED: Extract primary colors for Quick Read (first 6) - must be before early returns
+  const primaryColors = useMemo(() => {
+    if (!summary?.tokens?.color) return [];
+    const colors: string[] = [];
+    const colorTokens = summary.tokens.color;
+    
+    const extractColors = (obj: any) => {
+      for (const key in obj) {
+        if (colors.length >= 6) break;
+        const val = obj[key];
+        if (val?.$value && typeof val.$value === 'string') {
+          colors.push(val.$value);
+        } else if (typeof val === 'object' && !val.$value) {
+          extractColors(val);
+        }
+      }
+    };
+    extractColors(colorTokens);
+    return colors;
+  }, [summary?.tokens?.color]);
+  
+  // DEFERRED: Human-readable traits - calculated after initial render for better performance
+  const [humanTraits, setHumanTraits] = useState<{ contrast: string; density: string; vibe: string }>({
+    contrast: 'Medium',
+    density: 'Balanced',
+    vibe: ''
+  });
+  
+  useEffect(() => {
+    // Defer trait calculation to not block initial render
+    const timer = setTimeout(() => {
+      const traits: { contrast: string; density: string; vibe: string } = {
+        contrast: 'Medium',
+        density: 'Balanced',
+        vibe: ''
+      };
+      
+      if (primaryColors.length >= 2) {
+        const getLuminance = (color: string): number => {
+          let r = 0, g = 0, b = 0;
+          if (color.startsWith('#')) {
+            const hex = color.slice(1);
+            r = parseInt(hex.slice(0, 2), 16) / 255;
+            g = parseInt(hex.slice(2, 4), 16) / 255;
+            b = parseInt(hex.slice(4, 6), 16) / 255;
+          } else if (color.startsWith('rgb')) {
+            const match = color.match(/\d+/g);
+            if (match) {
+              r = parseInt(match[0]) / 255;
+              g = parseInt(match[1]) / 255;
+              b = parseInt(match[2]) / 255;
+            }
+          } else if (color.startsWith('oklch')) {
+            const match = color.match(/oklch\(\s*([\d.]+)/);
+            if (match) return parseFloat(match[1]);
+          }
+          return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        };
+        
+        const luminances = primaryColors.map(getLuminance);
+        const range = Math.max(...luminances) - Math.min(...luminances);
+        
+        if (range < 0.3) traits.contrast = 'Low';
+        else if (range > 0.6) traits.contrast = 'High';
+        else traits.contrast = 'Medium';
+      }
+      
+      if (summary?.tokens?.spacing) {
+        const spacingTokens = summary.tokens.spacing;
+        const spacingValues: number[] = [];
+        
+        const extractSpacing = (obj: any) => {
+          for (const key in obj) {
+            const val = obj[key];
+            if (val?.$value) {
+              const numMatch = String(val.$value).match(/[\d.]+/);
+              if (numMatch) spacingValues.push(parseFloat(numMatch[0]));
+            } else if (typeof val === 'object') {
+              extractSpacing(val);
+            }
+          }
+        };
+        extractSpacing(spacingTokens);
+        
+        if (spacingValues.length > 0) {
+          const avgSpacing = spacingValues.reduce((a, b) => a + b, 0) / spacingValues.length;
+          if (avgSpacing < 8) traits.density = 'Tight';
+          else if (avgSpacing > 20) traits.density = 'Airy';
+          else traits.density = 'Balanced';
+        }
+      }
+      
+      const vibeTags = summary?.metadataTags?.subjective?.emotionalImpact || 
+                       summary?.metadataTags?.objective?.visualMood || 
+                       [];
+      if (vibeTags.length > 0) {
+        traits.vibe = vibeTags[0];
+      } else if (summary?.description) {
+        traits.vibe = summary.description.split(/[,.]/).at(0)?.trim() || '';
+      }
+      
+      setHumanTraits(traits);
+    }, 100); // Small delay to allow UI to paint first
+    
+    return () => clearTimeout(timer);
+  }, [primaryColors, summary?.tokens?.spacing, summary?.metadataTags, summary?.description]);
+
   if (loading) {
     return (
       <Layout>
@@ -994,116 +1138,77 @@ export default ${safeName};`;
   }
 
   const previews = assets?.previews || {};
-
-  // Extract primary colors for Quick Read (first 6) - visual only
-  const getPrimaryColors = () => {
-    if (!summary?.tokens?.color) return [];
-    const colors: string[] = [];
-    const colorTokens = summary.tokens.color;
-    
-    const extractColors = (obj: any) => {
-      for (const key in obj) {
-        if (colors.length >= 6) break;
-        const val = obj[key];
-        if (val?.$value && typeof val.$value === 'string') {
-          colors.push(val.$value);
-        } else if (typeof val === 'object' && !val.$value) {
-          extractColors(val);
-        }
-      }
-    };
-    extractColors(colorTokens);
-    return colors;
-  };
   
-  const primaryColors = getPrimaryColors();
-  
-  // Derive human-readable traits from tokens
-  const getHumanTraits = () => {
-    const traits: { contrast: string; density: string; vibe: string } = {
-      contrast: 'Medium',
-      density: 'Balanced',
-      vibe: ''
-    };
-    
-    // Derive Contrast from color luminance range
-    if (primaryColors.length >= 2) {
-      const getLuminance = (color: string): number => {
-        // Simple luminance estimation from hex/rgb
-        let r = 0, g = 0, b = 0;
-        if (color.startsWith('#')) {
-          const hex = color.slice(1);
-          r = parseInt(hex.slice(0, 2), 16) / 255;
-          g = parseInt(hex.slice(2, 4), 16) / 255;
-          b = parseInt(hex.slice(4, 6), 16) / 255;
-        } else if (color.startsWith('rgb')) {
-          const match = color.match(/\d+/g);
-          if (match) {
-            r = parseInt(match[0]) / 255;
-            g = parseInt(match[1]) / 255;
-            b = parseInt(match[2]) / 255;
-          }
-        } else if (color.startsWith('oklch')) {
-          // Extract lightness from oklch
-          const match = color.match(/oklch\(\s*([\d.]+)/);
-          if (match) return parseFloat(match[1]);
-        }
-        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-      };
-      
-      const luminances = primaryColors.map(getLuminance);
-      const range = Math.max(...luminances) - Math.min(...luminances);
-      
-      if (range < 0.3) traits.contrast = 'Low';
-      else if (range > 0.6) traits.contrast = 'High';
-      else traits.contrast = 'Medium';
-    }
-    
-    // Derive Density from spacing tokens
-    if (summary?.tokens?.spacing) {
-      const spacingTokens = summary.tokens.spacing;
-      const spacingValues: number[] = [];
-      
-      const extractSpacing = (obj: any) => {
-        for (const key in obj) {
-          const val = obj[key];
-          if (val?.$value) {
-            const numMatch = String(val.$value).match(/[\d.]+/);
-            if (numMatch) spacingValues.push(parseFloat(numMatch[0]));
-          } else if (typeof val === 'object') {
-            extractSpacing(val);
-          }
-        }
-      };
-      extractSpacing(spacingTokens);
-      
-      if (spacingValues.length > 0) {
-        const avgSpacing = spacingValues.reduce((a, b) => a + b, 0) / spacingValues.length;
-        if (avgSpacing < 8) traits.density = 'Tight';
-        else if (avgSpacing > 20) traits.density = 'Airy';
-        else traits.density = 'Balanced';
-      }
-    }
-    
-    // Derive Vibe from metadata
-    const vibeTags = summary?.metadataTags?.subjective?.emotionalImpact || 
-                     summary?.metadataTags?.objective?.visualMood || 
-                     [];
-    if (vibeTags.length > 0) {
-      traits.vibe = vibeTags[0];
-    } else if (summary?.description) {
-      // Fallback: use first few words of description
-      traits.vibe = summary.description.split(/[,.]/).at(0)?.trim() || '';
-    }
-    
-    return traits;
-  };
-  
-  const humanTraits = getHumanTraits();
+  // ULTRA-MINIMAL PHASE: Show only essential info immediately before full render
+  // This helps prevent main thread stalls by yielding after the basic layout paints
+  if (mountStage === 0) {
+    return (
+      <Layout>
+        <div className="max-w-4xl mx-auto space-y-6">
+          <header className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Link href="/" className="inline-flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                <ArrowLeft size={12} /> Back
+              </Link>
+            </div>
+            <div className="space-y-1.5">
+              <h1 className="text-2xl md:text-3xl font-serif font-medium text-foreground leading-tight" data-testid="style-name">{summary.name}</h1>
+              <p className="text-muted-foreground text-base font-light leading-relaxed" data-testid="style-description">{summary.description}</p>
+            </div>
+          </header>
+          
+          {/* Minimal action bar with Regenerate button - always accessible */}
+          <section className="flex flex-wrap gap-2">
+            {isFeatureEnabled('regenerate.enabled') && (
+              <Button
+                onClick={async () => {
+                  // If not authenticated, show a message
+                  if (!isAuthenticated && !authLoading) {
+                    toast.info('Please sign in to regenerate style previews');
+                    return;
+                  }
+                  if (!summary?.id || regenerating) return;
+                  setRegenerating(true);
+                  try {
+                    const res = await fetch(`/api/styles/${summary.id}/regenerate`, {
+                      method: 'POST',
+                      credentials: 'include',
+                    });
+                    if (!res.ok) {
+                      const data = await res.json();
+                      throw new Error(data.error || 'Failed to start regeneration');
+                    }
+                    toast.success('Regeneration started! Previews will update in about a minute.');
+                  } catch (error) {
+                    toast.error(error instanceof Error ? error.message : 'Failed to regenerate');
+                  } finally {
+                    setRegenerating(false);
+                  }
+                }}
+                disabled={regenerating || !summary?.id || authLoading}
+                variant="outline"
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3"
+                data-testid="button-regenerate-style"
+              >
+                {regenerating || authLoading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+                Regenerate
+              </Button>
+            )}
+          </section>
+          
+          {/* Loading indicator for remaining content */}
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="animate-spin text-muted-foreground" size={24} />
+            <span className="ml-2 text-sm text-muted-foreground">Loading style details...</span>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
-      <div ref={containerRef} className="max-w-4xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div ref={containerRef} className="max-w-4xl mx-auto space-y-6">
         
         {/* === SECTION 1: HERO === */}
         <header className="space-y-3">
@@ -1176,7 +1281,8 @@ export default ${safeName};`;
           </div>
         </header>
 
-        {/* === SECTION 2: VISUAL TRUST STRIP === */}
+        {/* === SECTION 2: VISUAL TRUST STRIP === (Mounted in Stage 1) */}
+        {mountStage >= 1 ? (
         <section className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Source Image - Trust Signal */}
           <div className="relative aspect-square rounded-lg overflow-hidden border border-border bg-neutral-100 dark:bg-neutral-900">
@@ -1191,7 +1297,8 @@ export default ${safeName};`;
                         src={refSrc} 
                         alt="Source reference"
                         className="max-w-full max-h-full object-contain rounded"
-                        loading="eager"
+                        loading="lazy"
+                        decoding="async"
                         data-testid="img-source-reference"
                       />
                     </div>
@@ -1202,11 +1309,13 @@ export default ${safeName};`;
                 );
               } else if (summary.tokens) {
                 return (
-                  <TokenVisualization 
-                    tokens={summary.tokens} 
-                    compact={true}
-                    className="absolute inset-0"
-                  />
+                  <Suspense fallback={<LazyFallback />}>
+                    <TokenVisualization 
+                      tokens={summary.tokens} 
+                      compact={true}
+                      className="absolute inset-0"
+                    />
+                  </Suspense>
                 );
               } else {
                 return (
@@ -1231,7 +1340,8 @@ export default ${safeName};`;
                         src={uiSrc}
                         alt="Applied UI"
                         className="max-w-full max-h-full object-contain rounded"
-                        loading="eager"
+                        loading="lazy"
+                        decoding="async"
                         data-testid="img-applied-ui"
                       />
                     </div>
@@ -1258,8 +1368,15 @@ export default ${safeName};`;
             })()}
           </div>
         </section>
+        ) : (
+          /* Stage 1 loading placeholder for images */
+          <section className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="aspect-square bg-muted rounded-lg animate-pulse" />
+            <div className="aspect-square bg-muted rounded-lg animate-pulse" />
+          </section>
+        )}
 
-        {/* === SECTION 3: QUICK READ === */}
+        {/* === SECTION 3: QUICK READ === (Always visible) */}
         <section className="space-y-4">
           {/* Enhanced Palette Strip - Colors with roles and coverage */}
           {enhancedColors.length > 0 ? (
@@ -1383,20 +1500,22 @@ export default ${safeName};`;
           
           {/* Export - gated by export.tokens */}
           {isFeatureEnabled('export.tokens') && (
-            <ExportDialog 
-              tokens={summary.tokens} 
-              styleName={summary.name}
-              trigger={
-                <button 
-                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
-                  data-testid="button-export-tokens"
-                >
-                  <Download size={16} />
-                  Export
-                  <ChevronDown size={14} />
-                </button>
-              }
-            />
+            <Suspense fallback={<LazyFallback />}>
+              <ExportDialog 
+                tokens={summary.tokens} 
+                styleName={summary.name}
+                trigger={
+                  <button 
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+                    data-testid="button-export-tokens"
+                  >
+                    <Download size={16} />
+                    Export
+                    <ChevronDown size={14} />
+                  </button>
+                }
+              />
+            </Suspense>
           )}
           
           {/* PDF Brand Kit - gated by export.pdf */}
@@ -1430,43 +1549,47 @@ export default ${safeName};`;
           
           {/* Deploy - gated by deploy.enabled */}
           {isFeatureEnabled('deploy.enabled') && (
-            <DeployDialog 
-              tokens={summary.tokens} 
-              styleName={summary.name}
-              trigger={
-                <button 
-                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 border border-border bg-muted/50 hover:bg-muted rounded-lg text-sm font-medium transition-colors"
-                  data-testid="button-deploy-primary"
-                >
-                  <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth="1.5">
-                    <path d="M8 2L14 8L8 14" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M2 8H13" strokeLinecap="round" />
-                  </svg>
-                  Deploy
-                </button>
-              }
-            />
+            <Suspense fallback={<LazyFallback />}>
+              <DeployDialog 
+                tokens={summary.tokens} 
+                styleName={summary.name}
+                trigger={
+                  <button 
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 border border-border bg-muted/50 hover:bg-muted rounded-lg text-sm font-medium transition-colors"
+                    data-testid="button-deploy-primary"
+                  >
+                    <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth="1.5">
+                      <path d="M8 2L14 8L8 14" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M2 8H13" strokeLinecap="round" />
+                    </svg>
+                    Deploy
+                  </button>
+                }
+              />
+            </Suspense>
           )}
 
           {/* Style Audit - gated by audit.enabled */}
           {isFeatureEnabled('audit.enabled') && (
-            <StyleAudit
-              styleId={summary.id}
-              styleName={summary.name}
-              tokens={summary.tokens}
-              trigger={
-                <button 
-                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 border border-border bg-muted/50 hover:bg-muted rounded-lg text-sm font-medium transition-colors"
-                  data-testid="button-audit-primary"
-                >
-                  <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth="1.5">
-                    <circle cx="6" cy="6" r="4.5" />
-                    <path d="M9 9L14 14" strokeLinecap="round" />
-                  </svg>
-                  Audit
-                </button>
-              }
-            />
+            <Suspense fallback={<LazyFallback />}>
+              <StyleAudit
+                styleId={summary.id}
+                styleName={summary.name}
+                tokens={summary.tokens}
+                trigger={
+                  <button 
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 border border-border bg-muted/50 hover:bg-muted rounded-lg text-sm font-medium transition-colors"
+                    data-testid="button-audit-primary"
+                  >
+                    <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth="1.5">
+                      <circle cx="6" cy="6" r="4.5" />
+                      <path d="M9 9L14 14" strokeLinecap="round" />
+                    </svg>
+                    Audit
+                  </button>
+                }
+              />
+            </Suspense>
           )}
           
           {/* Design Tools - gated by designtools.enabled */}
@@ -1482,10 +1605,12 @@ export default ${safeName};`;
                 </button>
               </DialogTrigger>
               <DialogContent className="max-w-4xl p-0 overflow-hidden">
-                <DesignToolSync 
-                  styleName={summary.name}
-                  tokens={summary.tokens}
-                />
+                <Suspense fallback={<LazyFallback />}>
+                  <DesignToolSync 
+                    styleName={summary.name}
+                    tokens={summary.tokens}
+                  />
+                </Suspense>
               </DialogContent>
             </Dialog>
           )}
@@ -1507,9 +1632,52 @@ export default ${safeName};`;
               Remix
             </Button>
           )}
+          
+          {/* Regenerate - gated by regenerate.enabled, visible when auth loading */}
+          {isFeatureEnabled('regenerate.enabled') && (
+            <Button
+              onClick={async () => {
+                if (!isAuthenticated) {
+                  toast.error('Please sign in to regenerate styles');
+                  return;
+                }
+                if (!summary?.id || regenerating) return;
+                setRegenerating(true);
+                try {
+                  const res = await fetch(`/api/styles/${summary.id}/regenerate`, {
+                    method: 'POST',
+                    credentials: 'include',
+                  });
+                  if (!res.ok) {
+                    const data = await res.json();
+                    throw new Error(data.error || 'Failed to start regeneration');
+                  }
+                  toast.success('Regeneration started! Previews will update in about a minute.');
+                  // Start polling for updates
+                  setTimeout(refetchAssets, 5000);
+                  setTimeout(refetchAssets, 15000);
+                  setTimeout(refetchAssets, 30000);
+                  setTimeout(refetchAssets, 60000);
+                } catch (error) {
+                  toast.error(error instanceof Error ? error.message : 'Failed to regenerate');
+                } finally {
+                  setRegenerating(false);
+                }
+              }}
+              disabled={regenerating || !summary?.id || !isAuthenticated || authLoading}
+              variant="outline"
+              className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3"
+              data-testid="button-regenerate-style"
+              title={!isAuthenticated && !authLoading ? "Sign in to regenerate" : undefined}
+            >
+              {regenerating || authLoading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+              Regenerate
+            </Button>
+          )}
         </section>
 
-        {/* === COLLAPSED SECTIONS === */}
+        {/* === COLLAPSED SECTIONS === (Mounted in Stage 2) */}
+        {mountStage >= 2 ? (
         <div className="border border-border rounded-lg divide-y divide-border">
           
           {/* Canonical Previews - gated by feature flag */}
@@ -1603,13 +1771,15 @@ export default ${safeName};`;
                 <ChevronDown size={16} className="text-muted-foreground group-open:rotate-180 transition-transform" />
               </summary>
               <div className="p-4 pt-0">
-                <StyleSpecEditor 
-                  styleId={summary.id} 
-                  styleSpec={summary.styleSpec}
-                  createdAt={summary.createdAt}
-                  updatedAt={summary.updatedAt}
-                  onUpdate={handleSpecUpdate}
-                />
+                <Suspense fallback={<LazyFallback />}>
+                  <StyleSpecEditor 
+                    styleId={summary.id} 
+                    styleSpec={summary.styleSpec}
+                    createdAt={summary.createdAt}
+                    updatedAt={summary.updatedAt}
+                    onUpdate={handleSpecUpdate}
+                  />
+                </Suspense>
               </div>
             </details>
           )}
@@ -1627,13 +1797,15 @@ export default ${safeName};`;
                     <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
                   </div>
                 ) : (
-                  <AiMoodBoard
-                    styleId={summary.id}
-                    styleName={summary.name}
-                    moodBoard={assets?.moodBoard}
-                    uiConcepts={assets?.uiConcepts}
-                    assetRefs={assetRefs}
-                  />
+                  <Suspense fallback={<LazyFallback />}>
+                    <AiMoodBoard
+                      styleId={summary.id}
+                      styleName={summary.name}
+                      moodBoard={assets?.moodBoard}
+                      uiConcepts={assets?.uiConcepts}
+                      assetRefs={assetRefs}
+                    />
+                  </Suspense>
                 )}
               </div>
             </details>
@@ -1786,27 +1958,42 @@ export default ${safeName};`;
             <div className="p-4 pt-0 space-y-6">
               <div>
                 <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Color Details</h4>
-                <ColorDetails colors={enhancedColors.length > 0 ? enhancedColors : undefined} tokens={summary.tokens} />
+                <Suspense fallback={<LazyFallback />}>
+                  <ColorDetails colors={enhancedColors.length > 0 ? enhancedColors : undefined} tokens={summary.tokens} />
+                </Suspense>
               </div>
               <div>
                 <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">All Tokens</h4>
-                <TokenViewer tokens={summary.tokens} />
+                <Suspense fallback={<LazyFallback />}>
+                  <TokenViewer tokens={summary.tokens} />
+                </Suspense>
               </div>
               
               {/* Material Intelligence - inside Design DNA - gated by materials.enabled */}
               {isFeatureEnabled('materials.enabled') && (
                 <div data-testid="section-materials">
                   <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Material Intelligence</h4>
-                  <MaterialIntelligencePanel
-                    styleId={summary.id}
-                    referenceImage={getImageUrl(summary.imageIds?.reference, 'full') || undefined}
-                  />
+                  <Suspense fallback={<LazyFallback />}>
+                    <MaterialIntelligencePanel
+                      styleId={summary.id}
+                      referenceImage={getImageUrl(summary.imageIds?.reference, 'full') || undefined}
+                    />
+                  </Suspense>
                 </div>
               )}
             </div>
           </details>
           )}
         </div>
+        ) : (
+          /* Stage 2 loading placeholder */
+          <div className="border border-border rounded-lg p-6">
+            <div className="animate-pulse space-y-4">
+              <div className="h-4 bg-muted rounded w-1/3" />
+              <div className="h-20 bg-muted rounded" />
+            </div>
+          </div>
+        )}
 
         {/* Try It Now Dialog */}
         {tryItOpen && (

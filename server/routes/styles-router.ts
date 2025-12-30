@@ -12,6 +12,7 @@ import type { UiConceptAssets } from "@shared/schema";
 import { logger } from "../logger";
 import { storeImageToObjectStorage, getImageFromObjectStorage, getObjectAssetsByStyle, migrateStyleToObjectStorage } from "../object-image-service";
 import { isValidImageDataUri } from "../preview-generation";
+import { regenerateStyle } from "../style-regeneration";
 
 const router = Router();
 
@@ -138,6 +139,23 @@ router.get("/api/styles/:id", async (req, res) => {
       error: "Failed to fetch style",
       message: error instanceof Error ? error.message : "Unknown error",
     });
+  }
+});
+
+router.get("/api/styles/:id/hero", async (req, res) => {
+  try {
+    const styleId = req.params.id;
+    const hero = await storage.getStyleHero(styleId);
+    
+    if (!hero) {
+      return res.status(404).json({ error: "Style not found" });
+    }
+    
+    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+    res.json(hero);
+  } catch (error) {
+    logger.error("Error fetching style hero", error, { module: 'Styles' });
+    res.status(500).json({ error: "Failed to fetch style hero" });
   }
 });
 
@@ -743,9 +761,22 @@ router.post("/api/style/typography", async (req, res) => {
 
 router.get("/api/styles/:id/image-ids", async (req, res) => {
   try {
-    const { getImagesByStyle } = await import("../image-service");
-    const imageIds = await getImagesByStyle(req.params.id);
-    res.json(imageIds);
+    const { getObjectAssetsWithDimensions } = await import("../object-image-service");
+    const { assets, reference } = await getObjectAssetsWithDimensions(req.params.id);
+    
+    const imageIds: Record<string, string> = {};
+    const dimensions: Record<string, { width: number | null; height: number | null }> = {};
+    
+    for (const [type, data] of Object.entries(assets)) {
+      imageIds[type] = data.id;
+      dimensions[type] = { width: data.width, height: data.height };
+    }
+    
+    res.json({
+      ...imageIds,
+      _dimensions: dimensions,
+      _reference: reference,
+    });
   } catch (error) {
     logger.error("Error getting image IDs", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to get image IDs" });
@@ -1605,6 +1636,49 @@ router.get("/api/styles/:id/enhanced-colors", async (req, res) => {
     logger.error("Error extracting enhanced colors", error, { module: 'Styles' });
     res.status(500).json({
       error: "Failed to extract enhanced colors",
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+});
+
+router.post("/api/styles/:id/regenerate", isAuthenticated, async (req, res) => {
+  try {
+    const styleId = req.params.id;
+    const userId = (req.user as any)?.claims?.sub;
+    
+    const style = await storage.getStyleById(styleId);
+    if (!style) {
+      return res.status(404).json({ error: "Style not found" });
+    }
+    
+    if (style.creatorId && style.creatorId !== userId) {
+      return res.status(403).json({ error: "You can only regenerate your own styles" });
+    }
+    
+    logger.info(`Starting regeneration for style ${styleId}`, { module: 'Styles', userId, styleId });
+    
+    res.json({ 
+      success: true, 
+      message: "Regeneration started. This may take a minute.",
+      styleId 
+    });
+    
+    regenerateStyle(style as any).then(result => {
+      logger.info(`Regeneration completed for style ${styleId}`, { 
+        module: 'Styles', 
+        styleId, 
+        success: result.success,
+        stages: result.stages.length 
+      });
+      cache.delete(CACHE_KEYS.STYLE_SUMMARIES);
+    }).catch(error => {
+      logger.error(`Regeneration failed for style ${styleId}`, error, { module: 'Styles', styleId });
+    });
+    
+  } catch (error) {
+    logger.error("Error starting regeneration", error, { module: 'Styles' });
+    res.status(500).json({
+      error: "Failed to start regeneration",
       message: error instanceof Error ? error.message : "Unknown error",
     });
   }
