@@ -338,7 +338,7 @@ export default function Inspect() {
     }
   }, [versionsExpanded, fetchVersions, versions.length]);
 
-  // Load bookmark, rating, and collection status
+  // Load bookmark, rating, and collection status - DEFERRED to reduce initial load
   useEffect(() => {
     if (!id || !isAuthenticated) return;
     
@@ -380,7 +380,9 @@ export default function Inspect() {
       }
     };
     
-    loadUserData();
+    // Defer user data loading to not block initial render
+    const timer = setTimeout(loadUserData, 1000);
+    return () => clearTimeout(timer);
   }, [id, isAuthenticated]);
   
   const handleToggleCollection = useCallback(async (collectionId: string) => {
@@ -406,7 +408,7 @@ export default function Inspect() {
     }
   }, [id, isAuthenticated, styleCollections]);
 
-  // Load average rating (public)
+  // Load average rating (public) - DEFERRED to reduce initial load
   useEffect(() => {
     if (!id) return;
     
@@ -422,7 +424,9 @@ export default function Inspect() {
       }
     };
     
-    loadRatings();
+    // Defer ratings loading to not block initial render
+    const timer = setTimeout(loadRatings, 1500);
+    return () => clearTimeout(timer);
   }, [id]);
 
   useEffect(() => {
@@ -470,7 +474,7 @@ export default function Inspect() {
         })
         .catch(() => {})
         .finally(() => setEnhancedColorsLoading(false));
-    }, 500); // Defer by 500ms to allow main UI to render first
+    }, 1200); // Defer by 1.2s to allow main UI to render first
     
     return () => clearTimeout(enhancedColorsTimer);
   }, [id]);
