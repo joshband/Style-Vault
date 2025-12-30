@@ -1520,30 +1520,28 @@ export default ${safeName};`;
           {isFeatureEnabled('regenerate.enabled') && (
             <Button
               onClick={async () => {
-                console.log('[Regenerate] Button clicked, summary.id:', summary?.id, 'regenerating:', regenerating, 'isAuthenticated:', isAuthenticated);
                 if (!isAuthenticated) {
                   toast.error('Please sign in to regenerate styles');
                   return;
                 }
-                if (!summary?.id || regenerating) {
-                  console.log('[Regenerate] Early return - missing id or already regenerating');
-                  return;
-                }
+                if (!summary?.id || regenerating) return;
                 setRegenerating(true);
                 try {
-                  console.log('[Regenerate] Starting fetch to:', `/api/styles/${summary.id}/regenerate`);
                   const res = await fetch(`/api/styles/${summary.id}/regenerate`, {
                     method: 'POST',
                     credentials: 'include',
                   });
-                  console.log('[Regenerate] Fetch response status:', res.status);
                   if (!res.ok) {
                     const data = await res.json();
                     throw new Error(data.error || 'Failed to start regeneration');
                   }
                   toast.success('Regeneration started! Previews will update in about a minute.');
+                  // Start polling for updates
+                  setTimeout(refetchAssets, 5000);
+                  setTimeout(refetchAssets, 15000);
+                  setTimeout(refetchAssets, 30000);
+                  setTimeout(refetchAssets, 60000);
                 } catch (error) {
-                  console.error('[Regenerate] Error:', error);
                   toast.error(error instanceof Error ? error.message : 'Failed to regenerate');
                 } finally {
                   setRegenerating(false);
