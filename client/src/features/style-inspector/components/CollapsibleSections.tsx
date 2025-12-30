@@ -6,6 +6,7 @@ import type { StyleHero, StyleAssetRefs, StyleTokens, StyleMetadata, StyleImageI
 
 const TokenViewer = lazy(() => import("@/components/token-viewer").then(m => ({ default: m.TokenViewer })));
 const ColorDetails = lazy(() => import("@/components/color-details").then(m => ({ default: m.ColorDetails })));
+const StyleDNAPanel = lazy(() => import("./StyleDNAPanel"));
 
 interface CollapsibleSectionsProps {
   styleId: string;
@@ -83,14 +84,17 @@ function TokensSection({ styleId, enabled }: { styleId: string; enabled: boolean
 
   return (
     <div className="space-y-6">
+      <Suspense fallback={<LazyFallback />}>
+        <StyleDNAPanel tokens={data.tokens} />
+      </Suspense>
       <div>
-        <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Color Details</h4>
+        <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Color Analysis</h4>
         <Suspense fallback={<LazyFallback />}>
           <ColorDetails tokens={data.tokens} />
         </Suspense>
       </div>
       <div>
-        <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">All Tokens</h4>
+        <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Raw Tokens</h4>
         <Suspense fallback={<LazyFallback />}>
           <TokenViewer tokens={data.tokens} />
         </Suspense>
