@@ -458,17 +458,21 @@ export default function Inspect() {
       })
       .finally(() => setAssetsLoading(false));
     
-    // Fetch enhanced colors from Python CV
+    // Fetch enhanced colors from Python CV - defer to not block initial render
     setEnhancedColorsLoading(true);
-    fetch(`/api/styles/${id}/enhanced-colors`)
-      .then(res => res.ok ? res.json() : null)
-      .then((data: { colors?: EnhancedColor[] } | null) => {
-        if (data?.colors) {
-          setEnhancedColors(data.colors);
-        }
-      })
-      .catch(() => {})
-      .finally(() => setEnhancedColorsLoading(false));
+    const enhancedColorsTimer = setTimeout(() => {
+      fetch(`/api/styles/${id}/enhanced-colors`)
+        .then(res => res.ok ? res.json() : null)
+        .then((data: { colors?: EnhancedColor[] } | null) => {
+          if (data?.colors) {
+            setEnhancedColors(data.colors);
+          }
+        })
+        .catch(() => {})
+        .finally(() => setEnhancedColorsLoading(false));
+    }, 500); // Defer by 500ms to allow main UI to render first
+    
+    return () => clearTimeout(enhancedColorsTimer);
   }, [id]);
 
   const refetchAssets = useCallback(() => {
