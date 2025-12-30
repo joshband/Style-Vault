@@ -44,6 +44,11 @@ export interface StyleAssetRefs {
   };
 }
 
+export interface ImageDimensions {
+  width: number | null;
+  height: number | null;
+}
+
 export interface StyleImageIds {
   reference?: string;
   preview_landscape?: string;
@@ -53,4 +58,10 @@ export interface StyleImageIds {
   ui_software_app?: string;
   ui_dashboard?: string;
   mood_board?: string;
+  _dimensions?: Record<string, ImageDimensions>;
+  _reference?: {
+    id: string;
+    width: number | null;
+    height: number | null;
+  } | null;
 }

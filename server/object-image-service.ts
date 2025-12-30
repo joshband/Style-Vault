@@ -218,6 +218,50 @@ export async function getObjectAssetsByStyle(
   return result as Record<ImageAssetType, string>;
 }
 
+export interface ImageAssetWithDimensions {
+  id: string;
+  type: string;
+  width: number | null;
+  height: number | null;
+}
+
+export async function getObjectAssetsWithDimensions(
+  styleId: string
+): Promise<{
+  assets: Record<string, { id: string; width: number | null; height: number | null }>;
+  reference: { id: string; width: number | null; height: number | null } | null;
+}> {
+  const assets = await db
+    .select({
+      id: objectAssets.id,
+      type: objectAssets.type,
+      width: objectAssets.originalWidth,
+      height: objectAssets.originalHeight,
+    })
+    .from(objectAssets)
+    .where(eq(objectAssets.styleId, styleId));
+
+  const result: Record<string, { id: string; width: number | null; height: number | null }> = {};
+  let reference: { id: string; width: number | null; height: number | null } | null = null;
+  
+  for (const asset of assets) {
+    result[asset.type] = {
+      id: asset.id,
+      width: asset.width,
+      height: asset.height,
+    };
+    if (asset.type === 'reference') {
+      reference = {
+        id: asset.id,
+        width: asset.width,
+        height: asset.height,
+      };
+    }
+  }
+  
+  return { assets: result, reference };
+}
+
 export async function deleteObjectAssetsByStyle(styleId: string): Promise<void> {
   const assets = await db
     .select()

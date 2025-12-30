@@ -761,9 +761,22 @@ router.post("/api/style/typography", async (req, res) => {
 
 router.get("/api/styles/:id/image-ids", async (req, res) => {
   try {
-    const { getImagesByStyle } = await import("../image-service");
-    const imageIds = await getImagesByStyle(req.params.id);
-    res.json(imageIds);
+    const { getObjectAssetsWithDimensions } = await import("../object-image-service");
+    const { assets, reference } = await getObjectAssetsWithDimensions(req.params.id);
+    
+    const imageIds: Record<string, string> = {};
+    const dimensions: Record<string, { width: number | null; height: number | null }> = {};
+    
+    for (const [type, data] of Object.entries(assets)) {
+      imageIds[type] = data.id;
+      dimensions[type] = { width: data.width, height: data.height };
+    }
+    
+    res.json({
+      ...imageIds,
+      _dimensions: dimensions,
+      _reference: reference,
+    });
   } catch (error) {
     logger.error("Error getting image IDs", error, { module: 'Styles' });
     res.status(500).json({ error: "Failed to get image IDs" });

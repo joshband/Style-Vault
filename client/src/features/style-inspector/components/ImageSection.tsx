@@ -1,4 +1,4 @@
-import { Loader2 } from "lucide-react";
+import { Loader2, Maximize2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { StyleAssetRefs, StyleImageIds } from "../types";
 
@@ -10,6 +10,11 @@ interface ImageSectionProps {
 function getImageUrl(imageId: string | undefined, size: 'thumb' | 'medium' | 'full' = 'medium'): string | null {
   if (!imageId) return null;
   return `/api/images/${imageId}?size=${size}`;
+}
+
+function formatDimensions(width: number | null | undefined, height: number | null | undefined): string | null {
+  if (!width || !height) return null;
+  return `${width} × ${height}`;
 }
 
 export default function ImageSection({ styleId, assetRefs }: ImageSectionProps) {
@@ -30,6 +35,21 @@ export default function ImageSection({ styleId, assetRefs }: ImageSectionProps) 
   
   const refSrc = getImageUrl(referenceId, 'medium');
   const uiSrc = getImageUrl(uiConceptId, 'medium');
+  
+  const refDimensions = imageIds?._reference 
+    ? formatDimensions(imageIds._reference.width, imageIds._reference.height)
+    : null;
+  
+  const uiConceptType = imageIds?.ui_audio_plugin ? 'ui_audio_plugin' :
+                        imageIds?.ui_software_app ? 'ui_software_app' :
+                        imageIds?.ui_dashboard ? 'ui_dashboard' : null;
+  
+  const uiDimensions = uiConceptType && imageIds?._dimensions?.[uiConceptType]
+    ? formatDimensions(
+        imageIds._dimensions[uiConceptType].width,
+        imageIds._dimensions[uiConceptType].height
+      )
+    : null;
 
   return (
     <section className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -46,8 +66,16 @@ export default function ImageSection({ styleId, assetRefs }: ImageSectionProps) 
                 data-testid="img-source-reference"
               />
             </div>
-            <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/70 text-white text-[10px] font-mono rounded">
-              Source
+            <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+              <div className="px-2 py-1 bg-black/70 text-white text-[10px] font-mono rounded">
+                Source
+              </div>
+              {refDimensions && (
+                <div className="px-2 py-1 bg-black/70 text-white text-[10px] font-mono rounded flex items-center gap-1">
+                  <Maximize2 size={10} />
+                  {refDimensions}
+                </div>
+              )}
             </div>
           </>
         ) : (
@@ -70,8 +98,16 @@ export default function ImageSection({ styleId, assetRefs }: ImageSectionProps) 
                 data-testid="img-applied-ui"
               />
             </div>
-            <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/70 text-white text-[10px] font-mono rounded">
-              Applied
+            <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+              <div className="px-2 py-1 bg-black/70 text-white text-[10px] font-mono rounded">
+                Applied
+              </div>
+              {uiDimensions && (
+                <div className="px-2 py-1 bg-black/70 text-white text-[10px] font-mono rounded flex items-center gap-1">
+                  <Maximize2 size={10} />
+                  {uiDimensions}
+                </div>
+              )}
             </div>
           </>
         ) : assetRefs?.statuses?.uiConcepts === "generating" ? (
